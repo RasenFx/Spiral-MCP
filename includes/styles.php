@@ -339,8 +339,10 @@ function spiral_mcp_style_list() {
 		return $styler;
 	}
 	$out = array();
-	foreach ( (array) $styler->getThemes() as $id => $theme ) {
-		$out[ $id ] = array( 'name' => $theme['name'] ?? $id, 'variations' => array_keys( (array) ( $theme['styles'] ?? array() ) ) );
+	// getThemes() devuelve una lista: el ID del estilo (el valor de config.style) va en "id".
+	foreach ( (array) $styler->getThemes() as $key => $theme ) {
+		$id         = (string) ( $theme['id'] ?? $key );
+		$out[ $id ] = array( 'id' => $id, 'name' => $theme['name'] ?? $id, 'variations' => array_keys( (array) ( $theme['styles'] ?? array() ) ) );
 	}
 	return $out;
 }
@@ -398,7 +400,7 @@ add_action( 'wp_abilities_api_init', function () {
 			if ( ( (array) $input )['include_styles'] ?? true ) {
 				$styles = spiral_mcp_style_list();
 				if ( ! is_wp_error( $styles ) ) {
-					$out['styles'] = $styles;
+					$out['styles'] = array_values( $styles );
 				}
 			}
 			return $out;

@@ -2,6 +2,11 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.10.2] — 2026-10-11
+
+### Corregido
+- `update-theme-style` rechazaba cualquier estilo (p. ej. `"circle"`) y listaba los disponibles como números: `getThemes()` de YOOtheme devuelve una lista y el ID del estilo va en `id`. `get-theme-style` devuelve ahora cada estilo con su `id`, nombre y variaciones.
+
 ## [1.10.1] — 2026-10-11
 
 ### Cambiado
