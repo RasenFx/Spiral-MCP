@@ -2,7 +2,7 @@
 
 Plugin de WordPress que registra *abilities* (Abilities API de WordPress 6.9+) y las expone a agentes de IA a través del plugin **MCP Adapter**. Objetivo: que un agente (Claude) pueda controlar por completo un sitio WordPress con **YOOtheme Pro**: contenido, diseño, menús, medios, estilos y ajustes, sin entrar al wp-admin.
 
-El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes de empezar cualquier tarea. La guía de uso para el agente (flujo, convenciones, recetas, errores frecuentes) está en [`docs/agent-guide.md`](docs/agent-guide.md): actualízala cuando cambie una ability.
+El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes de empezar cualquier tarea. La guía de uso para el agente es el skill de Claude [`skills/spiral-mcp-wordpress/`](skills/spiral-mcp-wordpress/SKILL.md) (flujo, convenciones, recetas y errores frecuentes). Cuando añadas o cambies una ability, regenera su referencia con `php tests/gen-skill-abilities.php /ruta/al/wordpress` y revisa si `SKILL.md` o las recetas necesitan cambios.
 
 ## Requisitos
 - WordPress 6.9+ (Abilities API: `wp_register_ability`, `wp_register_ability_category`).
@@ -35,6 +35,8 @@ includes/preview.php     URLs de vista previa sin sesión (token firmado) e insp
 includes/styles.php      CSS adicional (+ snapshot kind "custom_css") y estilo de YOOtheme: catálogo de variables, cambios y estado de compilación
 tests/smoke.sh           prueba de humo por REST (ver "Entorno de desarrollo")
 tests/fixtures/          layouts de YOOtheme de ejemplo
+tests/gen-skill-abilities.php  regenera la referencia de abilities del skill
+skills/spiral-mcp-wordpress/   skill de Claude para el agente que usa el plugin
 dist/                    ZIP para instalar (no versionar)
 ```
 
@@ -94,5 +96,5 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 ## Versionado y entrega
 - SemVer en la cabecera del plugin (`Version:`) y en `SPIRAL_MCP_VERSION`.
 - Cada versión anota sus cambios en `CHANGELOG.md`.
-- ZIP: carpeta raíz `spiral-mcp-control/`, sin `.git`, `dist/`, `tests/` ni `docs/`.
+- ZIP: carpeta raíz `spiral-mcp-control/`, sin `.git`, `dist/`, `tests/`, `docs/` ni `skills/` (p. ej. `git archive --format=zip --prefix=spiral-mcp-control/ -o dist/spiral-mcp-control-X.Y.Z.zip HEAD -- spiral-mcp-control.php uninstall.php includes LICENSE CHANGELOG.md`).
 - Al terminar una fase: actualizar las casillas de `docs/ROADMAP.md`.
