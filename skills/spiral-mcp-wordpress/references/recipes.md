@@ -118,7 +118,8 @@ El año y el nombre quedan escritos tal cual: díselo al usuario. Comprueba con 
 3. **Crear**:
    - Texto con bloques: `create-widget {"type": "block", "sidebar": "sidebar", "instance": {"content": "<!-- wp:paragraph --><p>Texto</p><!-- /wp:paragraph -->"}}`.
    - Menú: `{"type": "nav_menu", "sidebar": "toolbar-left", "instance": {"nav_menu": 81}}`.
-   - Contenido con el builder de YOOtheme: `{"type": "builderwidget", "sidebar": "top", "layout": {"type": "fragment", "children": [{"type": "row", "children": [{"type": "column", "children": [...]}]}]}}`.
+   - Contenido con el builder de YOOtheme en `top` o `bottom`: raíz `layout` con secciones, porque YOOtheme no le pone sección alrededor (con `fragment` sale pegado a los bordes, sin contenedor): `{"type": "builderwidget", "sidebar": "top", "layout": {"type": "layout", "children": [{"type": "section", "props": {"style": "muted", "padding_top": "large", "padding_bottom": "large"}, "children": [{"type": "row", "children": [{"type": "column", "children": [...]}]}]}]}}`.
+   - En las demás áreas (sidebar, header, navbar…) el widget va dentro del módulo del tema: raíz `fragment` > row > column, sin secciones. Si la raíz no encaja con el área, la respuesta lo avisa en `warnings`.
    - `position` (1 = primero) coloca el widget dentro del área; sin él va al final.
 4. **Editar**: `update-widget` con las claves de `instance` que cambian, `sidebar` para moverlo o `position` para reordenarlo. Los widgets de builder se editan como un área: `get-layout-outline {"area": "widget:builderwidget-2"}` y `patch-layout`.
 5. Comprueba en una página donde se vea el área (`inspect-page`; la lateral sale en entradas, archivos y búsquedas). Para deshacer una creación, restaura su `snapshot_id`.

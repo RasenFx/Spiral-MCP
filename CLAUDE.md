@@ -10,7 +10,7 @@ El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes d
 - YOOtheme Pro activo (o un tema hijo de YOOtheme) para todo lo relacionado con el builder y los estilos.
 - PHP 7.4 como mínimo: no usar sintaxis de PHP 8 (match, nullsafe `?->`, argumentos con nombre, tipos de unión, `readonly`, enums).
 
-## Estructura actual (v1.11.0)
+## Estructura actual (v1.11.1)
 ```
 spiral-mcp-control.php   cabecera, constantes, comprobación de requisitos, require_once y hooks de activación
 uninstall.php            borra el rol y las capacidades (las tablas solo con el filtro spiral_mcp_uninstall_drop_tables)
@@ -79,7 +79,7 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - **`version` en la raíz de todo layout** (`"5.0.51"`): sin ella YOOtheme asume 1.0.0 y aplica todas sus migraciones al renderizar. Las funciones de guardado la añaden (`spiral_mcp_layout_stamp_version()`).
 - **Plantillas y biblioteca**: opción `yootheme` (JSON) bajo `templates.<id>` y `library.<id>`. Escribir **solo** con `\YOOtheme\app(\YOOtheme\Storage::class)`: guarda la opción entera en `shutdown` y pisaría un `update_option()` hecho en la misma petición.
 - **Elementos**: `\YOOtheme\app(\YOOtheme\Builder::class)->getTypes()`; `json_encode` resuelve los campos compartidos. `YOOtheme\Config` es una **interfaz** (usar `interface_exists`, no `class_exists`).
-- **Plantillas**: se aplica la primera activa (orden = prioridad) cuyo tipo y condiciones encajan; una página con layout propio no usa plantillas.- **Widgets de builder** (`builderwidget-N`): guardan su layout como JSON en texto en la clave `content` de la instancia (raíz `"type":"fragment"`). Se editan con `update-widget` o con las abilities de layout y `"area": "widget:builderwidget-N"`.
+- **Plantillas**: se aplica la primera activa (orden = prioridad) cuyo tipo y condiciones encajan; una página con layout propio no usa plantillas.- **Widgets de builder** (`builderwidget-N`): guardan su layout como JSON en texto en la clave `content` de la instancia. Raíz `"type":"fragment"` en header, navbar, sidebar…; en `top` y `bottom` YOOtheme imprime el widget sin sección alrededor (`templates/position.php`, estilo `section`), así que la raíz es `"type":"layout"` con secciones. Se editan con `update-widget` o con las abilities de layout y `"area": "widget:builderwidget-N"`.
 - **Fuentes dinámicas**: un elemento puede tener `"source": {"query": {"name": "customMenuItems", "arguments": {...}}, "props": {...}}`. Hay que conservarlas al editar.
 - **Rutas de imagen** en props: relativas a la raíz, p. ej. `wp-content/uploads/2024/11/logo.webp`.
 - **Los estilos (LESS) se compilan en el navegador**, en el Personalizador. Cambiar `config.style`, `config.less` o `config.custom_less` en la BD no cambia el CSS servido hasta recompilar. Si `StylerConfig['update']` es true, abrir el Personalizador recompila y guarda el CSS solo; este plugin lo fuerza mientras exista la opción `spiral_mcp_style_dirty` (ver `includes/styles.php`). El CSS va a `themes/yootheme/css/theme.<blog>.css` y las fuentes de Google se descargan a `themes/yootheme/fonts/`.

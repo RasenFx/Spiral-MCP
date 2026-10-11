@@ -74,7 +74,8 @@ function spiral_mcp_theme_builder_areas() {
  * Interpreta el nombre de un área con builder:
  * - "footer" (y las de spiral_mcp_theme_builder_areas): config.<área>.content, raíz "layout".
  * - "menu_item:<ID>": contenido de builder (mega menú) de un elemento de menú, raíz "fragment".
- * - "widget:<ID del widget>": widget de builder de YOOtheme (header, navbar, top, bottom…), raíz "fragment".
+ * - "widget:<ID del widget>": widget de builder de YOOtheme. Raíz "layout" (con secciones) en top y bottom,
+ *   "fragment" en el resto (header, navbar, sidebar…); si ya tiene layout, manda el tipo guardado.
  */
 function spiral_mcp_theme_area_parse( $area ) {
 	$area = (string) $area;
@@ -95,7 +96,9 @@ function spiral_mcp_theme_area_parse( $area ) {
 		if ( 'builderwidget' !== $data[0] ) {
 			return new WP_Error( 'spiral_mcp_bad_area', sprintf( 'El widget "%s" no es un widget de builder de YOOtheme (builderwidget-N).', $m[1] ) );
 		}
-		return array( 'area' => $area, 'kind' => 'widget', 'widget_id' => $m[1], 'root' => 'fragment' );
+		$stored = spiral_mcp_decode_layout( $data[3]['content'] ?? null );
+		$root   = $stored ? $stored['type'] : spiral_mcp_widget_expected_root( spiral_mcp_widget_sidebar_of( $m[1] ) );
+		return array( 'area' => $area, 'kind' => 'widget', 'widget_id' => $m[1], 'root' => $root );
 	}
 	if ( preg_match( '/^template:([\w-]+)$/', $area, $m ) ) {
 		$tpl = spiral_mcp_template_get( $m[1] );
@@ -404,6 +407,29 @@ function spiral_mcp_widget_types() {
 	return $out;
 }
 
+/**
+ * Raíz que espera un widget de builder según su área. En top y bottom YOOtheme imprime el widget
+ * tal cual, sin sección alrededor: el layout lleva sus propias secciones ("layout" > section > row…).
+ * En las demás áreas va dentro del módulo del tema: "fragment" > row > column…
+ */
+function spiral_mcp_widget_expected_root( $sidebar ) {
+	return in_array( (string) $sidebar, array( 'top', 'bottom' ), true ) ? 'layout' : 'fragment';
+}
+
+/** Aviso si la raíz del layout no es la que espera el área del widget. */
+function spiral_mcp_widget_root_warning( $layout, $sidebar ) {
+	if ( ! $sidebar || 'wp_inactive_widgets' === $sidebar || ! is_array( $layout ) ) {
+		return null;
+	}
+	$want = spiral_mcp_widget_expected_root( $sidebar );
+	if ( ( $layout['type'] ?? '' ) === $want ) {
+		return null;
+	}
+	return 'layout' === $want
+		? sprintf( 'En el área "%s" YOOtheme no envuelve el widget en una sección: con raíz "fragment" sale sin contenedor ni márgenes. Usa raíz "layout" > section > row > column.', $sidebar )
+		: sprintf( 'En el área "%s" el widget va dentro del módulo del tema: usa raíz "fragment" > row > column (sin secciones).', $sidebar );
+}
+
 /** Valida un área de widgets (o wp_inactive_widgets). */
 function spiral_mcp_widget_check_sidebar( $sidebar ) {
 	global $wp_registered_sidebars;
@@ -684,7 +710,7 @@ add_action( 'wp_abilities_api_init', function () {
 			'properties' => array(
 				'widget_id'  => array( 'type' => 'string', 'description' => 'ID del widget, p. ej. nav_menu-4.' ),
 				'instance'   => array( 'type' => 'object', 'description' => 'Claves de configuración a cambiar.' ),
-				'layout'     => array( 'type' => 'object', 'description' => 'Layout de YOOtheme para widgets de builder (raíz "fragment"). También se puede editar con spiral-mcp/patch-layout y "area": "widget:<ID>".' ),
+				'layout'     => array( 'type' => 'object', 'description' => 'Layout de YOOtheme para widgets de builder: raíz "layout" (con secciones) en top y bottom, "fragment" en las demás áreas. También se puede editar con spiral-mcp/patch-layout y "area": "widget:<ID>".' ),
 				'layout_key' => array( 'type' => 'string', 'default' => 'content' ),
 				'sidebar'    => array( 'type' => 'string', 'description' => 'Área destino. "wp_inactive_widgets" = desactivar.' ),
 				'position'   => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'Posición en el área (1 = primero). Sin "sidebar", reordena dentro de su área actual.' ),
@@ -738,6 +764,10 @@ add_action( 'wp_abilities_api_init', function () {
 				if ( is_wp_error( $warnings ) ) {
 					return $warnings;
 				}
+				$root_warning = spiral_mcp_widget_root_warning( $layout, '' !== $target ? $target : spiral_mcp_widget_sidebar_of( $wid ) );
+				if ( $root_warning ) {
+					$warnings[] = $root_warning;
+				}
 				$layout           = spiral_mcp_layout_stamp_version( $layout );
 				$key              = (string) ( $input['layout_key'] ?? 'content' );
 				$was_array        = isset( $instance[ $key ] ) && is_array( $instance[ $key ] );
@@ -755,7 +785,7 @@ add_action( 'wp_abilities_api_init', function () {
 			if ( '' !== $target ) {
 				spiral_mcp_widget_place( $wid, $target, $input['position'] ?? null );
 			}
-			return spiral_mcp_widget_out( $wid ) + array( 'snapshot_id' => $snapshot );
+			return spiral_mcp_widget_out( $wid ) + array( 'snapshot_id' => $snapshot, 'warnings' => $warnings ?? array() );
 		},
 		'meta'                => spiral_mcp_meta( false, false, true ),
 	) );
@@ -763,7 +793,7 @@ add_action( 'wp_abilities_api_init', function () {
 	/* 7. Crear widget ----------------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/create-widget', array(
 		'label'               => 'Crear widget',
-		'description'         => 'Crea un widget en un área. "type" es el id_base del tipo (ver "types" en spiral-mcp/list-widgets): p. ej. "block" (bloques de WordPress; "instance": {"content": "<!-- wp:paragraph --><p>Texto</p><!-- /wp:paragraph -->"}), "custom_html" ({"title", "content"}), "text" ({"title", "text"}), "nav_menu" ({"title", "nav_menu": ID del menú}) o "builderwidget" (builder de YOOtheme: envía "layout" con raíz "fragment" > row > column > elementos; "instance" puede llevar "title"). La configuración pasa por el update() del propio widget, como en wp-admin (sin permiso unfiltered_html se filtra el HTML). "sidebar" es el área (ver list-widgets) y "position" el orden (1 = primero; por defecto, al final). Devuelve el ID nuevo ("id") y "snapshot_id"; restaurar ese snapshot lo quita.',
+		'description'         => 'Crea un widget en un área. "type" es el id_base del tipo (ver "types" en spiral-mcp/list-widgets): p. ej. "block" (bloques de WordPress; "instance": {"content": "<!-- wp:paragraph --><p>Texto</p><!-- /wp:paragraph -->"}), "custom_html" ({"title", "content"}), "text" ({"title", "text"}), "nav_menu" ({"title", "nav_menu": ID del menú}) o "builderwidget" (builder de YOOtheme: envía "layout"; en top y bottom con raíz "layout" > section > row > column > elementos, porque YOOtheme no le pone sección alrededor; en las demás áreas, raíz "fragment" > row > column; "instance" puede llevar "title"). La configuración pasa por el update() del propio widget, como en wp-admin (sin permiso unfiltered_html se filtra el HTML). "sidebar" es el área (ver list-widgets) y "position" el orden (1 = primero; por defecto, al final). Devuelve el ID nuevo ("id") y "snapshot_id"; restaurar ese snapshot lo quita.',
 		'category'            => 'spiral-mcp-theme',
 		'group'               => 'design',
 		'log'                 => array( 'type' => 'widget', 'id' => function ( $in, $res ) {
@@ -776,7 +806,7 @@ add_action( 'wp_abilities_api_init', function () {
 				'type'     => array( 'type' => 'string', 'description' => 'id_base del tipo de widget, p. ej. block, custom_html, nav_menu, builderwidget.' ),
 				'sidebar'  => array( 'type' => 'string', 'description' => 'Área, p. ej. sidebar, top, toolbar-right. "wp_inactive_widgets" lo crea desactivado.' ),
 				'instance' => array( 'type' => 'object', 'description' => 'Configuración del widget.' ),
-				'layout'   => array( 'type' => 'object', 'description' => 'Solo builderwidget: layout de YOOtheme (raíz "fragment").' ),
+				'layout'   => array( 'type' => 'object', 'description' => 'Solo builderwidget: raíz "layout" con secciones en top y bottom; "fragment" en las demás áreas.' ),
 				'position' => array( 'type' => 'integer', 'minimum' => 1 ),
 			),
 		),
@@ -806,9 +836,13 @@ add_action( 'wp_abilities_api_init', function () {
 				if ( is_wp_error( $warnings ) ) {
 					return $warnings;
 				}
+				$root_warning = spiral_mcp_widget_root_warning( $layout, $sidebar );
+				if ( $root_warning ) {
+					$warnings[] = $root_warning;
+				}
 				$instance['content'] = spiral_mcp_json( spiral_mcp_layout_stamp_version( $layout ) );
 			} elseif ( 'builderwidget' === $base ) {
-				return new WP_Error( 'spiral_mcp_bad_layout', 'Un widget "builderwidget" necesita "layout" (raíz "fragment" > row > column > elementos).' );
+				return new WP_Error( 'spiral_mcp_bad_layout', 'Un widget "builderwidget" necesita "layout" (en top y bottom, raíz "layout" > section > row > column; en las demás áreas, "fragment" > row > column).' );
 			}
 			if ( 'nav_menu' === $base && ( empty( $instance['nav_menu'] ) || ! wp_get_nav_menu_object( (int) $instance['nav_menu'] ) ) ) {
 				return new WP_Error( 'spiral_mcp_menu_not_found', 'Un widget nav_menu necesita "nav_menu" con el ID de un menú existente (ver spiral-mcp/list-menus).' );

@@ -2,6 +2,12 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.11.1] — 2026-10-11
+
+### Corregido
+- Los widgets de builder en `top` y `bottom` no se podían editar con raíz `layout`: el área `widget:<ID>` exigía siempre `fragment`. En esas posiciones YOOtheme imprime el widget sin sección alrededor, así que con `fragment` sale sin contenedor ni márgenes. Ahora la raíz del área es la del layout guardado (o, si no hay, `layout` en top/bottom y `fragment` en las demás), y `create-widget` / `update-widget` avisan en `warnings` si la raíz no encaja con el área. `update-widget` devuelve también los avisos de validación del layout.
+- Skill y descripciones: raíz de los widgets de builder según el área.
+
 ## [1.11.0] — 2026-10-11
 
 ### Añadido
