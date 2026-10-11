@@ -9,6 +9,9 @@
 # funciona también con los enlaces permanentes "simples". curl va con -k
 # (certificados autofirmados del entorno local): nunca lo apuntes a producción.
 #
+# SMOKE_MEDIA_URL: imagen https para probar upload-media desde URL. Por defecto,
+# un logo de s.w.org; vacía (SMOKE_MEDIA_URL=) omite la prueba.
+#
 # Deja el sitio como estaba: borra la página y los menús de prueba y
 # restaura los snapshots del footer y del widget que toca.
 
@@ -106,7 +109,8 @@ check 'listado de abilities' 200
 for name in list-content get-content create-content update-content get-yootheme-layout update-yootheme-layout \
 	list-menus get-menu create-menu update-menu delete-menu add-menu-item update-menu-item delete-menu-item \
 	get-theme-layout update-theme-layout list-theme-backups restore-theme-backup list-widgets update-widget \
-	list-activity list-snapshots restore-snapshot; do
+	list-activity list-snapshots restore-snapshot upload-media list-media get-media update-media delete-media \
+	set-featured-image find-media-usage; do
 	case "$BODY" in
 		*"\"spiral-mcp\\/$name\""* | *"\"spiral-mcp/$name\""*) ;;
 		*) ko "registrada spiral-mcp/$name" ;;
@@ -222,6 +226,51 @@ if [ -n "$WIDGET_ID" ]; then
 else
 	echo 'AVISO no hay widgets con título: se omite update-widget'
 fi
+
+# --- Medios --------------------------------------------------------------
+PIXEL='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+call POST spiral-mcp/upload-media "{\"data_base64\":\"$PIXEL\",\"filename\":\"smoke-pixel.png\",\"alt\":\"Píxel de prueba\",\"attach_to\":$PAGE_ID}"
+check 'upload-media (base64)' 200 id path_relative sizes
+MEDIA_ID=$(jget id)
+eq 'upload-media: alt' alt 'Píxel de prueba'
+
+call POST spiral-mcp/upload-media '{"url":"https://127.0.0.1/x.png"}'
+[ "$(jget code)" = spiral_mcp_bad_url ] && ok 'upload-media rechaza URLs locales (SSRF)' || ko 'upload-media debería rechazar https://127.0.0.1'
+call POST spiral-mcp/upload-media "{\"data_base64\":\"$(printf '<svg xmlns="http://www.w3.org/2000/svg"/>' | base64 | tr -d '\n')\",\"filename\":\"x.svg\"}"
+[ "$STATUS" -ge 400 ] && ok 'upload-media rechaza SVG' || ko 'upload-media debería rechazar SVG'
+
+if [ -n "${SMOKE_MEDIA_URL-https://s.w.org/style/images/about/WordPress-logotype-wmark.png}" ]; then
+	call POST spiral-mcp/upload-media "{\"url\":\"${SMOKE_MEDIA_URL-https://s.w.org/style/images/about/WordPress-logotype-wmark.png}\",\"alt\":\"Prueba URL\"}"
+	if check 'upload-media (URL https)' 200 id width; then
+		URL_MEDIA_ID=$(jget id)
+		call DELETE spiral-mcp/delete-media "{\"id\":$URL_MEDIA_ID,\"confirm\":true}"
+		check 'limpieza: borrar la imagen descargada' 200 deleted
+	fi
+fi
+
+call GET spiral-mcp/list-media "{\"parent\":$PAGE_ID}"
+check 'list-media (por post)' 200 total items.0.id
+call GET spiral-mcp/get-media "{\"id\":$MEDIA_ID}"
+check 'get-media' 200 path_relative
+
+call POST spiral-mcp/update-media "{\"id\":$MEDIA_ID,\"alt\":\"Alt cambiado\"}"
+check 'update-media' 200 snapshot_id
+eq 'update-media: alt nuevo' alt 'Alt cambiado'
+call POST spiral-mcp/restore-snapshot "{\"id\":$(jget snapshot_id),\"confirm\":true}"
+check 'restore-snapshot (media_meta)' 200
+call GET spiral-mcp/get-media "{\"id\":$MEDIA_ID}"
+eq 'el alt vuelve al original' alt 'Píxel de prueba'
+
+call POST spiral-mcp/set-featured-image "{\"post_id\":$PAGE_ID,\"media_id\":$MEDIA_ID}"
+check 'set-featured-image' 200 snapshot_id media.id
+call GET spiral-mcp/find-media-usage "{\"id\":$MEDIA_ID}"
+check 'find-media-usage' 200 used posts
+eq 'find-media-usage: la página la usa como destacada' 'posts.0.where.0' featured_image
+
+call DELETE spiral-mcp/delete-media "{\"id\":$MEDIA_ID}"
+[ "$STATUS" -ge 400 ] && ok 'delete-media sin confirm se rechaza' || ko 'delete-media sin confirm'
+call DELETE spiral-mcp/delete-media "{\"id\":$MEDIA_ID,\"confirm\":true}"
+check 'delete-media' 200 deleted
 
 # --- Auditoría y snapshots -----------------------------------------------
 call GET spiral-mcp/list-snapshots '{"kind":"menu","per_page":5}'

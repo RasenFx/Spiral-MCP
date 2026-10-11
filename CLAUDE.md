@@ -10,7 +10,7 @@ El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes d
 - YOOtheme Pro activo (o un tema hijo de YOOtheme) para todo lo relacionado con el builder y los estilos.
 - PHP 7.4 como mínimo: no usar sintaxis de PHP 8 (match, nullsafe `?->`, argumentos con nombre, tipos de unión, `readonly`, enums).
 
-## Estructura actual (v1.4.0)
+## Estructura actual (v1.5.0)
 ```
 spiral-mcp-control.php   cabecera, constantes, comprobación de requisitos, require_once y hooks de activación
 uninstall.php            borra el rol y las capacidades (las tablas solo con el filtro spiral_mcp_uninstall_drop_tables)
@@ -22,6 +22,7 @@ includes/install.php     dbDelta, rol, migraciones y cron; se ejecuta al activar
 includes/content.php     helpers y abilities de páginas/entradas y layouts de página
 includes/menus.php       abilities de menús y elementos de menú (+ snapshot kind "menu")
 includes/theme.php       footer de YOOtheme (builder) y widgets (+ snapshot kinds "theme_config" y "widgets")
+includes/media.php       subir, listar, editar y borrar medios, imagen destacada y usos (+ snapshot kinds "media_meta" y "post_meta")
 tests/smoke.sh           prueba de humo por REST (ver "Entorno de desarrollo")
 tests/fixtures/          layouts de YOOtheme de ejemplo
 dist/                    ZIP para instalar (no versionar)
@@ -31,6 +32,7 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - Contenido: `list-content`, `get-content`, `create-content`, `update-content`, `get-yootheme-layout`, `update-yootheme-layout`.
 - Menús: `list-menus`, `get-menu`, `create-menu`, `update-menu`, `delete-menu`, `add-menu-item`, `update-menu-item`, `delete-menu-item`.
 - Tema: `get-theme-layout`, `update-theme-layout`, `list-widgets`, `update-widget`; `list-theme-backups` y `restore-theme-backup` son alias obsoletos (se quitan en la próxima versión).
+- Medios: `upload-media`, `list-media`, `get-media`, `update-media`, `delete-media`, `set-featured-image`, `find-media-usage`.
 - Auditoría y snapshots: `list-activity`, `list-snapshots`, `restore-snapshot`.
 
 ## Convenciones (obligatorias)

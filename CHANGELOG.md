@@ -2,6 +2,19 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.5.0] — 2026-10-11 · Fase 2: medios
+
+### Añadido
+- Módulo `includes/media.php` (grupo de permisos `media`).
+- `spiral-mcp/upload-media`: sube desde una URL `https` pública o desde base64 (+ `filename`), con `title`, `alt`, `caption`, `description` y `attach_to`. Tipos: jpg, jpeg, png, webp, gif, avif, pdf, mp4, webm (filtro `spiral_mcp_upload_types`). SVG solo con el filtro `spiral_mcp_allow_svg`. Límite `wp_max_upload_size()`. Protección SSRF: solo https al puerto 443, sin credenciales; rechaza IPs privadas, reservadas y de loopback (también en redirecciones, vía `wp_safe_remote_get`). Valida el tipo real del archivo.
+- `spiral-mcp/list-media`, `get-media`: salida con `id`, `url`, `path_relative` (formato de los props de imagen de YOOtheme), `width`, `height`, `mime`, `alt`, textos y `sizes`.
+- `spiral-mcp/update-media`: alt, title, caption y description, con snapshot `media_meta`.
+- `spiral-mcp/delete-media` (con `confirm`): papelera si `MEDIA_TRASH`; si no, borrado definitivo (la descripción lo indica según el sitio).
+- `spiral-mcp/set-featured-image` (`media_id` 0 = quitar), con snapshot `post_meta`.
+- `spiral-mcp/find-media-usage`: busca el adjunto en contenido y layouts de posts, imagen destacada, configuración del tema, widgets, logo e icono del sitio.
+- Tipos de snapshot `media_meta` y `post_meta`.
+- Pruebas de medios en `tests/smoke.sh` (variable `SMOKE_MEDIA_URL`).
+
 ## [1.4.0] — 2026-10-11 · Fase 0: base segura
 
 ### Añadido

@@ -57,17 +57,17 @@ Antes de dar más poder al agente: trazabilidad, deshacer y permisos acotados.
 
 Sin medios, el agente no puede poner logos ni fotos en los diseños.
 
-- [ ] `spiral-mcp/upload-media`. Entrada: `url` **o** `data_base64` + `filename`; además `title`, `alt`, `caption`, `description`, `attach_to` (ID de post).
+- [x] `spiral-mcp/upload-media`. Entrada: `url` **o** `data_base64` + `filename`; además `title`, `alt`, `caption`, `description`, `attach_to` (ID de post).
   - Usa `download_url()` + `media_handle_sideload()`. Para base64: escribir a un temporal y usar el mismo camino.
   - Tipos permitidos: jpg, jpeg, png, webp, gif, avif, pdf, mp4, webm. **SVG no** (riesgo de XSS) salvo que esté activo un plugin de saneado de SVG (filtro `spiral_mcp_allow_svg`).
   - Límite de tamaño: `wp_max_upload_size()`. Solo URLs `https`, y rechazar IPs privadas y loopback (SSRF).
   - Salida: `id`, `url`, `path_relative` (`wp-content/uploads/…`, el formato que usan los props de imagen de YOOtheme), `width`, `height`, `mime`, `alt` y `sizes`.
-- [ ] `spiral-mcp/list-media`: filtros `search`, `mime` (image, video, application/pdf), `parent`, paginación. Devuelve lo mismo que la salida de `upload-media`.
-- [ ] `spiral-mcp/get-media`: un adjunto por ID.
-- [ ] `spiral-mcp/update-media`: `alt`, `title`, `caption`, `description`. Hace snapshot `media_meta` del estado anterior.
-- [ ] `spiral-mcp/delete-media`: exige `confirm`. Si existe `MEDIA_TRASH`, va a la papelera; si no, se borra definitivamente, y la descripción debe decirlo.
-- [ ] `spiral-mcp/set-featured-image`: `post_id` + `media_id` (o `0` para quitarla).
-- [ ] `spiral-mcp/find-media-usage` (opcional): busca el `path_relative` o la URL de un adjunto en el contenido de posts, el theme config y los widgets, para saber qué se rompe antes de borrar.
+- [x] `spiral-mcp/list-media`: filtros `search`, `mime` (image, video, application/pdf), `parent`, paginación. Devuelve lo mismo que la salida de `upload-media`.
+- [x] `spiral-mcp/get-media`: un adjunto por ID.
+- [x] `spiral-mcp/update-media`: `alt`, `title`, `caption`, `description`. Hace snapshot `media_meta` del estado anterior.
+- [x] `spiral-mcp/delete-media`: exige `confirm`. Si existe `MEDIA_TRASH`, va a la papelera; si no, se borra definitivamente, y la descripción debe decirlo.
+- [x] `spiral-mcp/set-featured-image`: `post_id` + `media_id` (o `0` para quitarla).
+- [x] `spiral-mcp/find-media-usage` (opcional): busca el `path_relative` o la URL de un adjunto en el contenido de posts, el theme config y los widgets, para saber qué se rompe antes de borrar.
 
 **Terminado cuando:** el agente sube una imagen desde una URL, la usa en un elemento `image` de un layout de página, actualiza su alt text y la página la muestra.
 
