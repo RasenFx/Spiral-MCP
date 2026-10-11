@@ -252,7 +252,7 @@ add_action( 'wp_abilities_api_init', function () {
 		'status' => array( 'type' => 'string', 'enum' => array( 'enabled', 'disabled' ) ),
 		'query'  => array( 'type' => 'object', 'description' => 'Condiciones de uso según el tipo (p. ej. {"terms":[12]} para limitar a una categoría). Vacío = todas.' ),
 		'params' => array( 'type' => 'object', 'description' => 'Parámetros de la consulta en archivos (posts_per_page, order_by…).' ),
-		'layout' => array( 'type' => 'object', 'description' => 'Layout con raíz "layout" (sección > fila > columna > elementos). Usa fuentes dinámicas ("source") para mostrar el título, contenido, etc. del post.' ),
+		'layout' => array( 'type' => 'object', 'description' => 'Layout con raíz "layout" (sección > fila > columna > elementos). Usa fuentes dinámicas ("source") para mostrar el título, contenido, etc. del post: la consulta es "posts.singlePost" en single-post y "posts.archivePost" (una lista: ponla en el item de un grid y se repite por entrada) en archive-post.' ),
 	);
 
 	/* 1. Listar plantillas ------------------------------------------------ */

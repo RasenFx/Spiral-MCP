@@ -2,6 +2,12 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.11.2] — 2026-10-11
+
+### Corregido
+- Skill: la fuente dinámica de una entrada es `posts.singlePost` (la receta decía `template.posts.singlePost`, con la que la plantilla salía vacía). Nueva receta para la página del blog con una rejilla de entradas (`archive-post` + `posts.archivePost` en el `grid_item`).
+- `create-template` / `update-template`: la descripción indica los nombres de las consultas de entradas.
+
 ## [1.11.1] — 2026-10-11
 
 ### Corregido

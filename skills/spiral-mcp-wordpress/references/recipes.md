@@ -14,6 +14,7 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 - [Editar el footer](#editar-el-footer)
 - [Widgets: barra lateral, barra superior, top y bottom](#widgets-barra-lateral-barra-superior-top-y-bottom)
 - [Plantilla para las entradas](#plantilla-para-las-entradas)
+- [Página del blog con rejilla de entradas](#página-del-blog-con-rejilla-de-entradas)
 - [Cambiar la marca (colores y tipografía)](#cambiar-la-marca-colores-y-tipografía)
 - [Programar una publicación](#programar-una-publicación)
 - [Página hija con plantilla, categorías y SEO](#página-hija-con-plantilla-categorías-y-seo)
@@ -127,11 +128,32 @@ El año y el nombre quedan escritos tal cual: díselo al usuario. Comprueba con 
 ## Plantilla para las entradas
 
 1. `list-templates`: el campo `types` trae los tipos de plantilla del sitio (`single-post`, `archive-post`, `taxonomy-category`, `search`, `error-404`…) y los campos de `query` de cada uno.
-2. `create-template {"name": "Entrada", "type": "single-post", "layout": {...}}`. Para mostrar el título o el contenido de cada entrada usa fuentes dinámicas, por ejemplo:
+2. `create-template {"name": "Entrada", "type": "single-post", "layout": {...}}`. Para mostrar el título o el contenido de cada entrada usa fuentes dinámicas. El nombre de la consulta es `posts.singlePost` (sin prefijo; con otro nombre la plantilla sale vacía):
    ```json
-   {"type": "headline", "props": {"title_element": "h1"}, "source": {"query": {"name": "template.posts.singlePost"}, "props": {"content": {"name": "title"}}}}
+   {"type": "headline", "props": {"title_element": "h1"}, "source": {"query": {"name": "posts.singlePost"}, "props": {"content": {"name": "title"}}}},
+   {"type": "text", "source": {"query": {"name": "posts.singlePost"}, "props": {"content": {"name": "content"}}}}
    ```
-3. Se aplica a las entradas que no tienen layout propio, por orden: gana la primera plantilla activa que encaja. Compruébalo abriendo una entrada (`inspect-page {"path": "/?p=<id>"}`).
+   Campos útiles de una entrada: `title`, `content`, `excerpt`, `date` (con `"filters": {"date": "j F, Y"}`), `link`, `featuredImage.url` y `featuredImage.alt`.
+3. Se aplica a las entradas que no tienen layout propio, por orden: gana la primera plantilla activa que encaja. Compruébalo abriendo una entrada (`inspect-page {"path": "/hello-world/"}`).
+
+## Página del blog con rejilla de entradas
+
+1. Crea y publica la página (`create-content {"title": "Blog", "slug": "blog", "status": "publish"}`) y asígnala como página de entradas: `update-site-settings {"page_for_posts": <id>}`. Esa página no usa su propio layout: WordPress muestra ahí el listado de entradas, y YOOtheme le aplica la plantilla de tipo `archive-post`.
+2. `create-template {"name": "Blog", "type": "archive-post", "layout": {...}}` con un `grid` cuyo único `grid_item` lleva la fuente `posts.archivePost` (la lista de entradas de la página actual). YOOtheme repite ese item por cada entrada:
+   ```json
+   {"type": "grid", "props": {"grid_default": "1", "grid_small": "2", "grid_medium": "3", "grid_column_gap": "large", "grid_row_gap": "large",
+     "panel_style": "card-default", "panel_padding": "default", "panel_image_no_padding": true,
+     "show_title": true, "show_meta": true, "show_content": true, "show_image": true, "show_link": true,
+     "title_element": "h2", "meta_style": "text-meta", "meta_align": "above-title", "link_text": "Leer más"},
+    "children": [{"type": "grid_item", "props": {}, "source": {"query": {"name": "posts.archivePost", "arguments": {}}, "props": {
+      "title": {"name": "title"}, "meta": {"name": "date", "filters": {"date": "j F, Y"}}, "content": {"name": "excerpt"},
+      "image": {"name": "featuredImage.url"}, "image_alt": {"name": "featuredImage.alt"}, "link": {"name": "link"}}}}]},
+   {"type": "pagination", "props": {"text_align": "center", "margin_top": "large"}}
+   ```
+   - Con `panel_style` de tarjeta pon también `panel_padding`; si no, el texto queda pegado al borde.
+   - El elemento `pagination` usa la paginación del propio listado.
+   - Las categorías, etiquetas y autores usan sus propios tipos (`taxonomy-category`, `taxonomy-post_tag`, `author-archive`): crea una plantilla para cada uno, o el sitio usará la vista por defecto del tema.
+3. Comprueba con `inspect-page {"path": "/blog/"}`: debe salir un enlace "Leer más" por entrada publicada.
 
 ## Cambiar la marca (colores y tipografía)
 
