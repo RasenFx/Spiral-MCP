@@ -2,6 +2,24 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.10.0] — 2026-10-11 · Correcciones tras probar el skill con casos reales
+
+### Corregido
+- **Guardar la configuración del tema quitaba las ubicaciones a los menús.** El evento `config.save` de YOOtheme reescribe `nav_menu_locations` desde `config.menu.positions`, que en la BD estaba desfasado. Ahora se sincroniza antes de guardar.
+- **`restore-snapshot` deshacía sin avisar los cambios posteriores** del mismo objeto (p. ej. restaurar un cambio de color deshacía también el footer creado después). Ahora devuelve `spiral_mcp_snapshot_later` (HTTP 409) con la lista de cambios posteriores y, en `theme_config`, las secciones en que difiere; se puede restaurar solo una parte con `"parts"` (p. ej. `["less"]`) o todo con `"include_later": true`. El alias obsoleto `restore-theme-backup` mantiene su comportamiento.
+- **Opciones de select agrupadas** (p. ej. `animation`: `fade`, `scale-up`…) salían como un valor `"3"` en `get-element-schema` y la validación de layouts avisaba de valores válidos.
+- **`inspect-page`**: los enlaces a la propia vista previa (p. ej. "Cancel reply") salían rotos y mostraban el token; ahora se marcan `self`, sin token ni comprobación.
+
+### Cambiado
+- `inspect-page`: los encabezados llevan `in_content` (false si son del tema: barra lateral, widgets, comentarios) y los avisos de h1 y saltos de nivel solo miran el contenido; los enlaces se agrupan por destino (`count`, `texts`); un enlace roto a contenido sin publicar trae `target_id` y `target_status`; `preview` y `notes` explican el `noindex` de las vistas previas.
+- `get-element-schema`: lista las opciones de los campos `select-img` (p. ej. el `layout` de las filas), omite los controles internos del editor (`_source*`, botones de panel) y explica `layout` + `width_*` en filas.
+- `get-site-settings` devuelve `timezone_string`, la zona efectiva (`timezone`), la hora local (`local_time`) y `blog_public`; `update-site-settings` acepta `timezone_string` (zona IANA validada).
+- Los menús avisan (`warnings` y `object_status` en cada elemento) de los elementos que enlazan a contenido sin publicar.
+- `list-content` acepta `post_type: "any"`.
+- `update-yootheme-layout` y `patch-layout` (en páginas) devuelven `revision_id` y `undo_revision_id`.
+- `list-style-variables`: la descripción aclara que los grupos `primary`/`secondary` son fuentes y que el color principal es `@global-primary-background`.
+- Skill `spiral-mcp-wordpress`: cómo deshacer un cambio concreto sin pisar otros, enlaces a contenido publicado, fechas y zona horaria, receta para crear el menú principal, ejemplos completos de landing y footer, y nuevos errores frecuentes.
+
 ## [1.9.0] — 2026-10-11 · Fase 5: verificación y flujo de trabajo
 
 ### Añadido

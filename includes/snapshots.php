@@ -10,6 +10,10 @@
  *   'cap'     => capacidad nativa necesaria para restaurar,
  *   'capture' => callable( $ref ) que devuelve el estado actual,
  *   'restore' => callable( $ref, $data ) que lo escribe (true|array|WP_Error),
+ *   'parts'   => opcional: callable( $ref, $data ) que devuelve las partes (p. ej. secciones de la
+ *                configuración) en que el snapshot difiere del estado actual,
+ *   'partial' => opcional: callable( $ref, $data, $parts ) que devuelve el estado actual con solo
+ *                esas partes tomadas del snapshot (o WP_Error), para restaurar una parte,
  * ).
  *
  * @package Spiral_MCP_Control
@@ -101,7 +105,8 @@ function spiral_mcp_snapshot_can( $kind ) {
  * Restaura un snapshot. Antes guarda otro con el estado actual, para poder
  * deshacer la restauración.
  */
-function spiral_mcp_snapshot_restore( $id ) {
+function spiral_mcp_snapshot_restore( $id, array $opts = array() ) {
+	global $wpdb;
 	$snap = spiral_mcp_snapshot_get( $id );
 	if ( is_wp_error( $snap ) ) {
 		return $snap;
@@ -110,11 +115,43 @@ function spiral_mcp_snapshot_restore( $id ) {
 	if ( ! isset( $kinds[ $snap->kind ]['restore'] ) ) {
 		return new WP_Error( 'spiral_mcp_snapshot_kind', sprintf( 'Los snapshots de tipo "%s" no se pueden restaurar en esta versión.', $snap->kind ) );
 	}
-	$previous = spiral_mcp_snapshot_capture( $snap->kind, $snap->ref, sprintf( 'Antes de restaurar el snapshot #%d', $snap->id ) );
+	$kind  = $kinds[ $snap->kind ];
+	$parts = array_values( array_filter( array_map( 'strval', (array) ( $opts['parts'] ?? array() ) ), 'strlen' ) );
+	$diff  = isset( $kind['parts'] ) ? array_values( (array) call_user_func( $kind['parts'], $snap->ref, $snap->data ) ) : null;
+
+	// Un snapshot guarda el objeto entero: si después hubo otros cambios en el mismo objeto,
+	// restaurarlo también los desharía. Se exige elegir partes o confirmarlo con include_later.
+	$later = $wpdb->get_results( $wpdb->prepare( 'SELECT id, created_at, note FROM ' . spiral_mcp_table( 'snapshots' ) . ' WHERE kind = %s AND ref = %s AND id > %d ORDER BY id ASC LIMIT 11', $snap->kind, $snap->ref, (int) $snap->id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	if ( $later && ! $parts && empty( $opts['include_later'] ) ) {
+		$list = array();
+		foreach ( array_slice( $later, 0, 10 ) as $row ) {
+			$list[] = sprintf( '#%d %s (%s)', $row->id, spiral_mcp_utc_date( $row->created_at ), $row->note );
+		}
+		$hint = null !== $diff
+			? sprintf( ' El snapshot difiere del estado actual en: %s. Para deshacer solo una parte, envía "parts" con esas claves (p. ej. ["%s"]), o revierte el valor con la herramienta que lo cambió.', $diff ? implode( ', ', $diff ) : '(nada)', $diff ? $diff[0] : 'less' )
+			: ' Para deshacer solo un cambio concreto, revierte el valor con la herramienta que lo cambió.';
+		return new WP_Error(
+			'spiral_mcp_snapshot_later',
+			sprintf( 'Después de este snapshot hubo %s cambio(s) en el mismo objeto (%s) que también se desharían: %s.%s Si de verdad quieres volver al estado completo, repite con "include_later": true.', count( $later ) > 10 ? 'más de 10' : count( $later ), $snap->kind, implode( '; ', $list ), $hint ),
+			array( 'status' => 409, 'later' => array_map( 'intval', wp_list_pluck( $later, 'id' ) ), 'differs_in' => $diff )
+		);
+	}
+	$data = $snap->data;
+	if ( $parts ) {
+		if ( ! isset( $kind['partial'] ) ) {
+			return new WP_Error( 'spiral_mcp_snapshot_parts', sprintf( 'Los snapshots de tipo "%s" solo se restauran enteros: quita "parts".', $snap->kind ) );
+		}
+		$data = call_user_func( $kind['partial'], $snap->ref, $snap->data, $parts );
+		if ( is_wp_error( $data ) ) {
+			return $data;
+		}
+	}
+
+	$previous = spiral_mcp_snapshot_capture( $snap->kind, $snap->ref, sprintf( 'Antes de restaurar el snapshot #%d', $snap->id ) . ( $parts ? ' (' . implode( ', ', $parts ) . ')' : '' ) );
 	if ( is_wp_error( $previous ) ) {
 		return $previous;
 	}
-	$res = call_user_func( $kinds[ $snap->kind ]['restore'], $snap->ref, $snap->data );
+	$res = call_user_func( $kind['restore'], $snap->ref, $data );
 	if ( is_wp_error( $res ) ) {
 		return $res;
 	}
@@ -123,6 +160,8 @@ function spiral_mcp_snapshot_restore( $id ) {
 			'restored'             => (int) $snap->id,
 			'kind'                 => $snap->kind,
 			'ref'                  => $snap->ref,
+			'parts'                => $parts ? $parts : null,
+			'differed_in'          => $diff,
 			'snapshot_of_previous' => $previous,
 		),
 		is_array( $res ) ? $res : array()
@@ -255,7 +294,7 @@ add_action( 'wp_abilities_api_init', function () {
 	/* 2. Restaurar snapshot ----------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/restore-snapshot', array(
 		'label'               => 'Restaurar snapshot',
-		'description'         => 'Devuelve un objeto (toda la configuración del tema, un menú completo o un widget y las áreas de widgets) al estado guardado en un snapshot. Antes guarda otro snapshot con el estado actual ("snapshot_of_previous"), así que se puede deshacer. En menús, los elementos que hubo que recrear reciben IDs nuevos; si el snapshot es de un menú recién creado, restaurarlo borra el menú. Requiere "confirm": true.',
+		'description'         => 'Devuelve un objeto (toda la configuración del tema, un menú completo o un widget y las áreas de widgets) al estado guardado en un snapshot. Un snapshot guarda el objeto entero: si después hubo otros cambios en el mismo objeto, devuelve un error que los lista (y, en theme_config, en qué secciones difiere) en lugar de deshacerlos sin avisar; entonces restaura solo una parte con "parts" (solo theme_config, p. ej. ["less"] para el estilo o ["footer"]), revierte el valor con la herramienta que lo cambió, o envía "include_later": true si de verdad quieres el estado completo. Antes guarda otro snapshot con el estado actual ("snapshot_of_previous"), así que se puede deshacer. En menús, los elementos que hubo que recrear reciben IDs nuevos; si el snapshot es de un menú recién creado, restaurarlo borra el menú. Requiere "confirm": true.',
 		'category'            => 'spiral-mcp-snapshots',
 		'group'               => spiral_mcp_groups(),
 		'log'                 => array( 'type' => 'snapshot', 'id' => 'id' ),
@@ -263,8 +302,10 @@ add_action( 'wp_abilities_api_init', function () {
 			'type'       => 'object',
 			'required'   => array( 'id', 'confirm' ),
 			'properties' => array(
-				'id'      => array( 'type' => 'integer', 'description' => 'ID del snapshot (ver spiral-mcp/list-snapshots).' ),
-				'confirm' => array( 'type' => 'boolean', 'description' => 'Debe ser true.' ),
+				'id'            => array( 'type' => 'integer', 'description' => 'ID del snapshot (ver spiral-mcp/list-snapshots).' ),
+				'confirm'       => array( 'type' => 'boolean', 'description' => 'Debe ser true.' ),
+				'parts'         => array( 'type' => 'array', 'items' => array( 'type' => 'string' ), 'description' => 'Solo theme_config: secciones de primer nivel que se restauran (p. ej. ["less"], ["footer"]); el resto queda como está.' ),
+				'include_later' => array( 'type' => 'boolean', 'description' => 'true = restaurar el objeto entero aunque haya cambios posteriores (se deshacen también).' ),
 			),
 		),
 		'permission_callback' => function ( $input = array() ) {
@@ -277,7 +318,10 @@ add_action( 'wp_abilities_api_init', function () {
 			if ( is_wp_error( $ok ) ) {
 				return $ok;
 			}
-			return spiral_mcp_snapshot_restore( $input['id'] ?? 0 );
+			return spiral_mcp_snapshot_restore( $input['id'] ?? 0, array(
+				'parts'         => $input['parts'] ?? array(),
+				'include_later' => ! empty( $input['include_later'] ),
+			) );
 		},
 		'meta'                => spiral_mcp_meta( false, true, false ),
 	) );

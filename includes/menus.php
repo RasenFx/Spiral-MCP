@@ -54,6 +54,13 @@ function spiral_mcp_menu_item_out( $item ) {
 	if ( ! empty( $item->_invalid ) ) {
 		$out['invalid'] = true; // El contenido enlazado ya no existe.
 	}
+	// Un elemento que enlaza a contenido sin publicar sale en el menú, pero da 404 a los visitantes.
+	if ( 'post_type' === $item->type && empty( $out['invalid'] ) ) {
+		$status = get_post_status( (int) $item->object_id );
+		if ( $status && 'publish' !== $status ) {
+			$out['object_status'] = $status;
+		}
+	}
 	return $out;
 }
 
@@ -87,7 +94,22 @@ function spiral_mcp_menu_out( $menu ) {
 		'count'     => (int) $menu->count,
 		'locations' => spiral_mcp_menu_locations_of( $menu->term_id ),
 		'items'     => spiral_mcp_menu_tree( $menu->term_id ),
+		'warnings'  => spiral_mcp_menu_warnings( $menu->term_id ),
 	);
+}
+
+/** Avisos sobre los elementos de un menú: enlaces a contenido sin publicar o que ya no existe. */
+function spiral_mcp_menu_warnings( $menu_id ) {
+	$warnings = array();
+	foreach ( spiral_mcp_menu_items( $menu_id ) as $item ) {
+		$out = spiral_mcp_menu_item_out( $item );
+		if ( ! empty( $out['invalid'] ) ) {
+			$warnings[] = sprintf( 'El elemento %d ("%s") enlaza a contenido que ya no existe: bórralo o cámbialo.', $out['id'], $out['title'] );
+		} elseif ( isset( $out['object_status'] ) ) {
+			$warnings[] = sprintf( 'El elemento %d ("%s") enlaza a contenido en estado "%s": los visitantes verán el enlace pero obtendrán un 404 hasta que se publique.', $out['id'], $out['title'], $out['object_status'] );
+		}
+	}
+	return $warnings;
 }
 
 /** ¿El elemento pertenece al menú? */

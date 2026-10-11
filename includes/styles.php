@@ -408,7 +408,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	spiral_mcp_register_ability( 'spiral-mcp/list-style-variables', array(
 		'label'               => 'Listar variables de estilo',
-		'description'         => 'Lista las variables LESS del estilo activo de YOOtheme, agrupadas como en el Personalizador (component: global, base, button, navbar…; group: primary, typography, colors…). Para cada una: valor por defecto (expresión LESS sin evaluar, p. ej. "darken(@global-primary-background, 5%)" o "#1e87f0"), valor actual, tipo de campo (color, font, select-custom con sus opciones, boxshadow, text) y si está modificada. Para la paleta de marca empieza por component "global" (grupos primary, secondary, colors, backgrounds, typography). Filtra para no recibir cientos de variables.',
+		'description'         => 'Lista las variables LESS del estilo activo de YOOtheme, agrupadas como en el Personalizador (component: global, base, button, navbar…; group: primary, typography, colors…). Para cada una: valor por defecto (expresión LESS sin evaluar, p. ej. "darken(@global-primary-background, 5%)" o "#1e87f0"), valor actual, tipo de campo (color, font, select-custom con sus opciones, boxshadow, text) y si está modificada. Para la paleta de marca empieza por component "global": los colores están en los grupos "colors" y "backgrounds" (el color principal es @global-primary-background); los grupos "primary" y "secondary" son las fuentes primaria y secundaria, no colores. Filtra para no recibir cientos de variables.',
 		'category'            => 'spiral-mcp-styles',
 		'group'               => 'design',
 		'input_schema'        => array(

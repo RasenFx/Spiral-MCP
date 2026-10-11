@@ -181,7 +181,9 @@ call POST spiral-mcp/restore-snapshot "{\"id\":$SNAP_BEFORE_ADD}"
 [ "$STATUS" -ge 400 ] && ok 'restore-snapshot sin confirm se rechaza' || ko 'restore-snapshot sin confirm'
 
 call POST spiral-mcp/restore-snapshot "{\"id\":$SNAP_BEFORE_ADD,\"confirm\":true}"
-check 'restore-snapshot (menú)' 200 snapshot_of_previous
+check 'restore-snapshot con cambios posteriores se rechaza (409)' 409 data.later.0
+call POST spiral-mcp/restore-snapshot "{\"id\":$SNAP_BEFORE_ADD,\"confirm\":true,\"include_later\":true}"
+check 'restore-snapshot (menú, include_later)' 200 snapshot_of_previous
 call GET spiral-mcp/get-menu "{\"menu\":$MENU_ID}"
 eq 'el menú vuelve a 1 elemento' 'items.#' 1
 
@@ -350,7 +352,11 @@ if [ "$YOOTHEME" = 200 ]; then
 	call GET spiral-mcp/get-theme-layout '{"area":"footer"}'
 	check 'get-theme-layout (footer, con áreas)' 200 layout.children areas.0.area
 
-	call POST spiral-mcp/restore-snapshot "{\"id\":$SNAP_CFG,\"confirm\":true}"
+	call POST spiral-mcp/restore-snapshot "{\"id\":$SNAP_CFG,\"confirm\":true,\"parts\":[\"header\"]}"
+	check 'restore-snapshot parcial (solo header)' 200 parts.0
+	call GET spiral-mcp/get-layout-outline '{"area":"footer"}'
+	check 'restore parcial: el footer de la prueba sigue' 200 outline.0
+	call POST spiral-mcp/restore-snapshot "{\"id\":$SNAP_CFG,\"confirm\":true,\"include_later\":true}"
 	check 'restore-snapshot (configuración antes de la prueba)' 200
 	call GET spiral-mcp/get-theme-config '{"section":"header"}'
 	eq 'header.layout restaurado' value.layout "$ORIG_LAYOUT"

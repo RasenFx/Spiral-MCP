@@ -14,9 +14,10 @@ Si necesitas los parámetros de una herramienta concreta, consulta `references/a
 1. **Lee antes de escribir.** Cada escritura tiene su lectura: `get-layout-outline` antes de `patch-layout`, `get-theme-config` antes de `update-theme-config`, `get-menu` antes de tocar un menú. Así sabes qué hay y no pisas lo que no ves.
 2. **Cambios pequeños y comprobables.** Edita layouts con `patch-layout` y rutas concretas en lugar de reenviar el árbol entero. Es más barato y no destruye cambios de otros. Empieza el patch con una operación `test` sobre el valor que vas a cambiar: si alguien lo modificó desde que lo leíste, el patch falla sin guardar nada.
 3. **Borrador primero.** Crea o duplica en `draft`, revisa con `get-preview-url` e `inspect-page` y publica al final. Un error en un borrador no lo ve nadie.
-4. **Todo es reversible, y conviene saber cómo.** Los posts guardan revisiones (`list-revisions`, `restore-revision`). Lo demás (configuración del tema, menús, widgets, medios, SEO, términos, ajustes, estilos, plantillas) guarda un snapshot antes de cada cambio: la respuesta trae `snapshot_id`, que pasas a `restore-snapshot`. `list-activity` cuenta qué se cambió, cuándo y con qué snapshot. Anota los `snapshot_id` de lo que hagas para poder ofrecer deshacerlo.
+4. **Todo es reversible, y conviene saber cómo.** Los posts guardan revisiones: las escrituras de layout devuelven `undo_revision_id`, que pasas a `restore-revision`. Lo demás (configuración del tema, menús, widgets, medios, SEO, términos, ajustes, estilos, plantillas) guarda un snapshot antes de cada cambio: la respuesta trae `snapshot_id`. Anota esos IDs para poder ofrecer deshacer. Pero un snapshot es la foto del objeto **entero**: toda la configuración del tema (estilo, footer, header, mega menús…) es un solo objeto. Para deshacer un cambio concreto cuando después hubo otros, revierte solo ese valor (p. ej. `update-theme-style` con `null`) o restaura solo esa parte (`restore-snapshot` con `"parts": ["less"]`). `restore-snapshot` se niega a pisar cambios posteriores sin `"include_later": true`; no lo envíes sin que el usuario sepa qué más se deshace.
 5. **Los `warnings` son trabajo pendiente.** Muchas herramientas avisan sin bloquear: props desconocidos, valores fuera de sus opciones, ajustes que YOOtheme no conoce, SEO demasiado largo, enlaces rotos. Corrígelos o explica por qué no.
 6. **Lo destructivo pide `"confirm": true`.** Envíalo solo cuando el usuario quiera de verdad borrar o restaurar. Antes de borrar un medio, mira `find-media-usage`; antes de borrar contenido, recuerda que solo se borra definitivamente desde la papelera.
+7. **Los enlaces deben llevar a algo publicado.** Antes de enlazar una página (botón, menú, footer), compruébala con `list-content`. Si no existe, no la inventes en silencio: créala en borrador y díselo al usuario, o pregúntale el destino. Un enlace a un borrador se ve, pero da 404 a los visitantes hasta que se publica (`inspect-page` lo marca con `target_status`; `get-menu` avisa en `warnings`).
 
 ## Convenciones del sitio
 
@@ -25,8 +26,8 @@ Si necesitas los parámetros de una herramienta concreta, consulta `references/a
 - **Fuentes dinámicas.** Un nodo con `"source"` toma sus datos de WordPress (título del post, elementos de menú…); en `get-layout-outline` aparece con `[fuente dinámica]`. No borres ni cambies `source` sin entenderla, y recuerda que cambiar los props de ese nodo puede no verse porque la fuente los sobrescribe.
 - **Raíces de layout.** Páginas, footer y plantillas: `"type": "layout"` → section → row → column → elementos. Mega menús y widgets de builder: `"type": "fragment"` → row → column → elementos (sin secciones). Los elementos múltiples tienen hijos `<tipo>_item` (list → list_item, button → button_item). Los anchos de columna (`width_default`, `width_medium`…) se ponen en cada columna. Ante la duda: `list-elements` y `get-element-schema`.
 - **`version`** en la raíz de los layouts: si falta se añade; no la quites.
-- **Fechas:** ISO 8601 con zona (`2026-11-01T09:00:00+01:00`). Las respuestas usan UTC con `Z`.
-- **Header, navbar, top, bottom** no tienen layout propio: sus ajustes van en `update-theme-config` (secciones `header`, `navbar`, `mobile`, `logo`…) y su contenido de builder son widgets de builder (áreas `widget:builderwidget-N`). `get-theme-layout` lista todas las áreas con builder del sitio.
+- **Fechas:** envíalas en ISO 8601 con zona (`2026-11-01T09:00:00+01:00`). En las respuestas, lo que acaba en `Z` es UTC (`date_gmt`, `expires_at`, auditoría y snapshots) y lo que no lleva zona (`date`, `modified`) es la hora local del sitio. `get-site-settings` da la zona (`timezone`) y la hora local: compruébala antes de programar y avisa si no es la del usuario.
+- **Header, navbar, top, bottom** no tienen layout propio: sus ajustes van en `update-theme-config` (secciones `header`, `navbar`, `mobile`, `logo`…) y su contenido de builder son widgets de builder (áreas `widget:builderwidget-N`). `get-theme-layout` lista todas las áreas con builder del sitio. **El menú de la cabecera** no se pone con `update-theme-config`, sino asignando el menú a una ubicación (`locations` de `create-menu` o `update-menu`; ver la receta).
 
 ## Flujo para cambiar una página
 
@@ -41,9 +42,9 @@ Si necesitas los parámetros de una herramienta concreta, consulta `references/a
      {"op": "replace", "path": "/children/1/children/0/children/0/children/2/children/0/props/link", "value": "/contacto/"}
    ]}
    ```
-5. Revisa: `inspect-page {"id": 12}` (encabezados, enlaces rotos, imágenes sin alt, SEO efectivo y avisos). Si tienes navegador, abre la URL de `get-preview-url` y haz una captura: es la única forma de ver el diseño de verdad.
+5. Revisa: `inspect-page {"id": 12}` (encabezados, enlaces rotos, imágenes sin alt, SEO efectivo y avisos). Los avisos miran solo el contenido: los encabezados con `"in_content": false` son del tema (widgets, comentarios) y no se arreglan en la página. Para cambios globales (menú, footer, header, estilos) inspecciona la portada: `{"path": "/"}`. Si tienes navegador, abre la URL de `get-preview-url` y haz una captura: es la única forma de ver el diseño de verdad.
 6. Publica si era un borrador: `update-content {"id": 12, "status": "publish"}`. Las cachés de página se purgan solas tras cada escritura.
-7. Cuenta al usuario qué cambiaste, qué avisos quedaron y cómo deshacerlo (revisión o `snapshot_id`).
+7. Cuenta al usuario qué cambiaste, qué avisos quedaron y cómo deshacerlo (`undo_revision_id` o `snapshot_id`). Si lo dejas en borrador, dale la URL de `get-preview-url` y cuándo caduca.
 
 El mismo flujo sirve para el footer, los mega menús, los widgets de builder y las plantillas: usa `"area"` en lugar de `"id"` (`"footer"`, `"menu_item:80"`, `"widget:builderwidget-3"`, `"template:<id>"`).
 
@@ -58,6 +59,8 @@ El mismo flujo sirve para el footer, los mega menús, los widgets de builder y l
 ## Qué evitar
 
 - Reenviar layouts enteros para cambios pequeños, o publicar sin `inspect-page`.
+- Restaurar un snapshot antiguo de la configuración del tema para deshacer un solo cambio (ver principio 4).
+- `list-activity` sin filtros: es larga. Filtra por `ability`, `object_type` u `object_id`, y `"result": "ok"` para ignorar los intentos fallidos.
 - Dominios completos en enlaces internos, o imágenes sin `alt`.
 - Tocar `yootheme_apikey`, `version`, `site_url` (bloqueadas) o la sección `scripts` (JS) sin que el usuario lo pida.
 - Borrar medios, menús, términos o contenido sin comprobar antes qué depende de ellos.

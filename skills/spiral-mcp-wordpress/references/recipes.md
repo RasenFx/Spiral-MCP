@@ -8,6 +8,7 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 - [Crear una página desde cero](#crear-una-página-desde-cero)
 - [Añadir una sección](#añadir-una-sección)
 - [Subir una imagen y usarla](#subir-una-imagen-y-usarla)
+- [Crear el menú principal](#crear-el-menú-principal)
 - [Cambiar un elemento del menú](#cambiar-un-elemento-del-menú)
 - [Cambiar el header y el logo](#cambiar-el-header-y-el-logo)
 - [Editar el footer](#editar-el-footer)
@@ -25,9 +26,30 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 
 ## Crear una página desde cero
 
-1. `create-content {"title": "Landing", "status": "draft"}`.
-2. `update-yootheme-layout {"id": <id>, "layout": {...}}` con un árbol completo (raíz `layout`, `section > row > column > elementos`). Para conocer los props usa `list-elements` y `get-element-schema`, o parte de un layout de la biblioteca (`list-library`, `insert-from-library`).
-3. Lee los `warnings` de la respuesta y corrige.
+1. Comprueba los destinos de los enlaces que vas a poner (`list-content`).
+2. `create-content {"title": "Servicios", "slug": "servicios", "status": "draft"}`.
+3. `update-yootheme-layout {"id": <id>, "layout": {...}}` con un árbol completo (raíz `layout`, `section > row > column > elementos`). Ejemplo probado con hero, tres columnas y llamada a la acción (adáptalo; para otros props usa `get-element-schema`, o parte de la biblioteca con `list-library` / `insert-from-library`):
+   ```json
+   {"type": "layout", "children": [
+     {"type": "section", "props": {"style": "secondary", "text_color": "light", "padding_top": "xlarge", "padding_bottom": "xlarge", "name": "Hero"}, "children": [
+       {"type": "row", "children": [{"type": "column", "children": [
+         {"type": "headline", "props": {"content": "Webs que trabajan para tu negocio", "title_element": "h1", "title_style": "heading-large", "text_align": "center"}},
+         {"type": "text", "props": {"content": "<p>Entradilla.</p>", "text_style": "lead", "text_align": "center"}},
+         {"type": "button", "props": {"text_align": "center", "margin_top": "medium"}, "children": [
+           {"type": "button_item", "props": {"content": "Pide presupuesto", "link": "/contacto/", "button_style": "primary"}}]}]}]}]},
+     {"type": "section", "props": {"style": "default", "name": "Servicios"}, "children": [
+       {"type": "row", "props": {"layout": "1-3,1-3,1-3", "column_gap": "large"}, "children": [
+         {"type": "column", "props": {"width_medium": "1-3", "style": "card-default", "padding": "large"}, "children": [
+           {"type": "headline", "props": {"content": "Diseño web", "title_element": "h3"}},
+           {"type": "text", "props": {"content": "<p>Descripción.</p>"}}]},
+         {"type": "column", "props": {"width_medium": "1-3", "style": "card-default", "padding": "large"}, "children": ["…"]},
+         {"type": "column", "props": {"width_medium": "1-3", "style": "card-default", "padding": "large"}, "children": ["…"]}]}]},
+     {"type": "section", "props": {"style": "primary", "text_color": "light", "name": "Llamada a la acción"}, "children": ["… como el hero, con h2 …"]}
+   ]}
+   ```
+   - `title_element` es la etiqueta (h1, h2…: la jerarquía para SEO, un solo h1 por página) y `title_style` el tamaño visual (`heading-large`, `h1`…): un h2 puede verse grande sin romper la jerarquía.
+   - En filas con varias columnas pon `layout` en la fila (`"1-2,1-2"`, `"1-3,1-3,1-3"`, `"2-3,1-3"`…) y el ancho en cada columna (`width_medium`); sin `layout` las columnas se apilan.
+4. Lee los `warnings` de la respuesta y corrige. Revisa con `inspect-page`, guarda el SEO con `update-seo` y da al usuario la URL de `get-preview-url`.
 
 ## Añadir una sección
 
@@ -48,6 +70,15 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 3. Imagen destacada: `set-featured-image {"post_id": 12, "media_id": 345}` (o `featured_media` en `update-content`).
 4. Para cambiar el alt después: `update-media {"id": 345, "alt": "..."}`.
 
+## Crear el menú principal
+
+1. `list-menus`: menús existentes y ubicaciones (`locations`). `list-content {"post_type": "any"}` para los destinos; si una página no existe, ver el principio 7 del skill.
+2. `create-menu {"name": "Menú principal", "items": [{"type": "custom", "title": "Inicio", "url": "/"}, {"type": "page", "object_id": 12}], "locations": ["navbar", "dialog-mobile"]}`.
+   - En YOOtheme el menú de la cabecera de escritorio va en la ubicación `navbar` (en todas las disposiciones de `header.layout`). En móvil, `dialog-mobile` es el menú que abre el botón de hamburguesa (`navbar-mobile` si la cabecera móvil muestra una barra de navegación; mira `get-theme-config {"section": "mobile"}`).
+   - Las demás ubicaciones (`header`, `toolbar-left`, `toolbar-right`, `dialog`, `header-mobile`) son posiciones extra.
+3. Lee los `warnings`: avisan de elementos que enlazan a borradores (404 para los visitantes hasta publicarlos).
+4. Comprueba la portada: `inspect-page {"path": "/"}` debe listar los enlaces del menú.
+
 ## Cambiar un elemento del menú
 
 1. `list-menus` y `get-menu {"menu": "principal"}`.
@@ -65,7 +96,15 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 
 ## Editar el footer
 
-`get-layout-outline {"area": "footer"}`, después `patch-layout {"area": "footer", "operations": [...]}`. Si el footer está vacío, créalo con `update-theme-layout {"area": "footer", "layout": {...}}`.
+`get-layout-outline {"area": "footer"}`, después `patch-layout {"area": "footer", "operations": [...]}`. Si el footer está vacío, créalo con `update-theme-layout {"area": "footer", "layout": {...}}`. Una línea de copyright:
+
+```json
+{"type": "layout", "children": [{"type": "section", "props": {"style": "muted", "padding_top": "small", "padding_bottom": "small"}, "children": [
+  {"type": "row", "children": [{"type": "column", "children": [
+    {"type": "text", "props": {"content": "<p>© 2026 Nombre del sitio · <a href=\"/politica-de-privacidad/\">Política de privacidad</a></p>", "text_style": "small", "text_color": "muted", "text_align": "center"}}]}]}]}]}
+```
+
+El año y el nombre quedan escritos tal cual: díselo al usuario. Comprueba con `inspect-page {"path": "/"}`.
 
 ## Plantilla para las entradas
 
@@ -78,7 +117,7 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 
 ## Cambiar la marca (colores y tipografía)
 
-1. `list-style-variables {"component": "global"}`: grupos primary, secondary, colors, backgrounds, typography. Los valores por defecto son expresiones LESS (`darken(@global-primary-background, 5%)`).
+1. `list-style-variables {"component": "global"}`. Los colores están en los grupos `colors` y `backgrounds`; el color principal de la marca es `@global-primary-background`, del que salen botones, secciones y fondos "primary". Ojo: los grupos `primary` y `secondary` son las **fuentes** primaria y secundaria, no colores. Los valores por defecto son expresiones LESS (`darken(@global-primary-background, 5%)`): cambiar la variable base arrastra a las derivadas.
 2. `update-theme-style {"less": {"@global-primary-background": "#e63946", "@global-secondary-background": "#1d3557", "@global-font-family": "'Roboto'"}}`. Las fuentes de Google van entre comillas simples y YOOtheme las descarga sola; `null` devuelve una variable a su valor por defecto.
 3. Recompila: abre `recompile_url` en un navegador con sesión y espera. Después `get-style-status` → `needs_recompile: false`.
 4. Comprueba la portada (captura o `inspect-page {"path": "/"}`).
@@ -86,7 +125,9 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 
 ## Programar una publicación
 
-`update-content {"id": 12, "status": "publish", "date": "2026-11-01T09:00:00+01:00"}` deja el contenido en estado `future`. `list-content {"status": "future"}` lista lo programado.
+1. `get-site-settings`: comprueba la zona horaria del sitio (`timezone`). Si no es la del usuario, avísale: wp-admin mostrará la hora en esa zona. Cambiarla (`update-site-settings {"timezone_string": "Europe/Madrid"}`) afecta a todo el sitio: hazlo solo si te lo pide.
+2. Crea en borrador y revisa (`inspect-page`) como cualquier contenido.
+3. `update-content {"id": 12, "status": "publish", "date": "2026-11-01T09:00:00+01:00"}` lo deja en estado `future`; también vale `create-content` con esos dos campos si no hace falta revisar. Envía siempre la zona en la fecha. `list-content {"status": "future"}` lista lo programado.
 
 ## Página hija con plantilla, categorías y SEO
 
@@ -97,6 +138,8 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 
 ## Deshacer un cambio
 
-- **Página o entrada (título, contenido, layout):** `list-revisions {"id": 12}` → `restore-revision {"revision_id": …, "confirm": true}`. Antes guarda el estado actual, así que también se puede deshacer la restauración.
-- **Todo lo demás:** `list-activity` (filtra por `ability` u `object_id`) → `restore-snapshot {"id": <snapshot_id>, "confirm": true}`.
-- Si restauras un snapshot que cambia el estilo, vuelve a hacer falta recompilar (`get-style-status`).
+- **Página o entrada (título, contenido, layout):** `restore-revision {"revision_id": <undo_revision_id>, "confirm": true}` (o búscala con `list-revisions {"id": 12}`). Antes guarda el estado actual, así que también se puede deshacer la restauración.
+- **Un valor concreto** (un color, una sección de la configuración): lo más seguro es revertir solo ese valor con la herramienta que lo cambió. Por ejemplo `update-theme-style {"less": {"@global-primary-background": null}}` vuelve al valor por defecto del estilo. Para saber el valor anterior, mira `list-activity {"ability": "spiral-mcp/update-theme-style", "result": "ok"}`.
+- **Con snapshot:** `list-activity` (filtra por `ability` u `object_id`) → `restore-snapshot {"id": <snapshot_id>, "confirm": true}`. Si después hubo otros cambios en el mismo objeto, la llamada falla y los lista (en la configuración del tema, también en qué secciones difiere). Entonces restaura solo la parte que toca: `"parts": ["less"]` (estilo) o `["footer"]`. `"include_later": true` lo restaura entero y deshace también lo posterior: solo si el usuario lo quiere.
+- Restaurar el snapshot de un menú recién creado lo borra.
+- Si lo restaurado cambia el estilo, vuelve a hacer falta recompilar (`get-style-status`).

@@ -1,6 +1,6 @@
 # Referencia de abilities spiral-mcp/*
 
-Generada a partir de los esquemas registrados por el plugin (v1.9.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
+Generada a partir de los esquemas registrados por el plugin (v1.10.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
 
 Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; destructiva = requiere `"confirm": true`.
 
@@ -22,7 +22,7 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 | Ability | Tipo | Parámetros |
 |---|---|---|
 | `list-post-types` | lectura | — |
-| `list-content` | lectura | post_type `"post" / "page"`, status `"any" / "publish" / "future" / "draft" / "pending" / "private" / "trash"`, search `string`, parent `integer`, per_page `integer`, page `integer` |
+| `list-content` | lectura | post_type `"any" / "post" / "page"`, status `"any" / "publish" / "future" / "draft" / "pending" / "private" / "trash"`, search `string`, parent `integer`, per_page `integer`, page `integer` |
 | `get-content` | lectura | **id** `integer` |
 | `create-content` | escritura | post_type `"post" / "page"`, **title** `string`, content `string`, excerpt `string`, status `"publish" / "future" / "draft" / "pending" / "private"`, slug `string`, parent `integer`, menu_order `integer`, template `string`, author `integer`, date `string`, comment_status `"open" / "closed"`, terms `object`, featured_media `integer`, meta `object` |
 | `update-content` | escritura | **id** `integer`, title `string`, content `string`, excerpt `string`, status `"publish" / "future" / "draft" / "pending" / "private"`, slug `string`, parent `integer`, menu_order `integer`, template `string`, author `integer`, date `string`, comment_status `"open" / "closed"`, terms `object`, featured_media `integer`, meta `object` |
@@ -125,14 +125,14 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 | Ability | Tipo | Parámetros |
 |---|---|---|
 | `get-site-settings` | lectura | — |
-| `update-site-settings` | escritura | blogname `string`, blogdescription `string`, show_on_front `"posts" / "page"`, page_on_front `integer`, page_for_posts `integer`, site_icon `integer` |
+| `update-site-settings` | escritura | blogname `string`, blogdescription `string`, show_on_front `"posts" / "page"`, page_on_front `integer`, page_for_posts `integer`, site_icon `integer`, timezone_string `string` |
 
 ## Snapshots
 
 | Ability | Tipo | Parámetros |
 |---|---|---|
 | `list-snapshots` | lectura | kind `string`, ref `string`, per_page `integer`, page `integer` |
-| `restore-snapshot` | destructiva | **id** `integer`, **confirm** `boolean` |
+| `restore-snapshot` | destructiva | **id** `integer`, **confirm** `boolean`, parts `array`, include_later `boolean` |
 
 ## Auditoría
 

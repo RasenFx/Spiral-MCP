@@ -184,24 +184,33 @@ function spiral_mcp_inspect_html( $html, $check_links, $max_links ) {
 		'links'    => array( 'internal' => array(), 'external' => array(), 'broken' => array() ),
 		'images'   => array( 'total' => 0, 'missing_alt' => array(), 'empty_alt' => array() ),
 		'warnings' => array(),
+		'notes'    => array(),
 	);
 
-	// Encabezados en orden de documento (sin la barra de administración).
+	// Encabezados en orden de documento (sin la barra de administración). "in_content" distingue
+	// los del contenido (dentro de <main>, sin barra lateral, widgets ni comentarios) de los del tema:
+	// los avisos de h1 y saltos de nivel solo miran los del contenido.
+	$has_main = $xpath->query( '//body//main' )->length > 0;
+	$theme_q  = 'ancestor::*[self::aside or @id="comments" or @id="respond" or contains(concat(" ", normalize-space(@class), " "), " comments-area ") or contains(concat(" ", normalize-space(@class), " "), " widget ")]';
 	foreach ( $xpath->query( '//body//*[self::h1 or self::h2 or self::h3 or self::h4 or self::h5 or self::h6][not(ancestor::*[@id="wpadminbar"])]' ) as $h ) {
-		$out['headings'][] = array( 'level' => (int) substr( $h->nodeName, 1 ), 'text' => spiral_mcp_dom_text( $h ) );
+		$in_content        = ( ! $has_main || $xpath->query( 'ancestor::main', $h )->length > 0 ) && 0 === $xpath->query( $theme_q, $h )->length;
+		$out['headings'][] = array( 'level' => (int) substr( $h->nodeName, 1 ), 'text' => spiral_mcp_dom_text( $h ), 'in_content' => $in_content );
 	}
-	$h1 = count( array_filter( $out['headings'], function ( $h ) {
+	$content_h = array_values( array_filter( $out['headings'], function ( $h ) {
+		return $h['in_content'];
+	} ) );
+	$h1 = count( array_filter( $content_h, function ( $h ) {
 		return 1 === $h['level'];
 	} ) );
 	if ( 0 === $h1 ) {
-		$out['warnings'][] = 'La página no tiene ningún h1.';
+		$out['warnings'][] = 'El contenido no tiene ningún h1.';
 	} elseif ( $h1 > 1 ) {
-		$out['warnings'][] = sprintf( 'La página tiene %d h1; lo recomendable es uno.', $h1 );
+		$out['warnings'][] = sprintf( 'El contenido tiene %d h1; lo recomendable es uno.', $h1 );
 	}
 	$prev = 0;
-	foreach ( $out['headings'] as $h ) {
+	foreach ( $content_h as $h ) {
 		if ( $prev && $h['level'] > $prev + 1 ) {
-			$out['warnings'][] = sprintf( 'Salto de nivel de encabezado: h%d después de h%d ("%s").', $h['level'], $prev, $h['text'] );
+			$out['warnings'][] = sprintf( 'Salto de nivel de encabezado en el contenido: h%d después de h%d ("%s").', $h['level'], $prev, $h['text'] );
 		}
 		$prev = $h['level'];
 	}
@@ -209,29 +218,47 @@ function spiral_mcp_inspect_html( $html, $check_links, $max_links ) {
 		$out['warnings'][] = 'Sin meta description (ver spiral-mcp/update-seo).';
 	}
 
-	// Enlaces.
+	// Enlaces, agrupados por destino: "count" dice cuántos hay y "texts", con qué textos.
+	// Los que llevan el token de la vista previa apuntan a la propia página: se marcan "self",
+	// sin token ni comprobación (un borrador da 404 a un visitante sin token).
 	$seen = array();
 	foreach ( $xpath->query( '//body//a[@href][not(ancestor::*[@id="wpadminbar"])]' ) as $a ) {
 		$href = trim( $a->getAttribute( 'href' ) );
 		$text = spiral_mcp_dom_text( $a );
 		$path = spiral_mcp_internal_path( $href );
 		if ( null === $path ) {
-			if ( preg_match( '#^(https?:)?//#i', $href ) && ! isset( $seen[ $href ] ) ) {
-				$seen[ $href ]                 = true;
-				$out['links']['external'][] = array( 'href' => $href, 'text' => $text );
+			if ( preg_match( '#^(https?:)?//#i', $href ) ) {
+				if ( isset( $seen[ $href ] ) ) {
+					$out['links']['external'][ $seen[ $href ] ]['count']++;
+					continue;
+				}
+				$seen[ $href ]              = count( $out['links']['external'] );
+				$out['links']['external'][] = array( 'href' => $href, 'text' => $text, 'count' => 1 );
 			}
 			continue;
 		}
-		if ( isset( $seen[ $path ] ) ) {
+		$path = preg_replace( '/#.*$/', '', $path );
+		$self = false !== strpos( $path, 'spiral_preview=' );
+		if ( $self ) {
+			$path = remove_query_arg( array( 'spiral_preview', 'preview' ), $path );
+		}
+		$key = 'i:' . $path;
+		if ( isset( $seen[ $key ] ) ) {
+			$link = &$out['links']['internal'][ $seen[ $key ] ];
+			$link['count']++;
+			if ( '' !== $text && ! in_array( $text, $link['texts'], true ) ) {
+				$link['texts'][] = $text;
+			}
+			unset( $link );
 			continue;
 		}
-		$seen[ $path ]                 = true;
-		$out['links']['internal'][] = array( 'href' => $path, 'text' => $text );
+		$seen[ $key ]               = count( $out['links']['internal'] );
+		$out['links']['internal'][] = array( 'href' => $path, 'text' => $text, 'texts' => '' === $text ? array() : array( $text ), 'count' => 1 ) + ( $self ? array( 'self' => true ) : array() );
 	}
 	if ( $check_links ) {
 		$checked = 0;
 		foreach ( $out['links']['internal'] as $i => $link ) {
-			if ( $checked >= $max_links || preg_match( '#^/(wp-admin|wp-login\.php|wp-json|feed)#', $link['href'] ) ) {
+			if ( $checked >= $max_links || ! empty( $link['self'] ) || preg_match( '#^/(wp-admin|wp-login\.php|wp-json|feed)#', $link['href'] ) ) {
 				continue;
 			}
 			$checked++;
@@ -243,11 +270,25 @@ function spiral_mcp_inspect_html( $html, $check_links, $max_links ) {
 			}
 			$out['links']['internal'][ $i ]['status'] = $code;
 			if ( 0 === $code || $code >= 400 ) {
+				// Si el destino es contenido sin publicar, decirlo: se arregla publicándolo, no cambiando el enlace.
+				$target = url_to_postid( home_url( $link['href'] ) );
+				if ( ! $target ) { // url_to_postid() no resuelve borradores por su ruta.
+					$by_path = get_page_by_path( trim( (string) wp_parse_url( $link['href'], PHP_URL_PATH ), '/' ), OBJECT, spiral_mcp_post_types() );
+					$target  = $by_path ? $by_path->ID : 0;
+				}
+				$status = $target ? get_post_status( $target ) : false;
+				if ( $status && 'publish' !== $status ) {
+					$out['links']['internal'][ $i ]['target_id']     = $target;
+					$out['links']['internal'][ $i ]['target_status'] = $status;
+				}
 				$out['links']['broken'][] = $out['links']['internal'][ $i ];
 			}
 		}
-		if ( count( $out['links']['internal'] ) > $checked ) {
-			$out['warnings'][] = sprintf( 'Solo se comprobaron %d de %d enlaces internos (max_links).', $checked, count( $out['links']['internal'] ) );
+		$checkable = count( array_filter( $out['links']['internal'], function ( $l ) {
+			return empty( $l['self'] ) && ! preg_match( '#^/(wp-admin|wp-login\.php|wp-json|feed)#', $l['href'] );
+		} ) );
+		if ( $checkable > $checked ) {
+			$out['warnings'][] = sprintf( 'Solo se comprobaron %d de %d enlaces internos (max_links).', $checked, $checkable );
 		}
 	}
 	if ( $out['links']['broken'] ) {
@@ -349,7 +390,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	spiral_mcp_register_ability( 'spiral-mcp/inspect-page', array(
 		'label'               => 'Inspeccionar una página',
-		'description'         => 'Renderiza una página como la ve un visitante (también borradores, con una vista previa interna que se revoca al terminar) y devuelve un informe sin el HTML: código HTTP; SEO efectivo (title, description, canonical, robots, Open Graph); encabezados h1–h6 en orden; enlaces internos (con su código HTTP: los rotos van en links.broken) y externos; imágenes sin alt; y "warnings" con lo que conviene corregir (sin h1, varios h1, saltos de nivel, sin description, enlaces rotos, imágenes sin alt). Úsala antes de publicar y después de cada cambio importante. Indica "id" o "path" (ruta relativa, p. ej. /contacto/).',
+		'description'         => 'Renderiza una página como la ve un visitante (también borradores, con una vista previa interna que se revoca al terminar) y devuelve un informe sin el HTML: código HTTP; SEO efectivo (title, description, canonical, robots, Open Graph); encabezados h1–h6 en orden ("in_content": false si son del tema, como widgets de la cabecera o el formulario de comentarios); enlaces internos agrupados por destino ("count" y "texts"; con su código HTTP: los rotos van en links.broken, con "target_status" si el destino existe pero no está publicado; "self" si apuntan a la propia vista previa) y externos; imágenes sin alt; "warnings" con lo que conviene corregir en el contenido (sin h1, varios h1, saltos de nivel, sin description, enlaces rotos, imágenes sin alt); y "notes" aclaratorias. Úsala antes de publicar y después de cada cambio importante. Indica "id" o "path" (ruta relativa, p. ej. /contacto/).',
 		'category'            => 'spiral-mcp-preview',
 		'group'               => array( 'content', 'design' ),
 		'input_schema'        => array(
@@ -402,9 +443,13 @@ add_action( 'wp_abilities_api_init', function () {
 			if ( $code >= 400 ) {
 				array_unshift( $report['warnings'], sprintf( 'La página responde con HTTP %d.', $code ) );
 			}
+			if ( $revoke ) {
+				$report['notes'][] = 'Inspeccionada como vista previa (no está publicada): el robots "noindex" lo añade la vista previa; al publicar se aplica el del sitio y el SEO del contenido.';
+			}
 			return array(
-				'url'    => isset( $revoke ) && $revoke ? remove_query_arg( 'spiral_preview', $url ) : $url,
-				'status' => $code,
+				'url'     => $revoke ? remove_query_arg( array( 'spiral_preview', 'preview' ), $url ) : $url,
+				'status'  => $code,
+				'preview' => (bool) $revoke,
 			) + $report;
 		},
 		'meta'                => spiral_mcp_meta( true, false, true ),

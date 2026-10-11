@@ -37,6 +37,13 @@ function spiral_mcp_theme_config_read() {
  * Personalizador al guardar (normaliza los layouts de los mega menús).
  */
 function spiral_mcp_theme_config_write( array $config, $original_raw ) {
+	// config.save de YOOtheme reescribe nav_menu_locations a partir de config.menu.positions.<ubicación>.menu,
+	// que en la BD puede estar desfasado (YOOtheme lo rellena en memoria al cargar). Sin esto, guardar la
+	// configuración quitaría a los menús las ubicaciones asignadas con create-menu o update-menu.
+	$locations = get_nav_menu_locations();
+	foreach ( array_keys( get_registered_nav_menus() ) as $name ) {
+		$config['menu']['positions'][ $name ]['menu'] = empty( $locations[ $name ] ) ? '' : $locations[ $name ];
+	}
 	if ( class_exists( 'YOOtheme\Event' ) ) {
 		try {
 			$filtered = \YOOtheme\Event::emit( 'config.save|filter', $config );
@@ -327,6 +334,52 @@ function spiral_mcp_theme_config_restore( $ref, $data ) {
 	return true;
 }
 
+/** Decodifica un valor del theme mod "config" (texto JSON o array). */
+function spiral_mcp_theme_config_decode( $raw ) {
+	$c = is_string( $raw ) ? json_decode( $raw, true ) : $raw;
+	return is_array( $c ) ? $c : array();
+}
+
+/** Secciones de primer nivel en que un snapshot de theme_config difiere de la configuración actual. */
+function spiral_mcp_theme_config_diff( $ref, $data ) {
+	$old  = spiral_mcp_theme_config_decode( $data );
+	$cur  = spiral_mcp_theme_config_decode( get_theme_mod( 'config', null ) );
+	$diff = array();
+	foreach ( array_unique( array_merge( array_keys( $old ), array_keys( $cur ) ) ) as $key ) {
+		// menu.positions lo sincroniza YOOtheme con las ubicaciones de los menús: no cuenta como cambio.
+		$a = $old[ $key ] ?? null;
+		$b = $cur[ $key ] ?? null;
+		if ( 'menu' === $key ) {
+			unset( $a['positions'], $b['positions'] );
+		}
+		if ( $a != $b ) { // phpcs:ignore Universal.Operators.StrictComparisons.LooseNotEqual
+			$diff[] = (string) $key;
+		}
+	}
+	return $diff;
+}
+
+/** Configuración actual con solo las secciones $parts tomadas del snapshot (mismo formato que el theme mod). */
+function spiral_mcp_theme_config_partial( $ref, $data, array $parts ) {
+	$raw = get_theme_mod( 'config', null );
+	$old = spiral_mcp_theme_config_decode( $data );
+	$cur = spiral_mcp_theme_config_decode( $raw );
+	foreach ( $parts as $key ) {
+		if ( in_array( $key, array( 'yootheme_apikey', 'version', 'site_url' ), true ) ) {
+			return new WP_Error( 'spiral_mcp_snapshot_parts', sprintf( 'La sección "%s" no se puede restaurar.', $key ) );
+		}
+		if ( ! array_key_exists( $key, $old ) && ! array_key_exists( $key, $cur ) ) {
+			return new WP_Error( 'spiral_mcp_snapshot_parts', sprintf( 'La sección "%s" no existe en el snapshot ni en la configuración actual.', $key ) );
+		}
+		if ( array_key_exists( $key, $old ) ) {
+			$cur[ $key ] = $old[ $key ];
+		} else {
+			unset( $cur[ $key ] );
+		}
+	}
+	return is_string( $raw ) || null === $raw ? spiral_mcp_json( $cur ) : $cur;
+}
+
 /** Estado de un widget: su opción widget_<base> y la asignación de áreas. */
 function spiral_mcp_widget_capture( $widget_id ) {
 	$parsed = spiral_mcp_widget_parse_id( $widget_id );
@@ -359,6 +412,8 @@ add_filter( 'spiral_mcp_snapshot_kinds', function ( $kinds ) {
 			return get_theme_mod( 'config', null );
 		},
 		'restore' => 'spiral_mcp_theme_config_restore',
+		'parts'   => 'spiral_mcp_theme_config_diff',
+		'partial' => 'spiral_mcp_theme_config_partial',
 	);
 	$kinds['widgets']      = array(
 		'group'   => 'design',
@@ -529,7 +584,7 @@ add_action( 'wp_abilities_api_init', function () {
 			if ( is_wp_error( $id ) ) {
 				return $id;
 			}
-			$res = spiral_mcp_snapshot_restore( $id );
+			$res = spiral_mcp_snapshot_restore( $id, array( 'include_later' => true ) ); // Alias obsoleto: conserva su comportamiento.
 			if ( is_wp_error( $res ) ) {
 				return $res;
 			}

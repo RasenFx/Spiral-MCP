@@ -10,7 +10,7 @@ El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes d
 - YOOtheme Pro activo (o un tema hijo de YOOtheme) para todo lo relacionado con el builder y los estilos.
 - PHP 7.4 como mínimo: no usar sintaxis de PHP 8 (match, nullsafe `?->`, argumentos con nombre, tipos de unión, `readonly`, enums).
 
-## Estructura actual (v1.9.0)
+## Estructura actual (v1.10.0)
 ```
 spiral-mcp-control.php   cabecera, constantes, comprobación de requisitos, require_once y hooks de activación
 uninstall.php            borra el rol y las capacidades (las tablas solo con el filtro spiral_mcp_uninstall_drop_tables)
@@ -57,7 +57,7 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - **Nombres**: abilities `spiral-mcp/<verbo>-<objeto>` en kebab-case; funciones PHP `spiral_mcp_*`; constantes `SPIRAL_MCP_*`; códigos de `WP_Error` `spiral_mcp_*`; filtros y acciones `spiral_mcp_*`; categorías `spiral-mcp-<módulo>`.
 - **Un módulo por archivo** en `includes/`, cada uno con su categoría y sus abilities, registrado desde el archivo principal con `require_once`.
 - **Patrón de registro**: copiar el de `includes/menus.php`. Registrar siempre con `spiral_mcp_register_ability()`, nunca con `wp_register_ability()` directamente. Argumentos extra del wrapper: `'group'` (`content`, `design`, `media`, `settings`, `code`, o un array si basta con uno: exige la capacidad `spiral_mcp_<grupo>`) y `'log' => [ 'type' => …, 'id' => clave de la entrada o callable( $input, $result ) ]` (objeto para la auditoría). `'meta' => spiral_mcp_meta( $readonly, $destructive, $idempotent )`. `input_schema` con `required`. El wrapper registra en el log toda ability con `readonly = false`.
-- **Snapshots**: cada módulo registra sus tipos con el filtro `spiral_mcp_snapshot_kinds` (`group`, `cap`, `capture`, `restore`) y llama a `spiral_mcp_snapshot_capture( $kind, $ref, $note )` antes de escribir. Si devuelve `WP_Error`, no escribir. Devolver `snapshot_id` en la respuesta.
+- **Snapshots**: cada módulo registra sus tipos con el filtro `spiral_mcp_snapshot_kinds` (`group`, `cap`, `capture`, `restore`; opcionales `parts` y `partial` para restaurar por partes, como `theme_config`) y llama a `spiral_mcp_snapshot_capture( $kind, $ref, $note )` antes de escribir. Si devuelve `WP_Error`, no escribir. Devolver `snapshot_id` en la respuesta.
 - **Descripciones en español, escritas para un agente**: qué hace, qué leer antes ("primero lee con X"), qué devuelve y qué es irreversible. Las descripciones son la documentación que verá el agente.
 - **Permisos**: el wrapper exige la capacidad `spiral_mcp_*` del grupo; además, `permission_callback` comprueba la nativa del objeto (`edit_post` con ese ID, `edit_theme_options`…). Nunca `__return_true`.
 - **Acciones destructivas** (borrar, restaurar, reemplazar algo sin revisión): exigir `"confirm": true` con `spiral_mcp_require_confirm()` y marcar `destructive => true`.
@@ -75,6 +75,7 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - **Footer**: `config.footer.content` es un layout con el mismo formato que una página.
 - **Mega menús**: `config.menu.items.<ID del elemento de menú>.content`, raíz `"type":"fragment"`.
 - **Header, navbar, top, bottom…** no tienen layout en `config`: son ajustes planos; su contenido de builder son widgets `builderwidget` en esas posiciones.
+- **Ubicaciones de menú**: el evento `config.save` de YOOtheme reescribe `nav_menu_locations` a partir de `config.menu.positions.<ubicación>.menu`, que en la BD puede estar desfasado. `spiral_mcp_theme_config_write()` lo sincroniza con las ubicaciones actuales antes de guardar; cualquier otra escritura de `config` que pase por `config.save` debe hacer lo mismo.
 - **`version` en la raíz de todo layout** (`"5.0.51"`): sin ella YOOtheme asume 1.0.0 y aplica todas sus migraciones al renderizar. Las funciones de guardado la añaden (`spiral_mcp_layout_stamp_version()`).
 - **Plantillas y biblioteca**: opción `yootheme` (JSON) bajo `templates.<id>` y `library.<id>`. Escribir **solo** con `\YOOtheme\app(\YOOtheme\Storage::class)`: guarda la opción entera en `shutdown` y pisaría un `update_option()` hecho en la misma petición.
 - **Elementos**: `\YOOtheme\app(\YOOtheme\Builder::class)->getTypes()`; `json_encode` resuelve los campos compartidos. `YOOtheme\Config` es una **interfaz** (usar `interface_exists`, no `class_exists`).

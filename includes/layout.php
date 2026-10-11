@@ -268,7 +268,7 @@ function spiral_mcp_layout_patch_target( array $input, array $ops, $note ) {
 		if ( is_wp_error( $res ) ) {
 			return $res;
 		}
-		$out = array( 'id' => (int) $loaded['post']->ID );
+		$out = array( 'id' => (int) $loaded['post']->ID ) + spiral_mcp_revision_info( $loaded['post']->ID );
 	} else {
 		$area = $loaded['target']['area'];
 		$res  = spiral_mcp_theme_area_save( $area, $layout, $note . ':' . $area );

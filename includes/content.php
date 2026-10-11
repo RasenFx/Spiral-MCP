@@ -112,6 +112,18 @@ function spiral_mcp_layout_save_post( WP_Post $post, $layout ) {
 	) );
 }
 
+/**
+ * Revisiones tras guardar: "revision_id" es el estado recién guardado y "undo_revision_id",
+ * el anterior (el que se pasa a restore-revision para deshacer el cambio).
+ */
+function spiral_mcp_revision_info( $post_id ) {
+	$ids = array_values( wp_get_post_revisions( $post_id, array( 'fields' => 'ids', 'posts_per_page' => 2, 'orderby' => 'ID', 'order' => 'DESC' ) ) );
+	return array(
+		'revision_id'      => isset( $ids[0] ) ? (int) $ids[0] : null,
+		'undo_revision_id' => isset( $ids[1] ) ? (int) $ids[1] : null,
+	);
+}
+
 /** Ficha completa de un post: resumen + jerarquía, plantilla, autor, fecha, términos, imagen y metas. */
 function spiral_mcp_content_details( WP_Post $post ) {
 	$terms = array();
@@ -392,7 +404,7 @@ add_action( 'wp_abilities_api_init', function () {
 		'input_schema'        => array(
 			'type'       => 'object',
 			'properties' => array(
-				'post_type' => array( 'type' => 'string', 'enum' => spiral_mcp_post_types(), 'default' => 'page' ),
+				'post_type' => array( 'type' => 'string', 'enum' => array_merge( array( 'any' ), spiral_mcp_post_types() ), 'default' => 'page', 'description' => '"any" = todos los tipos editables.' ),
 				'status'    => array( 'type' => 'string', 'enum' => array( 'any', 'publish', 'future', 'draft', 'pending', 'private', 'trash' ), 'default' => 'any' ),
 				'search'    => array( 'type' => 'string', 'description' => 'Texto a buscar en título/contenido.' ),
 				'parent'    => array( 'type' => 'integer', 'description' => 'Solo hijos de este ID (0 = solo los de primer nivel).' ),
@@ -413,7 +425,7 @@ add_action( 'wp_abilities_api_init', function () {
 		'execute_callback'    => function ( $input = array() ) {
 			$input = (array) $input;
 			$args  = array(
-				'post_type'      => $input['post_type'] ?? 'page',
+				'post_type'      => 'any' === ( $input['post_type'] ?? 'page' ) ? spiral_mcp_post_types() : ( $input['post_type'] ?? 'page' ),
 				'post_status'    => $input['status'] ?? 'any',
 				's'              => $input['search'] ?? '',
 				'posts_per_page' => (int) ( $input['per_page'] ?? 20 ),
@@ -825,7 +837,7 @@ add_action( 'wp_abilities_api_init', function () {
 			if ( is_wp_error( $result ) ) {
 				return $result;
 			}
-			return array_merge( spiral_mcp_summary( get_post( $post->ID ) ), array( 'updated' => true, 'warnings' => $warnings ) );
+			return array_merge( spiral_mcp_summary( get_post( $post->ID ) ), array( 'updated' => true ), spiral_mcp_revision_info( $post->ID ), array( 'warnings' => $warnings ) );
 		},
 		'meta'                => spiral_mcp_meta( false ),
 	) );

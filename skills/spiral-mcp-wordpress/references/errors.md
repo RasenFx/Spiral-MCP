@@ -18,3 +18,7 @@
 | `rest_ability_cannot_execute` / `ability_invalid_permissions` | Al usuario del agente le falta un permiso | Avisa a la persona responsable del sitio; no intentes rodearlo. |
 | `ability_invalid_input` | Falta un parámetro obligatorio o tiene otro tipo | Revisa `references/abilities.md` (los obligatorios van en negrita). |
 | `inspect-page` no carga la página | El servidor no se alcanza a sí mismo por su dominio | Pide que se configure el filtro `spiral_mcp_inspect_base_url`. Mientras tanto, revisa con la URL de `get-preview-url` en tu navegador. |
+| `spiral_mcp_snapshot_later` | Después de ese snapshot hubo otros cambios en el mismo objeto, y restaurarlo los desharía | Restaura solo la parte que toca (`"parts"`, en la configuración del tema) o revierte el valor con su herramienta. `"include_later": true` solo si el usuario quiere volver al estado completo. |
+| Enlace roto con `target_status` en `inspect-page` | El destino existe pero no está publicado (borrador, programado…) | Publica el destino cuando el usuario lo apruebe, o cambia el enlace. La ruta está bien. |
+| `warnings` de `get-menu` / `create-menu` sobre elementos en borrador | El menú enlaza a contenido sin publicar | Igual que arriba: el elemento se ve en el menú, pero da 404 hasta publicar. |
+| Avisos de encabezados que no son de la página | Encabezados del tema (widgets, comentarios) | Los que tienen `"in_content": false` no cuentan para los avisos y no se arreglan en la página. |

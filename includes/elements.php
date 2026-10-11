@@ -66,7 +66,10 @@ function spiral_mcp_field_option_values( $options ) {
 	}
 	$values = array();
 	foreach ( $options as $label => $value ) {
-		if ( is_array( $value ) && ! isset( $value['label'] ) && ! isset( $value['value'] ) ) {
+		if ( is_array( $value ) && isset( $value['options'] ) && is_array( $value['options'] ) ) {
+			// Grupo de opciones: [ 'label' => 'Animations', 'options' => [ … ] ].
+			$values = array_merge( $values, (array) spiral_mcp_field_option_values( $value['options'] ) );
+		} elseif ( is_array( $value ) && ! isset( $value['label'] ) && ! isset( $value['value'] ) ) {
 			$values = array_merge( $values, (array) spiral_mcp_field_option_values( $value ) );
 		} elseif ( is_array( $value ) ) {
 			$values[] = (string) ( $value['value'] ?? $label );
@@ -265,7 +268,7 @@ function spiral_mcp_validate_node( $node, $path, $parent, array $types, array &$
 				continue;
 			}
 			$field = $known[ $prop ] ?? array();
-			if ( 'select' === ( $field['type'] ?? '' ) && is_scalar( $value ) && '' !== $value ) {
+			if ( in_array( $field['type'] ?? '', array( 'select', 'select-img' ), true ) && is_scalar( $value ) && '' !== $value ) {
 				$values = spiral_mcp_field_option_values( $field['options'] ?? null );
 				if ( null !== $values && ! in_array( is_bool( $value ) ? ( $value ? '1' : '' ) : (string) $value, $values, true ) ) {
 					$result['warnings'][] = sprintf( 'En %s (%s): "%s" = "%s" no está entre sus opciones (%s).', $at, $type, $prop, $value, implode( ', ', array_slice( array_map( function ( $v ) {
@@ -341,7 +344,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	spiral_mcp_register_ability( 'spiral-mcp/get-element-schema', array(
 		'label'               => 'Esquema de un elemento',
-		'description'         => 'Devuelve los props que admite un tipo de elemento de YOOtheme: para cada uno, su tipo de campo (text si no se indica, select, checkbox, number, editor, image, link, color…), etiqueta, opciones permitidas (en los select) y si admite contenido dinámico ("source"). Incluye los valores por defecto del tipo y, en filas, los props que se ponen en las columnas hijas (width_default, width_small, width_medium…). Los props de imagen llevan rutas relativas como wp-content/uploads/2024/11/logo.webp y los enlaces, rutas relativas como /contacto/.',
+		'description'         => 'Devuelve los props que admite un tipo de elemento de YOOtheme: para cada uno, su tipo de campo (text si no se indica, select, checkbox, number, editor, image, link, color…), etiqueta, opciones permitidas (en los select) y si admite contenido dinámico ("source"). Incluye los valores por defecto del tipo y, en filas, los props que se ponen en las columnas hijas (width_default, width_small, width_medium…). En una fila con varias columnas pon "layout" (una de sus opciones, p. ej. "1-3,1-3,1-3") y los width_* coherentes en cada columna: sin "layout" la fila apila las columnas a ancho completo hasta que un width_* lo cambie. Omite los controles internos del editor (botones de panel y selectores de fuente dinámica). Los props de imagen llevan rutas relativas como wp-content/uploads/2024/11/logo.webp y los enlaces, rutas relativas como /contacto/.',
 		'category'            => 'spiral-mcp-layout',
 		'group'               => array( 'content', 'design' ),
 		'input_schema'        => array(
@@ -369,7 +372,11 @@ add_action( 'wp_abilities_api_init', function () {
 						'type'  => $f['type'] ?? 'text',
 						'label' => $f['label'] ?? '',
 					);
-					$values = 'select' === $row['type'] ? spiral_mcp_field_option_values( $f['options'] ?? null ) : null;
+					// Controles del editor que no son props (botones de panel, selectores de fuente dinámica).
+					if ( '_' === substr( (string) $prop, 0, 1 ) || in_array( $row['type'], array( 'button-panel', 'hidden' ), true ) || 0 === strpos( $row['type'], 'source-' ) ) {
+						continue;
+					}
+					$values = in_array( $row['type'], array( 'select', 'select-img' ), true ) ? spiral_mcp_field_option_values( $f['options'] ?? null ) : null;
 					if ( null !== $values ) {
 						$row['options'] = $values;
 					}
