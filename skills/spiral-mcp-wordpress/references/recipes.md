@@ -12,6 +12,7 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 - [Cambiar un elemento del menú](#cambiar-un-elemento-del-menú)
 - [Cambiar el header y el logo](#cambiar-el-header-y-el-logo)
 - [Editar el footer](#editar-el-footer)
+- [Widgets: barra lateral, barra superior, top y bottom](#widgets-barra-lateral-barra-superior-top-y-bottom)
 - [Plantilla para las entradas](#plantilla-para-las-entradas)
 - [Cambiar la marca (colores y tipografía)](#cambiar-la-marca-colores-y-tipografía)
 - [Programar una publicación](#programar-una-publicación)
@@ -109,6 +110,18 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 ```
 
 El año y el nombre quedan escritos tal cual: díselo al usuario. Comprueba con `inspect-page {"path": "/"}`.
+
+## Widgets: barra lateral, barra superior, top y bottom
+
+1. `list-widgets`: áreas con sus widgets y `types` (tipos disponibles). En YOOtheme, `toolbar-left`/`toolbar-right` es la barra superior, `top`/`bottom` van encima y debajo del contenido y `sidebar` es la lateral. Lo que el usuario llama "arriba" suele ser la barra superior, no `top`: compruébalo en la lista.
+2. **Quitar** del sitio sin perderlo: `update-widget {"widget_id": "block-5", "sidebar": "wp_inactive_widgets"}`. **Borrar** de verdad: `delete-widget {"widget_id": "block-5", "confirm": true}` (deja snapshot).
+3. **Crear**:
+   - Texto con bloques: `create-widget {"type": "block", "sidebar": "sidebar", "instance": {"content": "<!-- wp:paragraph --><p>Texto</p><!-- /wp:paragraph -->"}}`.
+   - Menú: `{"type": "nav_menu", "sidebar": "toolbar-left", "instance": {"nav_menu": 81}}`.
+   - Contenido con el builder de YOOtheme: `{"type": "builderwidget", "sidebar": "top", "layout": {"type": "fragment", "children": [{"type": "row", "children": [{"type": "column", "children": [...]}]}]}}`.
+   - `position` (1 = primero) coloca el widget dentro del área; sin él va al final.
+4. **Editar**: `update-widget` con las claves de `instance` que cambian, `sidebar` para moverlo o `position` para reordenarlo. Los widgets de builder se editan como un área: `get-layout-outline {"area": "widget:builderwidget-2"}` y `patch-layout`.
+5. Comprueba en una página donde se vea el área (`inspect-page`; la lateral sale en entradas, archivos y búsquedas). Para deshacer una creación, restaura su `snapshot_id`.
 
 ## Plantilla para las entradas
 

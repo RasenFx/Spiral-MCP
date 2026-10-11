@@ -380,6 +380,54 @@ function spiral_mcp_theme_config_partial( $ref, $data, array $parts ) {
 	return is_string( $raw ) || null === $raw ? spiral_mcp_json( $cur ) : $cur;
 }
 
+/** Objeto WP_Widget registrado para una base (id_base), o null. */
+function spiral_mcp_widget_type( $base ) {
+	global $wp_widget_factory;
+	foreach ( (array) ( $wp_widget_factory->widgets ?? array() ) as $widget ) {
+		if ( $widget instanceof WP_Widget && $widget->id_base === $base ) {
+			return $widget;
+		}
+	}
+	return null;
+}
+
+/** Tipos de widget disponibles: id_base => nombre. */
+function spiral_mcp_widget_types() {
+	global $wp_widget_factory;
+	$out = array();
+	foreach ( (array) ( $wp_widget_factory->widgets ?? array() ) as $widget ) {
+		if ( $widget instanceof WP_Widget ) {
+			$out[ $widget->id_base ] = wp_strip_all_tags( (string) $widget->name );
+		}
+	}
+	ksort( $out );
+	return $out;
+}
+
+/** Valida un área de widgets (o wp_inactive_widgets). */
+function spiral_mcp_widget_check_sidebar( $sidebar ) {
+	global $wp_registered_sidebars;
+	if ( 'wp_inactive_widgets' !== $sidebar && ! isset( $wp_registered_sidebars[ $sidebar ] ) ) {
+		return new WP_Error( 'spiral_mcp_bad_sidebar', sprintf( 'El área "%s" no existe. Disponibles: %s', $sidebar, implode( ', ', array_keys( (array) $wp_registered_sidebars ) ) ) );
+	}
+	return true;
+}
+
+/** Coloca un widget en un área (lo quita de las demás). $position: 1 = primero; null = al final. */
+function spiral_mcp_widget_place( $widget_id, $sidebar, $position = null ) {
+	$sidebars = wp_get_sidebars_widgets();
+	foreach ( $sidebars as $s => $ids ) {
+		if ( is_array( $ids ) ) {
+			$sidebars[ $s ] = array_values( array_diff( $ids, array( $widget_id ) ) );
+		}
+	}
+	$list = isset( $sidebars[ $sidebar ] ) && is_array( $sidebars[ $sidebar ] ) ? $sidebars[ $sidebar ] : array();
+	$at   = null === $position ? count( $list ) : max( 0, min( count( $list ), (int) $position - 1 ) );
+	array_splice( $list, $at, 0, array( $widget_id ) );
+	$sidebars[ $sidebar ] = $list;
+	wp_set_sidebars_widgets( $sidebars );
+}
+
 /** Estado de un widget: su opción widget_<base> y la asignación de áreas. */
 function spiral_mcp_widget_capture( $widget_id ) {
 	$parsed = spiral_mcp_widget_parse_id( $widget_id );
@@ -596,7 +644,7 @@ add_action( 'wp_abilities_api_init', function () {
 	/* 5. Listar widgets --------------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/list-widgets', array(
 		'label'               => 'Listar widgets',
-		'description'         => 'Lista las áreas de widgets del tema y los widgets de cada una (incluidos los inactivos), con su configuración. Los nav_menu indican qué menú muestran y los widgets de builder de YOOtheme devuelven su layout decodificado en "layouts".',
+		'description'         => 'Lista las áreas de widgets del tema y los widgets de cada una (incluidos los inactivos), con su configuración, y los tipos de widget disponibles ("types": id_base => nombre; los usa spiral-mcp/create-widget). Los nav_menu indican qué menú muestran y los widgets de builder de YOOtheme devuelven su layout decodificado en "layouts". Las áreas de YOOtheme: toolbar-left/toolbar-right (barra superior), top y bottom (encima y debajo del contenido), sidebar (lateral), header, navbar, dialog y sus versiones -mobile, y builder-N.',
 		'category'            => 'spiral-mcp-theme',
 		'group'               => 'design',
 		'input_schema'        => array( 'type' => 'object', 'properties' => new stdClass() ),
@@ -618,7 +666,7 @@ add_action( 'wp_abilities_api_init', function () {
 					'widgets' => $widgets,
 				);
 			}
-			return array( 'areas' => $areas );
+			return array( 'areas' => $areas, 'types' => (object) spiral_mcp_widget_types() );
 		},
 		'meta'                => spiral_mcp_meta( true, false, true ),
 	) );
@@ -639,11 +687,11 @@ add_action( 'wp_abilities_api_init', function () {
 				'layout'     => array( 'type' => 'object', 'description' => 'Layout de YOOtheme para widgets de builder (raíz "fragment"). También se puede editar con spiral-mcp/patch-layout y "area": "widget:<ID>".' ),
 				'layout_key' => array( 'type' => 'string', 'default' => 'content' ),
 				'sidebar'    => array( 'type' => 'string', 'description' => 'Área destino. "wp_inactive_widgets" = desactivar.' ),
+				'position'   => array( 'type' => 'integer', 'minimum' => 1, 'description' => 'Posición en el área (1 = primero). Sin "sidebar", reordena dentro de su área actual.' ),
 			),
 		),
 		'permission_callback' => $can,
 		'execute_callback'    => function ( $input ) {
-			global $wp_registered_sidebars;
 			$wid  = (string) ( $input['widget_id'] ?? '' );
 			$data = spiral_mcp_widget_instance( $wid );
 			if ( is_wp_error( $data ) ) {
@@ -654,11 +702,17 @@ add_action( 'wp_abilities_api_init', function () {
 
 			// Se valida el área antes de escribir nada.
 			$target = (string) ( $input['sidebar'] ?? '' );
-			if ( '' !== $target && 'wp_inactive_widgets' !== $target && ! isset( $wp_registered_sidebars[ $target ] ) ) {
-				return new WP_Error( 'spiral_mcp_bad_sidebar', sprintf( 'El área "%s" no existe. Disponibles: %s', $target, implode( ', ', array_keys( (array) $wp_registered_sidebars ) ) ) );
+			if ( '' === $target && isset( $input['position'] ) ) {
+				$target = (string) spiral_mcp_widget_sidebar_of( $wid );
+			}
+			if ( '' !== $target ) {
+				$ok = spiral_mcp_widget_check_sidebar( $target );
+				if ( is_wp_error( $ok ) ) {
+					return $ok;
+				}
 			}
 			if ( empty( $input['instance'] ) && ! isset( $input['layout'] ) && '' === $target ) {
-				return new WP_Error( 'spiral_mcp_nothing', 'No se envió ningún cambio (instance, layout o sidebar).' );
+				return new WP_Error( 'spiral_mcp_nothing', 'No se envió ningún cambio (instance, layout, sidebar o position).' );
 			}
 			$snapshot = spiral_mcp_snapshot_capture( 'widgets', $wid, 'update-widget' );
 			if ( is_wp_error( $snapshot ) ) {
@@ -699,18 +753,141 @@ add_action( 'wp_abilities_api_init', function () {
 			}
 
 			if ( '' !== $target ) {
-				$sidebars = wp_get_sidebars_widgets();
-				foreach ( $sidebars as $s => $ids ) {
-					if ( is_array( $ids ) ) {
-						$sidebars[ $s ] = array_values( array_diff( $ids, array( $wid ) ) );
-					}
-				}
-				$sidebars[ $target ]   = isset( $sidebars[ $target ] ) && is_array( $sidebars[ $target ] ) ? $sidebars[ $target ] : array();
-				$sidebars[ $target ][] = $wid;
-				wp_set_sidebars_widgets( $sidebars );
+				spiral_mcp_widget_place( $wid, $target, $input['position'] ?? null );
 			}
 			return spiral_mcp_widget_out( $wid ) + array( 'snapshot_id' => $snapshot );
 		},
 		'meta'                => spiral_mcp_meta( false, false, true ),
+	) );
+
+	/* 7. Crear widget ----------------------------------------------------- */
+	spiral_mcp_register_ability( 'spiral-mcp/create-widget', array(
+		'label'               => 'Crear widget',
+		'description'         => 'Crea un widget en un área. "type" es el id_base del tipo (ver "types" en spiral-mcp/list-widgets): p. ej. "block" (bloques de WordPress; "instance": {"content": "<!-- wp:paragraph --><p>Texto</p><!-- /wp:paragraph -->"}), "custom_html" ({"title", "content"}), "text" ({"title", "text"}), "nav_menu" ({"title", "nav_menu": ID del menú}) o "builderwidget" (builder de YOOtheme: envía "layout" con raíz "fragment" > row > column > elementos; "instance" puede llevar "title"). La configuración pasa por el update() del propio widget, como en wp-admin (sin permiso unfiltered_html se filtra el HTML). "sidebar" es el área (ver list-widgets) y "position" el orden (1 = primero; por defecto, al final). Devuelve el ID nuevo ("id") y "snapshot_id"; restaurar ese snapshot lo quita.',
+		'category'            => 'spiral-mcp-theme',
+		'group'               => 'design',
+		'log'                 => array( 'type' => 'widget', 'id' => function ( $in, $res ) {
+			return is_array( $res ) ? ( $res['id'] ?? '' ) : '';
+		} ),
+		'input_schema'        => array(
+			'type'       => 'object',
+			'required'   => array( 'type', 'sidebar' ),
+			'properties' => array(
+				'type'     => array( 'type' => 'string', 'description' => 'id_base del tipo de widget, p. ej. block, custom_html, nav_menu, builderwidget.' ),
+				'sidebar'  => array( 'type' => 'string', 'description' => 'Área, p. ej. sidebar, top, toolbar-right. "wp_inactive_widgets" lo crea desactivado.' ),
+				'instance' => array( 'type' => 'object', 'description' => 'Configuración del widget.' ),
+				'layout'   => array( 'type' => 'object', 'description' => 'Solo builderwidget: layout de YOOtheme (raíz "fragment").' ),
+				'position' => array( 'type' => 'integer', 'minimum' => 1 ),
+			),
+		),
+		'permission_callback' => $can,
+		'execute_callback'    => function ( $input ) {
+			$base   = (string) ( $input['type'] ?? '' );
+			$widget = spiral_mcp_widget_type( $base );
+			if ( ! $widget ) {
+				return new WP_Error( 'spiral_mcp_bad_widget_type', sprintf( 'No existe el tipo de widget "%s". Disponibles: %s.', $base, implode( ', ', array_keys( spiral_mcp_widget_types() ) ) ) );
+			}
+			$sidebar = (string) ( $input['sidebar'] ?? '' );
+			$ok      = spiral_mcp_widget_check_sidebar( $sidebar );
+			if ( is_wp_error( $ok ) ) {
+				return $ok;
+			}
+			$instance = isset( $input['instance'] ) && is_array( $input['instance'] ) ? $input['instance'] : array();
+			$warnings = array();
+			if ( isset( $input['layout'] ) ) {
+				$layout = $input['layout'];
+				if ( 'builderwidget' !== $base ) {
+					return new WP_Error( 'spiral_mcp_bad_layout', '"layout" solo vale para widgets "builderwidget".' );
+				}
+				if ( ! is_array( $layout ) || ! in_array( $layout['type'] ?? '', array( 'layout', 'fragment' ), true ) ) {
+					return new WP_Error( 'spiral_mcp_bad_layout', 'El layout debe ser un objeto con "type": "fragment" (o "layout").' );
+				}
+				$warnings = spiral_mcp_layout_check( $layout );
+				if ( is_wp_error( $warnings ) ) {
+					return $warnings;
+				}
+				$instance['content'] = spiral_mcp_json( spiral_mcp_layout_stamp_version( $layout ) );
+			} elseif ( 'builderwidget' === $base ) {
+				return new WP_Error( 'spiral_mcp_bad_layout', 'Un widget "builderwidget" necesita "layout" (raíz "fragment" > row > column > elementos).' );
+			}
+			if ( 'nav_menu' === $base && ( empty( $instance['nav_menu'] ) || ! wp_get_nav_menu_object( (int) $instance['nav_menu'] ) ) ) {
+				return new WP_Error( 'spiral_mcp_menu_not_found', 'Un widget nav_menu necesita "nav_menu" con el ID de un menú existente (ver spiral-mcp/list-menus).' );
+			}
+
+			$all = get_option( 'widget_' . $base, array() );
+			$all = is_array( $all ) ? $all : array();
+			$num = 2;
+			foreach ( array_keys( $all ) as $key ) {
+				if ( is_int( $key ) && $key >= $num ) {
+					$num = $key + 1;
+				}
+			}
+			$wid      = $base . '-' . $num;
+			$snapshot = spiral_mcp_snapshot_capture( 'widgets', $wid, 'create-widget' );
+			if ( is_wp_error( $snapshot ) ) {
+				return $snapshot;
+			}
+			// Como en wp-admin: la configuración pasa por el update() del widget (sanea según los permisos).
+			$clean = $widget->update( $instance, array() );
+			if ( false === $clean || ! is_array( $clean ) ) {
+				return new WP_Error( 'spiral_mcp_widget_rejected', 'El widget rechazó la configuración enviada.' );
+			}
+			$all[ $num ]          = $clean;
+			$all['_multiwidget'] = 1;
+			update_option( 'widget_' . $base, $all );
+			spiral_mcp_widget_place( $wid, $sidebar, $input['position'] ?? null );
+			return spiral_mcp_widget_out( $wid ) + array( 'snapshot_id' => $snapshot, 'warnings' => $warnings );
+		},
+		'meta'                => spiral_mcp_meta( false ),
+	) );
+
+	/* 8. Borrar widget ---------------------------------------------------- */
+	spiral_mcp_register_ability( 'spiral-mcp/delete-widget', array(
+		'label'               => 'Borrar widget',
+		'description'         => 'Borra un widget: lo quita de su área y elimina su configuración (como "Borrar" en wp-admin). Para quitarlo del sitio sin borrarlo, usa spiral-mcp/update-widget con "sidebar": "wp_inactive_widgets". Primero mira el widget con spiral-mcp/list-widgets. Requiere "confirm": true. Antes guarda un snapshot ("snapshot_id"; restaurarlo lo recupera).',
+		'category'            => 'spiral-mcp-theme',
+		'group'               => 'design',
+		'log'                 => array( 'type' => 'widget', 'id' => 'widget_id' ),
+		'input_schema'        => array(
+			'type'       => 'object',
+			'required'   => array( 'widget_id', 'confirm' ),
+			'properties' => array(
+				'widget_id' => array( 'type' => 'string', 'description' => 'ID del widget, p. ej. block-5.' ),
+				'confirm'   => array( 'type' => 'boolean', 'description' => 'Debe ser true.' ),
+			),
+		),
+		'permission_callback' => $can,
+		'execute_callback'    => function ( $input ) {
+			$ok = spiral_mcp_require_confirm( $input, 'borrar el widget' );
+			if ( is_wp_error( $ok ) ) {
+				return $ok;
+			}
+			$wid  = (string) ( $input['widget_id'] ?? '' );
+			$data = spiral_mcp_widget_instance( $wid );
+			if ( is_wp_error( $data ) ) {
+				return $data;
+			}
+			list( $base, $num, $all ) = $data;
+			$before                   = spiral_mcp_widget_out( $wid );
+			$snapshot                 = spiral_mcp_snapshot_capture( 'widgets', $wid, 'delete-widget' );
+			if ( is_wp_error( $snapshot ) ) {
+				return $snapshot;
+			}
+			$sidebars = wp_get_sidebars_widgets();
+			foreach ( $sidebars as $s => $ids ) {
+				if ( is_array( $ids ) ) {
+					$sidebars[ $s ] = array_values( array_diff( $ids, array( $wid ) ) );
+				}
+			}
+			wp_set_sidebars_widgets( $sidebars );
+			unset( $all[ $num ] );
+			update_option( 'widget_' . $base, $all );
+			return array(
+				'deleted'     => true,
+				'widget'      => $before,
+				'snapshot_id' => $snapshot,
+			);
+		},
+		'meta'                => spiral_mcp_meta( false, true, true ),
 	) );
 } );

@@ -108,7 +108,7 @@ rest GET '/wp-abilities/v1/abilities&per_page=100'
 check 'listado de abilities' 200
 for name in list-content get-content create-content update-content get-yootheme-layout update-yootheme-layout \
 	list-menus get-menu create-menu update-menu delete-menu add-menu-item update-menu-item delete-menu-item \
-	get-theme-layout update-theme-layout list-theme-backups restore-theme-backup list-widgets update-widget \
+	get-theme-layout update-theme-layout list-theme-backups restore-theme-backup list-widgets update-widget create-widget delete-widget \
 	list-activity list-snapshots restore-snapshot upload-media list-media get-media update-media delete-media \
 	set-featured-image find-media-usage list-elements get-element-schema get-layout-outline get-layout-node \
 	patch-layout duplicate-content get-theme-config update-theme-config list-templates get-template \
@@ -222,19 +222,33 @@ call GET spiral-mcp/list-theme-backups
 check 'list-theme-backups (alias)' 200 backups
 
 call GET spiral-mcp/list-widgets
-check 'list-widgets' 200 areas
-WIDGET_ID=$(printf '%s' "$BODY" | php -r '
-	$d = json_decode( stream_get_contents( STDIN ), true );
-	foreach ( $d["areas"] as $a ) { foreach ( $a["widgets"] as $w ) { if ( isset( $w["instance"]["title"] ) ) { echo $w["id"]; exit; } } }
-')
-if [ -n "$WIDGET_ID" ]; then
-	call POST spiral-mcp/update-widget "{\"widget_id\":\"$WIDGET_ID\",\"instance\":{\"title\":\"Smoke\"}}"
-	check "update-widget ($WIDGET_ID)" 200 snapshot_id
-	call POST spiral-mcp/restore-snapshot "{\"id\":$(jget snapshot_id),\"confirm\":true}"
-	check 'restore-snapshot (widgets)' 200
-else
-	echo 'AVISO no hay widgets con título: se omite update-widget'
-fi
+check 'list-widgets' 200 areas types.block
+
+# Ciclo completo con widgets desactivados (no se ven en el sitio): crear, editar, restaurar y borrar.
+call POST spiral-mcp/create-widget '{"type":"slider-que-no-existe","sidebar":"wp_inactive_widgets"}'
+[ "$STATUS" -ge 400 ] && ok 'create-widget rechaza un tipo inexistente' || ko 'create-widget con tipo inexistente'
+call POST spiral-mcp/create-widget '{"type":"text","sidebar":"wp_inactive_widgets","instance":{"title":"Smoke","text":"Hola"}}'
+check 'create-widget (text)' 200 id snapshot_id
+WIDGET_ID=$(jget id)
+eq 'create-widget: título' title Smoke
+call POST spiral-mcp/update-widget "{\"widget_id\":\"$WIDGET_ID\",\"instance\":{\"title\":\"Smoke editado\"}}"
+check "update-widget ($WIDGET_ID)" 200 snapshot_id
+eq 'update-widget: título' title 'Smoke editado'
+call POST spiral-mcp/restore-snapshot "{\"id\":$(jget snapshot_id),\"confirm\":true}"
+check 'restore-snapshot (widgets)' 200
+call POST spiral-mcp/create-widget '{"type":"builderwidget","sidebar":"wp_inactive_widgets","layout":{"type":"fragment","children":[{"type":"row","children":[{"type":"column","children":[{"type":"headline","props":{"content":"Smoke"}}]}]}]}}'
+check 'create-widget (builderwidget)' 200 id layouts.content
+BUILDER_ID=$(jget id)
+call POST spiral-mcp/patch-layout "{\"area\":\"widget:$BUILDER_ID\",\"operations\":[{\"op\":\"replace\",\"path\":\"/children/0/children/0/children/0/props/content\",\"value\":\"Smoke patch\"}]}"
+check 'patch-layout (widget de builder nuevo)' 200 snapshot_id
+call DELETE spiral-mcp/delete-widget "{\"widget_id\":\"$WIDGET_ID\"}"
+[ "$STATUS" -ge 400 ] && ok 'delete-widget sin confirm se rechaza' || ko 'delete-widget sin confirm'
+for wid in "$WIDGET_ID" "$BUILDER_ID"; do
+	call DELETE spiral-mcp/delete-widget "{\"widget_id\":\"$wid\",\"confirm\":true}"
+	check "delete-widget ($wid)" 200 snapshot_id
+done
+call GET spiral-mcp/list-widgets
+printf '%s' "$BODY" | grep -q "\"$WIDGET_ID\"" && ko 'el widget borrado sigue en list-widgets' || ok 'list-widgets ya no muestra los widgets borrados'
 
 # --- Contenido completo: tipos, jerarquía, términos, revisiones y SEO ----
 call GET spiral-mcp/list-post-types

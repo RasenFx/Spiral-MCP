@@ -2,6 +2,14 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.11.0] — 2026-10-11
+
+### Añadido
+- `spiral-mcp/create-widget`: crea un widget de cualquier tipo registrado (bloques, HTML, texto, menú, builder de YOOtheme con "layout"…) en un área y posición. La configuración pasa por el `update()` del widget, como en wp-admin. Snapshot para deshacer.
+- `spiral-mcp/delete-widget`: borra un widget (área y configuración), con `confirm` y snapshot.
+- `list-widgets` devuelve los tipos disponibles (`types`) y describe las áreas de YOOtheme; `update-widget` admite `position` para reordenar.
+- Ciclo completo de widgets en `tests/smoke.sh` (crear, editar, restaurar, patch de un widget de builder y borrar), con widgets desactivados para no tocar el sitio.
+
 ## [1.10.2] — 2026-10-11
 
 ### Corregido

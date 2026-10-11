@@ -1,6 +1,6 @@
 # Referencia de abilities spiral-mcp/*
 
-Generada a partir de los esquemas registrados por el plugin (v1.10.1). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
+Generada a partir de los esquemas registrados por el plugin (v1.11.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
 
 Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; destructiva = requiere `"confirm": true`.
 
@@ -62,7 +62,9 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 | `list-theme-backups` | lectura | — |
 | `restore-theme-backup` | destructiva | **backup_id** `string`, **confirm** `boolean` |
 | `list-widgets` | lectura | — |
-| `update-widget` | escritura | **widget_id** `string`, instance `object`, layout `object`, layout_key `string`, sidebar `string` |
+| `update-widget` | escritura | **widget_id** `string`, instance `object`, layout `object`, layout_key `string`, sidebar `string`, position `integer` |
+| `create-widget` | escritura | **type** `string`, **sidebar** `string`, instance `object`, layout `object`, position `integer` |
+| `delete-widget` | destructiva | **widget_id** `string`, **confirm** `boolean` |
 | `get-theme-config` | lectura | section `string` |
 | `update-theme-config` | escritura | **section** `string`, **values** `string / integer / number / boolean / array / object`, replace `boolean` |
 | `list-templates` | lectura | — |
