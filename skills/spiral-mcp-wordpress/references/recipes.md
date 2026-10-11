@@ -88,8 +88,12 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 
 ## Cambiar el header y el logo
 
-1. Sube el logo con `upload-media` y guarda el `path_relative`.
-2. `update-theme-config {"section": "logo", "values": {"image": "wp-content/uploads/…/logo.svg"}}`.
+1. Sube el logo con `upload-media` y guarda el `path_relative`. Si ya está en la biblioteca, búscalo con `list-media` y ponle `alt` con `update-media`.
+2. `get-theme-config {"section": "logo"}`: trae `known_keys` con las claves válidas. Después `update-theme-config {"section": "logo", "values": {"image": "wp-content/uploads/…/logo.png", "image_width": 50, "image_height": 50, "text": "Nombre de la marca"}}`.
+   - El alt del logo en la página sale de `text`, no del alt del medio: rellénalo siempre.
+   - Da un tamaño en px si la imagen es grande (YOOtheme sirve una copia redimensionada). Para un logo cuadrado, ancho y alto iguales.
+   - `image_mobile` (si falta, se usa `image`), `image_inverse` para fondos oscuros, `image_svg_inline` para SVG.
+   - Compruébalo con `inspect-page {"path": "/"}`: `images.empty_alt` debe quedar vacío.
 3. Disposición: `get-theme-config {"section": "header"}`, que trae en `defaults` las claves válidas. Después `update-theme-config {"section": "header", "values": {"layout": "stacked-center-a"}}`. Es un merge: solo cambian las claves enviadas.
 4. Navbar fija: sección `navbar` (`sticky`). Versión móvil: sección `mobile` (p. ej. `{"header": {"layout": "horizontal-center-logo"}}`).
 5. Contenido de builder en el header, la navbar, top o bottom: son widgets de builder. Busca en las `areas` de `get-theme-layout` las que empiezan por `widget:`.

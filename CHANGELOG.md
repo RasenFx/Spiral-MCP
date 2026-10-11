@@ -2,6 +2,12 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.10.1] — 2026-10-11
+
+### Cambiado
+- `get-theme-config {"section": "logo"}` devuelve `known_keys` (claves válidas y qué hace cada una), porque YOOtheme no tiene valores por defecto para el logo; `update-theme-config` avisa de claves desconocidas en `logo` y de un logo con imagen pero sin `text`, que YOOtheme usa como alt.
+- Skill: la receta del logo explica `known_keys`, el alt (`text`), el tamaño en px y las variantes móvil e inversa.
+
 ## [1.10.0] — 2026-10-11 · Correcciones tras probar el skill con casos reales
 
 ### Corregido

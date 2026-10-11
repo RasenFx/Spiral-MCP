@@ -50,6 +50,30 @@ function spiral_mcp_theme_config_defaults() {
 	return array();
 }
 
+/**
+ * Claves conocidas de las secciones que no tienen valores por defecto en YOOtheme
+ * (sacadas de los campos del Personalizador), con su descripción para el agente.
+ */
+function spiral_mcp_theme_config_known_keys() {
+	return array(
+		'logo' => array(
+			'text'                 => 'Texto del logo. Se muestra si no hay imagen y es el alt de las imágenes del logo: rellénalo siempre.',
+			'image'                => 'Imagen del logo (ruta relativa, p. ej. wp-content/uploads/2026/10/logo.png).',
+			'image_width'          => 'Ancho en px; YOOtheme genera una copia redimensionada. Indica ancho y alto (o uno solo para mantener la proporción) si la imagen original es grande.',
+			'image_height'         => 'Alto en px.',
+			'image_svg_inline'     => 'true = incrusta el SVG en el HTML (solo para logos SVG).',
+			'image_inverse'        => 'Variante para fondos oscuros o cabeceras transparentes.',
+			'image_mobile'         => 'Logo para la cabecera móvil (si falta, se usa "image").',
+			'image_mobile_width'   => 'Ancho en px del logo móvil.',
+			'image_mobile_height'  => 'Alto en px del logo móvil.',
+			'image_mobile_inverse' => 'Variante del logo móvil para fondos oscuros.',
+			'image_dialog'         => 'Logo dentro del diálogo o menú desplegable.',
+			'image_dialog_width'   => 'Ancho en px del logo del diálogo.',
+			'image_dialog_height'  => 'Alto en px del logo del diálogo.',
+		),
+	);
+}
+
 /** Merge profundo: los objetos se mezclan; las listas y escalares se reemplazan. */
 function spiral_mcp_merge_deep( $base, $values ) {
 	if ( ! is_array( $base ) || ! is_array( $values ) || spiral_mcp_is_list( $values ) || ( $base && spiral_mcp_is_list( $base ) ) ) {
@@ -69,7 +93,7 @@ function spiral_mcp_theme_config_unknown( $values, $defaults, $prefix ) {
 	}
 	foreach ( $values as $k => $v ) {
 		if ( ! array_key_exists( $k, $defaults ) ) {
-			$out[] = sprintf( '"%s.%s" no es un ajuste conocido de YOOtheme (puede que se ignore). Revisa "defaults" en spiral-mcp/get-theme-config.', $prefix, $k );
+			$out[] = sprintf( '"%s.%s" no es un ajuste conocido de YOOtheme (puede que se ignore). Revisa "defaults" (o "known_keys") en spiral-mcp/get-theme-config.', $prefix, $k );
 		} else {
 			$out = array_merge( $out, spiral_mcp_theme_config_unknown( $v, $defaults[ $k ], $prefix . '.' . $k ) );
 		}
@@ -104,7 +128,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	spiral_mcp_register_ability( 'spiral-mcp/get-theme-config', array(
 		'label'               => 'Leer la configuración de YOOtheme',
-		'description'         => 'Lee los ajustes de YOOtheme (Personalizar). Sin "section" devuelve la lista de secciones (site, header, navbar, dialog, mobile, top, bottom, footer, logo, post, blog, consent, scripts…) con su tipo y si se pueden editar. Con "section" devuelve su valor actual y "defaults" (los ajustes que admite y sus valores por defecto). Las claves api y otros secretos salen ocultos. Las claves con punto (p. ej. "search_dropdown.stretch") son nombres literales, no rutas. Los estilos (less, custom_less, style) se tratan en otra fase: cambiarlos no recompila el CSS.',
+		'description'         => 'Lee los ajustes de YOOtheme (Personalizar). Sin "section" devuelve la lista de secciones (site, header, navbar, dialog, mobile, top, bottom, footer, logo, post, blog, consent, scripts…) con su tipo y si se pueden editar. Con "section" devuelve su valor actual y "defaults" (los ajustes que admite y sus valores por defecto); en las secciones sin valores por defecto (p. ej. logo) devuelve "known_keys" con las claves y qué hace cada una. Las claves api y otros secretos salen ocultos. Las claves con punto (p. ej. "search_dropdown.stretch") son nombres literales, no rutas. Los estilos (less, custom_less, style) se tratan en otra fase: cambiarlos no recompila el CSS.',
 		'category'            => 'spiral-mcp-theme',
 		'group'               => 'design',
 		'input_schema'        => array(
@@ -134,17 +158,18 @@ add_action( 'wp_abilities_api_init', function () {
 				return new WP_Error( 'spiral_mcp_bad_section', sprintf( 'La sección "%s" no existe. Secciones: %s.', $section, implode( ', ', array_keys( $config ) ) ) );
 			}
 			$defaults = spiral_mcp_theme_config_defaults();
+			$known    = spiral_mcp_theme_config_known_keys();
 			return spiral_mcp_theme_config_summary( $section, $config[ $section ] ) + array(
 				'value'    => spiral_mcp_mask_secrets( $config[ $section ], $section ),
 				'defaults' => $defaults[ $section ] ?? null,
-			);
+			) + ( ! isset( $defaults[ $section ] ) && isset( $known[ $section ] ) ? array( 'known_keys' => $known[ $section ] ) : array() );
 		},
 		'meta'                => spiral_mcp_meta( true, false, true ),
 	) );
 
 	spiral_mcp_register_ability( 'spiral-mcp/update-theme-config', array(
 		'label'               => 'Cambiar la configuración de YOOtheme',
-		'description'         => 'Cambia una sección de los ajustes de YOOtheme. "values" se mezcla con lo que hay (merge profundo: solo cambian las claves enviadas; las listas se reemplazan enteras); con "replace": true sustituye la sección completa. Primero lee la sección con spiral-mcp/get-theme-config. Secciones editables: ' . implode( ', ', spiral_mcp_theme_config_sections() ) . '; "scripts" (JS personalizado) requiere además el permiso de código. No se pueden tocar yootheme_apikey, version, minimum_stability ni site_url. Las rutas de imagen (logo, favicon…) van relativas, p. ej. wp-content/uploads/2024/11/logo.webp (usa path_relative de spiral-mcp/upload-media). Avisa en "warnings" de claves que YOOtheme no conoce. Antes guarda un snapshot de toda la configuración ("snapshot_id"; se deshace con spiral-mcp/restore-snapshot).',
+		'description'         => 'Cambia una sección de los ajustes de YOOtheme. "values" se mezcla con lo que hay (merge profundo: solo cambian las claves enviadas; las listas se reemplazan enteras); con "replace": true sustituye la sección completa. Primero lee la sección con spiral-mcp/get-theme-config. Secciones editables: ' . implode( ', ', spiral_mcp_theme_config_sections() ) . '; "scripts" (JS personalizado) requiere además el permiso de código. No se pueden tocar yootheme_apikey, version, minimum_stability ni site_url. Las rutas de imagen (logo, favicon…) van relativas, p. ej. wp-content/uploads/2024/11/logo.webp (usa path_relative de spiral-mcp/upload-media). En "logo", el alt de la imagen es "text" (no el alt del medio) y conviene dar "image_width"/"image_height" si la imagen es grande. Avisa en "warnings" de claves que YOOtheme no conoce. Antes guarda un snapshot de toda la configuración ("snapshot_id"; se deshace con spiral-mcp/restore-snapshot).',
 		'category'            => 'spiral-mcp-theme',
 		'group'               => 'design',
 		'log'                 => array( 'type' => 'theme_config', 'id' => 'section' ),
@@ -186,7 +211,14 @@ add_action( 'wp_abilities_api_init', function () {
 				return new WP_Error( 'spiral_mcp_bad_values', sprintf( 'La sección "%s" es un objeto: envía "values" como objeto con las claves a cambiar.', $section ) );
 			}
 			$defaults = spiral_mcp_theme_config_defaults();
+			$known    = spiral_mcp_theme_config_known_keys();
+			if ( ! isset( $defaults[ $section ] ) && isset( $known[ $section ] ) ) {
+				$defaults[ $section ] = array_fill_keys( array_keys( $known[ $section ] ), null );
+			}
 			$warnings = spiral_mcp_theme_config_unknown( $values, $defaults[ $section ] ?? null, $section );
+			if ( 'logo' === $section && is_array( $values ) && ! empty( $values['image'] ) && '' === (string) ( $values['text'] ?? ( is_array( $current ) ? ( $current['text'] ?? '' ) : '' ) ) ) {
+				$warnings[] = 'El logo no tiene "text": YOOtheme lo usa como alt de la imagen. Ponle el nombre del sitio o de la marca.';
+			}
 
 			$snapshot = spiral_mcp_snapshot_take( 'theme_config', 'config', $read['raw'], 'update-theme-config:' . $section );
 			if ( is_wp_error( $snapshot ) ) {
