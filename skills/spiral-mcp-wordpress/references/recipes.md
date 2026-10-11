@@ -15,6 +15,7 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 - [Widgets: barra lateral, barra superior, top y bottom](#widgets-barra-lateral-barra-superior-top-y-bottom)
 - [Plantilla para las entradas](#plantilla-para-las-entradas)
 - [Página del blog con rejilla de entradas](#página-del-blog-con-rejilla-de-entradas)
+- [Usar la librería online de YOOtheme](#usar-la-librería-online-de-yootheme)
 - [Cambiar la marca (colores y tipografía)](#cambiar-la-marca-colores-y-tipografía)
 - [Programar una publicación](#programar-una-publicación)
 - [Página hija con plantilla, categorías y SEO](#página-hija-con-plantilla-categorías-y-seo)
@@ -154,6 +155,21 @@ El año y el nombre quedan escritos tal cual: díselo al usuario. Comprueba con 
    - El elemento `pagination` usa la paginación del propio listado.
    - Las categorías, etiquetas y autores usan sus propios tipos (`taxonomy-category`, `taxonomy-post_tag`, `author-archive`): crea una plantilla para cada uno, o el sitio usará la vista por defecto del tema.
 3. Comprueba con `inspect-page {"path": "/blog/"}`: debe salir un enlace "Leer más" por entrada publicada.
+
+## Usar la librería online de YOOtheme
+
+La librería de YOOtheme tiene cientos de diseños hechos por su equipo (páginas Home, Services, About…, plantillas Post, Post Index, Search, Error 404…, footers, mega menús y elementos sueltos), agrupados por web de ejemplo con el mismo nombre que los estilos (Circle, Fuse…).
+
+1. **Busca:** `list-online-library {"group": "template", "website": "Circle"}` (o `"group": "layout", "type": "Home"`, o `"kind": "element", "type": "accordion"`). Sin filtros, `facets` dice qué grupos, tipos y webs hay. Los diseños de la web que coincide con el estilo activo (`get-theme-style`) encajan mejor. `has_api_key: false` = falta la clave: pide al usuario que la ponga en Personalizar > Ajustes > API Key.
+2. **Mira antes de importar:** `get-online-library-item {"id": "a8c540b2"}` da el esquema, cuántas imágenes trae y cuántos nodos tienen fuente dinámica. `preview` (en el listado) es una imagen del diseño para enseñársela al usuario.
+3. **Importa:**
+   - Como plantilla: `import-from-online-library {"id": "a8c540b2", "target": "template"}` (tipo deducido; si es null, indica `template_type`). Queda **desactivada**.
+   - En una página: `{"id": "...", "target": "insert", "post_id": 12, "path": "/children/1"}`. Si la página aún no usa el builder, el diseño pasa a ser su layout.
+   - Un elemento suelto en una columna: `{"id": "...", "kind": "element", "target": "insert", "post_id": 12, "path": "/children/0/children/0/children/0/children/-"}`.
+   - En la biblioteca del sitio, para reutilizarlo: `"target": "library"`.
+   Las imágenes se descargan a la biblioteca de medios (sin duplicar).
+4. **Adapta:** los diseños son contenido de muestra (lorem ipsum, autores y fotos de ejemplo). Cambia textos, enlaces e imágenes con `patch-layout`. En plantillas, conecta título, fecha, imagen y contenido con fuentes dinámicas (`posts.singlePost`, `posts.archivePost`; ver las recetas de plantillas) antes de activarla con `update-template {"id": ..., "status": "enabled"}`: si no, todas las entradas mostrarían el mismo artículo de ejemplo.
+5. Revisa con `inspect-page` (o la URL de `get-preview-url` en un navegador) y enseña el resultado al usuario.
 
 ## Cambiar la marca (colores y tipografía)
 

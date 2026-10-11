@@ -2,6 +2,16 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.12.0] — 2026-10-11
+
+### Añadido
+- **Librería online de YOOtheme** (`includes/online-library.php`):
+  - `spiral-mcp/list-online-library`: catálogo de diseños (plantillas, páginas, footers, mega menús, búsqueda, diálogos) y de elementos prediseñados, con filtros por grupo, tipo, web de ejemplo y texto, `facets` y, en plantillas, el tipo de plantilla del sitio equivalente. Público, cacheado 12 h.
+  - `spiral-mcp/get-online-library-item`: descarga un diseño con la clave de API y devuelve su esquema, nº de imágenes y de fuentes dinámicas, sin importarlo.
+  - `spiral-mcp/import-from-online-library`: importa como plantilla (desactivada por defecto), en la biblioteca del sitio o insertado en una página o área. Descarga las imágenes a la biblioteca de medios (sin duplicar, por md5) y cambia sus URLs; aplica las migraciones de YOOtheme. La clave de API nunca sale en las respuestas.
+- `insert-from-library` (y la importación) en una página que aún no usa el builder: el layout del diseño pasa a ser el de la página.
+- `tests/smoke.sh`: bloque `SMOKE_ONLINE=1` para la librería online.
+
 ## [1.11.2] — 2026-10-11
 
 ### Corregido

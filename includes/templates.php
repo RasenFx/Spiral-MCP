@@ -191,6 +191,67 @@ function spiral_mcp_template_prepare( array $in, array $tpl = array() ) {
 	return array( $tpl, $warnings );
 }
 
+/**
+ * Inserta un elemento de biblioteca (layout guardado o elemento) en un layout ("id" o "area")
+ * en la posición "path" de una lista children. Un layout aporta sus secciones (o sus filas, en
+ * raíces "fragment"); un elemento, el propio elemento. Guarda como patch-layout.
+ */
+function spiral_mcp_library_insert( array $input, array $item, $note ) {
+	unset( $item['name'], $item['modified'], $item['version'], $item['id'], $item['path'], $item['meta'], $item['images'] );
+	$path = (string) ( $input['path'] ?? '' );
+	if ( false === strpos( $path, '/' ) ) {
+		return new WP_Error( 'spiral_mcp_bad_path', '"path" debe ser una posición en una lista children, p. ej. /children/1 o /children/0/children/0/children/0/children/-.' );
+	}
+	$nodes = array( $item );
+	// Una página que aún no usa el builder empieza con el layout del diseño.
+	if ( 'layout' === ( $item['type'] ?? '' ) && ! empty( $input['id'] ) ) {
+		$loaded = spiral_mcp_layout_target_load( $input );
+		if ( is_wp_error( $loaded ) && 'spiral_mcp_no_layout' === $loaded->get_error_code() ) {
+			$post = spiral_mcp_get_post( $input['id'] );
+			if ( is_wp_error( $post ) ) {
+				return $post;
+			}
+			$warnings = spiral_mcp_layout_check( $item );
+			if ( is_wp_error( $warnings ) ) {
+				return $warnings;
+			}
+			$res = spiral_mcp_layout_save_post( $post, $item );
+			if ( is_wp_error( $res ) ) {
+				return $res;
+			}
+			return array( 'id' => (int) $post->ID ) + spiral_mcp_revision_info( $post->ID ) + array(
+				'updated'  => true,
+				'created'  => true,
+				'warnings' => $warnings,
+			);
+		}
+	}
+	if ( 'layout' === ( $item['type'] ?? '' ) ) {
+		$nodes = (array) ( $item['children'] ?? array() );
+		// En raíces fragment (mega menú, widget) se insertan las filas.
+		$loaded = spiral_mcp_layout_target_load( $input );
+		if ( ! is_wp_error( $loaded ) && 'fragment' === ( $loaded['layout']['type'] ?? '' ) && preg_match( '#^/children/[^/]+$#', $path ) ) {
+			$rows = array();
+			foreach ( $nodes as $section ) {
+				$rows = array_merge( $rows, (array) ( $section['children'] ?? array() ) );
+			}
+			$nodes = $rows;
+		}
+	}
+	// Se insertan en orden: cada uno detrás del anterior.
+	$ops   = array();
+	$base  = substr( $path, 0, strrpos( $path, '/' ) + 1 );
+	$index = substr( $path, strrpos( $path, '/' ) + 1 );
+	foreach ( array_values( $nodes ) as $i => $node ) {
+		$ops[] = array(
+			'op'    => 'add',
+			'path'  => $base . ( '-' === $index ? '-' : ( (int) $index + $i ) ),
+			'value' => $node,
+		);
+	}
+	return spiral_mcp_layout_patch_target( $input, $ops, $note );
+}
+
 /** Elemento de la biblioteca en formato de salida. */
 function spiral_mcp_library_out( $id, array $item, $full = false ) {
 	$out = array(
@@ -532,35 +593,7 @@ add_action( 'wp_abilities_api_init', function () {
 			if ( ! is_array( $item ) ) {
 				return new WP_Error( 'spiral_mcp_library_not_found', 'No existe ese elemento en la biblioteca (ver spiral-mcp/list-library).' );
 			}
-			$item = json_decode( wp_json_encode( $item ), true );
-			unset( $item['name'], $item['modified'], $item['version'] );
-
-			$path  = (string) $input['path'];
-			$nodes = array( $item );
-			if ( 'layout' === ( $item['type'] ?? '' ) ) {
-				$nodes = (array) ( $item['children'] ?? array() );
-				// En raíces fragment (mega menú, widget) se insertan las filas.
-				$loaded = spiral_mcp_layout_target_load( (array) $input );
-				if ( ! is_wp_error( $loaded ) && 'fragment' === ( $loaded['layout']['type'] ?? '' ) && preg_match( '#^/children/[^/]+$#', $path ) ) {
-					$rows = array();
-					foreach ( $nodes as $section ) {
-						$rows = array_merge( $rows, (array) ( $section['children'] ?? array() ) );
-					}
-					$nodes = $rows;
-				}
-			}
-			// Se insertan en orden: cada uno detrás del anterior.
-			$ops   = array();
-			$base  = substr( $path, 0, strrpos( $path, '/' ) + 1 );
-			$index = substr( $path, strrpos( $path, '/' ) + 1 );
-			foreach ( array_values( $nodes ) as $i => $node ) {
-				$ops[] = array(
-					'op'    => 'add',
-					'path'  => $base . ( '-' === $index ? '-' : ( (int) $index + $i ) ),
-					'value' => $node,
-				);
-			}
-			return spiral_mcp_layout_patch_target( (array) $input, $ops, 'insert-from-library' );
+			return spiral_mcp_library_insert( (array) $input, json_decode( wp_json_encode( $item ), true ), 'insert-from-library' );
 		},
 		'meta'                => spiral_mcp_meta( false ),
 	) );

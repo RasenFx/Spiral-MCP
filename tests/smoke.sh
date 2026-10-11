@@ -113,7 +113,7 @@ for name in list-content get-content create-content update-content get-yootheme-
 	set-featured-image find-media-usage list-elements get-element-schema get-layout-outline get-layout-node \
 	patch-layout duplicate-content get-theme-config update-theme-config list-templates get-template \
 	create-template update-template delete-template list-library get-library-item save-to-library \
-	insert-from-library clear-cache list-post-types trash-content restore-content delete-content \
+	insert-from-library list-online-library get-online-library-item import-from-online-library clear-cache list-post-types trash-content restore-content delete-content \
 	list-revisions restore-revision list-taxonomies list-terms create-term update-term delete-term \
 	get-seo update-seo get-site-settings update-site-settings get-custom-css update-custom-css \
 	get-theme-style list-style-variables update-theme-style get-style-status mark-style-compiled \
@@ -463,6 +463,23 @@ if [ "${SMOKE_INSPECT:-0}" = 1 ]; then
 	check 'inspect-page' 200 status headings seo warnings
 else
 	echo 'AVISO inspect-page omitido (SMOKE_INSPECT=1 para probarlo; necesita un servidor que se alcance a sí mismo)'
+fi
+if [ "${SMOKE_ONLINE:-0}" = 1 ]; then
+	# Librería online de YOOtheme: necesita internet y, para descargar, la clave de API en el tema.
+	call GET spiral-mcp/list-online-library '{"group":"template","per_page":5}'
+	check 'list-online-library' 200 total items.0.id facets.group
+	call GET spiral-mcp/list-online-library '{"kind":"element","type":"accordion","per_page":1}'
+	check 'list-online-library (elementos)' 200 items.0.id
+	ONLINE_ID=$(jget items.0.id)
+	call GET spiral-mcp/get-online-library-item "{\"id\":\"$ONLINE_ID\",\"kind\":\"element\"}"
+	check 'get-online-library-item' 200 root outline
+	call POST spiral-mcp/import-from-online-library "{\"id\":\"$ONLINE_ID\",\"kind\":\"element\",\"target\":\"library\",\"name\":\"Smoke online\"}"
+	check 'import-from-online-library (biblioteca)' 200 library.id snapshot_id
+	printf '%s' "$BODY" | grep -q 'X-Amz\|[?&]key=' && ko 'la respuesta no debe llevar URLs firmadas ni la clave' || ok 'la respuesta no lleva URLs firmadas ni la clave'
+	call POST spiral-mcp/restore-snapshot "{\"id\":$(jget snapshot_id),\"confirm\":true,\"include_later\":true}"
+	check 'restore-snapshot (biblioteca tras importar)' 200
+else
+	echo 'AVISO librería online omitida (SMOKE_ONLINE=1 para probarla; necesita internet y la clave de API de YOOtheme)'
 fi
 call POST spiral-mcp/trash-content "{\"id\":$PREV_ID}"
 call DELETE spiral-mcp/delete-content "{\"id\":$PREV_ID,\"confirm\":true}"
