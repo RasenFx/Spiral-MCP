@@ -128,13 +128,15 @@ Hoy `update-yootheme-layout` exige enviar el árbol completo: es caro y arriesga
 
 ## Fase 1 — Contenido completo
 
-- [ ] `spiral-mcp/list-post-types`: tipos públicos y editables (no solo `page` y `post`). Las abilities de contenido aceptan cualquiera de ellos; el filtro `spiral_mcp_post_types` mantiene la posibilidad de restringirlos.
-- [ ] Ampliar `create-content` y `update-content`: `parent`, `menu_order`, `template` (plantilla de página), `author`, `date` (programar), `comment_status`, `terms` (`{taxonomía: [ids o slugs]}`), `featured_media`, `meta` (solo claves en una lista blanca, filtro `spiral_mcp_allowed_meta`).
-- [ ] `spiral-mcp/trash-content`, `restore-content` (sacar de la papelera), `delete-content` (definitivo, con `confirm`).
-- [ ] `spiral-mcp/list-revisions` y `restore-revision` (con `confirm`; antes guarda el estado actual como revisión).
-- [ ] Taxonomías: `list-taxonomies`, `list-terms`, `create-term`, `update-term`, `delete-term` (con `confirm`).
-- [ ] SEO: `spiral-mcp/get-seo` y `update-seo` con título, meta description, título y descripción Open Graph, canonical y noindex. Si Yoast está activo, usar sus metas (`_yoast_wpseo_title`, `_yoast_wpseo_metadesc`…). Dejar la estructura preparada para Rank Math, sin implementarlo todavía.
-- [ ] Ajustes del sitio: `spiral-mcp/get-site-settings` y `update-site-settings` (`blogname`, `blogdescription`, `show_on_front`, `page_on_front`, `page_for_posts`, `site_icon`). Requiere `spiral_mcp_settings`. Snapshot `option` antes.
+- [x] `spiral-mcp/list-post-types`: tipos públicos y editables (no solo `page` y `post`). Las abilities de contenido aceptan cualquiera de ellos; el filtro `spiral_mcp_post_types` mantiene la posibilidad de restringirlos.
+- [x] Ampliar `create-content` y `update-content`: `parent`, `menu_order`, `template` (plantilla de página), `author`, `date` (programar), `comment_status`, `terms` (`{taxonomía: [ids o slugs]}`), `featured_media`, `meta` (solo claves en una lista blanca, filtro `spiral_mcp_allowed_meta`).
+- [x] `spiral-mcp/trash-content`, `restore-content` (sacar de la papelera), `delete-content` (definitivo, con `confirm`).
+- [x] `spiral-mcp/list-revisions` y `restore-revision` (con `confirm`; antes guarda el estado actual como revisión).
+- [x] Taxonomías: `list-taxonomies`, `list-terms`, `create-term`, `update-term`, `delete-term` (con `confirm`).
+- [x] SEO: `spiral-mcp/get-seo` y `update-seo` con título, meta description, título y descripción Open Graph, canonical y noindex. Si Yoast está activo, usar sus metas (`_yoast_wpseo_title`, `_yoast_wpseo_metadesc`…). Dejar la estructura preparada para Rank Math, sin implementarlo todavía.
+- [x] Ajustes del sitio: `spiral-mcp/get-site-settings` y `update-site-settings` (`blogname`, `blogdescription`, `show_on_front`, `page_on_front`, `page_for_posts`, `site_icon`). Requiere `spiral_mcp_settings`. Snapshot `option` antes.
+
+**Notas de implementación:** las páginas no tienen categorías en WordPress (las categorías se probaron en una entrada). YOOtheme no trae plantillas de página propias: `template` se valida contra las del tema activo. Sin plugin de SEO, Spiral-MCP guarda el SEO en metas `_spiral_mcp_seo_*` y lo imprime él mismo (title, description, Open Graph, canonical, robots). Los ajustes del sitio exigen `spiral_mcp_settings` + `edit_theme_options` (el rol del agente no tiene `manage_options`).
 
 **Terminado cuando:** el agente crea una página hija con plantilla, imagen destacada, categorías y SEO completos, la programa para publicarse, y luego la restaura a una revisión anterior.
 

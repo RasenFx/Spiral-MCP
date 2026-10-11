@@ -2,6 +2,21 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.7.0] — 2026-10-11 · Fase 1: contenido completo
+
+### Añadido
+- `spiral-mcp/list-post-types`. Las abilities de contenido aceptan todos los tipos públicos con interfaz (no solo page y post); el filtro `spiral_mcp_post_types` sigue permitiendo restringirlos.
+- `create-content` y `update-content` admiten `parent` (sin ciclos), `menu_order`, `template` (validada contra las plantillas del tema), `author`, `date` (fecha futura + publish = programar), `comment_status`, `terms` (`{taxonomía: [IDs, slugs o nombres]}`), `featured_media` y `meta` (lista blanca `spiral_mcp_allowed_meta`). Todo se valida antes de escribir. `get-content` devuelve la ficha completa.
+- `trash-content`, `restore-content` (recupera el estado anterior) y `delete-content` (solo desde la papelera, con `confirm`).
+- `list-revisions` (con los campos que difieren del estado actual) y `restore-revision` (con `confirm`; antes guarda el estado actual como revisión).
+- Taxonomías: `list-taxonomies`, `list-terms`, `create-term`, `update-term`, `delete-term`. Snapshot `term`: deshacer un borrado recrea el término y se lo vuelve a asignar a sus contenidos.
+- SEO: `get-seo` y `update-seo` (title, description, og_title, og_description, canonical, noindex). Usa Yoast SEO si está activo; Rank Math tiene su mapa preparado pero aún no está soportado; sin plugin de SEO, Spiral-MCP imprime los metadatos. Snapshot `seo`.
+- Ajustes del sitio: `get-site-settings` y `update-site-settings` (nombre, lema, portada, página de entradas, icono), grupo `settings`, snapshot `option`.
+
+### Cambiado
+- `list-content` filtra también por `parent` y por los estados `future` y `trash`.
+- El rol `spiral_mcp_agent` recibe `delete_published_*`, `delete_others_*`, `delete_private_*`, `edit_private_posts` y `read_private_posts` (necesarios para la papelera).
+
 ## [1.6.0] — 2026-10-11 · Fase 3: YOOtheme completo
 
 ### Añadido

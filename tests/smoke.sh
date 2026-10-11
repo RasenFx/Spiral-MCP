@@ -113,7 +113,9 @@ for name in list-content get-content create-content update-content get-yootheme-
 	set-featured-image find-media-usage list-elements get-element-schema get-layout-outline get-layout-node \
 	patch-layout duplicate-content get-theme-config update-theme-config list-templates get-template \
 	create-template update-template delete-template list-library get-library-item save-to-library \
-	insert-from-library clear-cache; do
+	insert-from-library clear-cache list-post-types trash-content restore-content delete-content \
+	list-revisions restore-revision list-taxonomies list-terms create-term update-term delete-term \
+	get-seo update-seo get-site-settings update-site-settings; do
 	case "$BODY" in
 		*"\"spiral-mcp\\/$name\""* | *"\"spiral-mcp/$name\""*) ;;
 		*) ko "registrada spiral-mcp/$name" ;;
@@ -229,6 +231,65 @@ if [ -n "$WIDGET_ID" ]; then
 else
 	echo 'AVISO no hay widgets con título: se omite update-widget'
 fi
+
+# --- Contenido completo: tipos, jerarquía, términos, revisiones y SEO ----
+call GET spiral-mcp/list-post-types
+check 'list-post-types' 200 post_types.0.name
+call GET spiral-mcp/list-taxonomies
+check 'list-taxonomies' 200 taxonomies.0.name
+call POST spiral-mcp/create-term "{\"taxonomy\":\"category\",\"name\":\"Smoke $(date +%s)\"}"
+check 'create-term' 200 id snapshot_id
+TERM_ID=$(jget id)
+call POST spiral-mcp/update-term "{\"term_id\":$TERM_ID,\"description\":\"Categoría de prueba\"}"
+check 'update-term' 200 snapshot_id
+call GET spiral-mcp/list-terms '{"taxonomy":"category","search":"Smoke"}'
+check 'list-terms' 200 total items.0.id
+
+FUTURE=$(php -r 'echo gmdate( "Y-m-d\TH:i:s\Z", time() + 7 * 86400 );')
+call POST spiral-mcp/create-content "{\"title\":\"Smoke hija\",\"parent\":$PAGE_ID,\"status\":\"publish\",\"date\":\"$FUTURE\",\"menu_order\":2}"
+check 'create-content (página hija programada)' 200 id parent template date_gmt
+eq 'la página hija queda programada' status future
+eq 'con su padre' parent "$PAGE_ID"
+CHILD_ID=$(jget id)
+call POST spiral-mcp/create-content "{\"post_type\":\"post\",\"title\":\"Smoke entrada\",\"status\":\"draft\",\"terms\":{\"category\":[$TERM_ID]}}"
+check 'create-content (entrada con categoría)' 200 terms.category.0.id
+POST_ID=$(jget id)
+
+call POST spiral-mcp/update-content "{\"id\":$CHILD_ID,\"title\":\"Smoke hija v2\"}"
+call POST spiral-mcp/update-content "{\"id\":$CHILD_ID,\"title\":\"Smoke hija v3\"}"
+call GET spiral-mcp/list-revisions "{\"id\":$CHILD_ID}"
+check 'list-revisions' 200 revisions.0.id
+REV_ID=$(printf '%s' "$BODY" | php -r '$d = json_decode( stream_get_contents( STDIN ), true ); foreach ( $d["revisions"] as $r ) { if ( "Smoke hija v2" === $r["title"] ) { echo $r["id"]; break; } }')
+call POST spiral-mcp/restore-revision "{\"revision_id\":${REV_ID:-0},\"confirm\":true}"
+check 'restore-revision' 200 current_revision_id
+eq 'vuelve a la v2' title 'Smoke hija v2'
+
+call GET spiral-mcp/get-seo "{\"id\":$CHILD_ID}"
+check 'get-seo' 200 provider title
+call POST spiral-mcp/update-seo "{\"id\":$CHILD_ID,\"title\":\"Smoke | SEO\",\"description\":\"Descripción de prueba\",\"canonical\":\"/smoke/\"}"
+check 'update-seo' 200 snapshot_id canonical
+eq 'update-seo: título' title 'Smoke | SEO'
+
+call POST spiral-mcp/trash-content "{\"id\":$POST_ID}"
+eq 'trash-content' status trash
+call POST spiral-mcp/restore-content "{\"id\":$POST_ID}"
+eq 'restore-content (vuelve a borrador)' status draft
+call POST spiral-mcp/trash-content "{\"id\":$POST_ID}"
+call DELETE spiral-mcp/delete-content "{\"id\":$POST_ID,\"confirm\":true}"
+check 'delete-content (desde la papelera)' 200 deleted
+call POST spiral-mcp/trash-content "{\"id\":$CHILD_ID}"
+call DELETE spiral-mcp/delete-content "{\"id\":$CHILD_ID,\"confirm\":true}"
+check 'limpieza: borrar la página hija' 200 deleted
+call DELETE spiral-mcp/delete-term "{\"term_id\":$TERM_ID,\"confirm\":true}"
+check 'delete-term' 200 deleted snapshot_id
+
+call GET spiral-mcp/get-site-settings
+check 'get-site-settings' 200 blogname show_on_front
+call POST spiral-mcp/update-site-settings '{"blogdescription":"Lema de prueba smoke"}'
+check 'update-site-settings' 200 snapshot_id
+eq 'update-site-settings: lema' blogdescription 'Lema de prueba smoke'
+call POST spiral-mcp/restore-snapshot "{\"id\":$(jget snapshot_id),\"confirm\":true}"
+check 'restore-snapshot (ajustes del sitio)' 200
 
 # --- Catálogo de elementos y edición por partes --------------------------
 call GET spiral-mcp/list-elements
