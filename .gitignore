@@ -1,0 +1,5 @@
+# IDE
+.idea/
+
+# ZIP de instalación (no versionar)
+dist/
