@@ -1,0 +1,169 @@
+# Spiral-MCP-Control — Roadmap de desarrollo
+
+**Objetivo de esta etapa:** que un agente de IA pueda controlar por completo un sitio WordPress con YOOtheme Pro (contenido, diseño, medios, menús, estilos y ajustes) mediante abilities expuestas por MCP, sin entrar al wp-admin.
+
+**Criterio de éxito global:** desde un cliente MCP, el agente puede (1) crear una página completa con imágenes propias subidas por él, (2) cambiar el header, el footer y la paleta de marca, (3) previsualizar el resultado antes de publicar y (4) deshacer cualquier cambio. Todo con registro de auditoría.
+
+**Orden de las fases:** 0 → 2 → 3 → 1 → 4 → 5. Medios y YOOtheme son lo que más bloquea el trabajo de diseño hoy.
+
+Leyenda: `[ ]` pendiente · `[x]` hecho · **Spike** = investigar en el entorno local antes de implementar, y anotar el resultado en este documento.
+
+---
+
+## Fase 0 — Base segura
+
+Antes de dar más poder al agente: trazabilidad, deshacer y permisos acotados.
+
+### 0.1 Reorganización
+- [ ] Mover las abilities de contenido de `spiral-mcp-control.php` a `includes/content.php`. El archivo principal queda con la cabecera, las constantes (`SPIRAL_MCP_VERSION`, `SPIRAL_MCP_DIR`), la comprobación de requisitos y los `require_once`.
+- [ ] `includes/core.php` con los helpers compartidos:
+  - `spiral_mcp_register_ability( $name, $args )`: envuelve `wp_register_ability`. Envuelve `execute_callback` para registrar en la auditoría, rellena `meta` por defecto y fuerza el prefijo `spiral-mcp/`.
+  - `spiral_mcp_meta( $readonly, $destructive, $idempotent )`.
+  - `spiral_mcp_json( $data )`: `wp_json_encode` con los flags del proyecto.
+  - `spiral_mcp_require_confirm( $input )`: devuelve un `WP_Error` si falta `"confirm": true`.
+- [ ] Migrar todas las abilities existentes al wrapper, sin cambiar sus nombres ni sus esquemas.
+- [ ] Añadir `.gitignore` (`dist/`, `node_modules/`, `.idea/`) y `CHANGELOG.md`.
+
+### 0.2 Registro de auditoría
+- [ ] Tabla `{prefix}spiral_mcp_log`, creada con `dbDelta` en la activación y en cada actualización de versión: `id, created_at, user_id, ability, object_type, object_id, input_json, result ('ok'|código de error), snapshot_id, duration_ms`.
+- [ ] El wrapper registra **solo las abilities que escriben** (`readonly = false`). `input_json` se trunca a 8 KB y se redactan las claves sensibles (`password`, `token`, `apikey`, `yootheme_apikey`, `key`).
+- [ ] Ability `spiral-mcp/list-activity`: filtros por ability, objeto, usuario y fechas, con paginación. Solo lectura.
+- [ ] Retención configurable (filtro `spiral_mcp_log_retention_days`, 90 días por defecto) con limpieza diaria vía WP-Cron.
+
+### 0.3 Snapshots genéricos
+- [ ] Tabla `{prefix}spiral_mcp_snapshots`: `id, created_at, user_id, kind, ref, data (longtext), note`.
+  - `kind`: `theme_config`, `menu`, `widgets`, `option`, `custom_css`, `post_meta`, `media_meta`.
+- [ ] Helpers `spiral_mcp_snapshot_take( $kind, $ref, $data, $note )` y `spiral_mcp_snapshot_restore( $id )`. Restaurar también guarda un snapshot del estado actual.
+- [ ] Usar los snapshots en todo lo que escribe fuera de posts: theme config, menús (el árbol completo antes de cada cambio), widgets (`sidebars_widgets` y la opción `widget_<base>` afectada).
+- [ ] Migrar `rasenfx_ca_yootheme_config_backups` / `spiral_mcp_yootheme_config_backups` (opción de la 1.3.0) a la tabla y borrar la opción. `list-theme-backups` y `restore-theme-backup` pasan a `list-snapshots` y `restore-snapshot` (con `confirm`). Se mantienen los nombres viejos como alias durante una versión.
+
+### 0.4 Permisos
+- [ ] Capacidades propias: `spiral_mcp_content`, `spiral_mcp_design` (builder, menús, widgets, estilos), `spiral_mcp_media`, `spiral_mcp_settings`, `spiral_mcp_code` (scripts y JS personalizado: el riesgo es mayor).
+- [ ] Rol `spiral_mcp_agent` con esas capacidades más las nativas necesarias (`edit_pages`, `edit_others_pages`, `publish_pages`, `edit_posts`, `upload_files`, `edit_theme_options`…), sin `install_plugins`, `edit_plugins`, `manage_options`, `promote_users` ni `delete_users`.
+- [ ] Los administradores reciben todas las capacidades `spiral_mcp_*` en la activación.
+- [ ] Cada ability comprueba la capacidad `spiral_mcp_*` de su grupo y, además, la nativa del objeto (`edit_post` para ese ID, etc.).
+- [ ] La desinstalación (`uninstall.php`) elimina el rol y las capacidades. **No** borra las tablas salvo que el filtro `spiral_mcp_uninstall_drop_tables` devuelva true.
+
+### 0.5 Pruebas
+- [ ] `tests/smoke.sh`: llama por REST a cada ability con una Application Password del rol `spiral_mcp_agent` contra el WordPress local. Comprueba códigos HTTP y claves de la respuesta. Variables: `WP_URL`, `WP_USER`, `WP_APP_PASSWORD`.
+- [ ] `tests/fixtures/`: layouts de YOOtheme de ejemplo (página simple, página con fuentes dinámicas, footer).
+- [ ] Spike: comprobar la ruta REST de la Abilities API en el entorno local y anotarla en `CLAUDE.md`.
+
+**Terminado cuando:** todas las abilities existentes pasan por el wrapper, cada escritura queda en el log, cualquier cambio de menú, widget o theme config se puede restaurar, y `smoke.sh` pasa con el rol `spiral_mcp_agent`.
+
+---
+
+## Fase 2 — Medios
+
+Sin medios, el agente no puede poner logos ni fotos en los diseños.
+
+- [ ] `spiral-mcp/upload-media`. Entrada: `url` **o** `data_base64` + `filename`; además `title`, `alt`, `caption`, `description`, `attach_to` (ID de post).
+  - Usa `download_url()` + `media_handle_sideload()`. Para base64: escribir a un temporal y usar el mismo camino.
+  - Tipos permitidos: jpg, jpeg, png, webp, gif, avif, pdf, mp4, webm. **SVG no** (riesgo de XSS) salvo que esté activo un plugin de saneado de SVG (filtro `spiral_mcp_allow_svg`).
+  - Límite de tamaño: `wp_max_upload_size()`. Solo URLs `https`, y rechazar IPs privadas y loopback (SSRF).
+  - Salida: `id`, `url`, `path_relative` (`wp-content/uploads/…`, el formato que usan los props de imagen de YOOtheme), `width`, `height`, `mime`, `alt` y `sizes`.
+- [ ] `spiral-mcp/list-media`: filtros `search`, `mime` (image, video, application/pdf), `parent`, paginación. Devuelve lo mismo que la salida de `upload-media`.
+- [ ] `spiral-mcp/get-media`: un adjunto por ID.
+- [ ] `spiral-mcp/update-media`: `alt`, `title`, `caption`, `description`. Hace snapshot `media_meta` del estado anterior.
+- [ ] `spiral-mcp/delete-media`: exige `confirm`. Si existe `MEDIA_TRASH`, va a la papelera; si no, se borra definitivamente, y la descripción debe decirlo.
+- [ ] `spiral-mcp/set-featured-image`: `post_id` + `media_id` (o `0` para quitarla).
+- [ ] `spiral-mcp/find-media-usage` (opcional): busca el `path_relative` o la URL de un adjunto en el contenido de posts, el theme config y los widgets, para saber qué se rompe antes de borrar.
+
+**Terminado cuando:** el agente sube una imagen desde una URL, la usa en un elemento `image` de un layout de página, actualiza su alt text y la página la muestra.
+
+---
+
+## Fase 3 — YOOtheme completo
+
+### 3.1 Spikes (hacer primero y anotar los resultados aquí)
+- [ ] **Áreas de la configuración**: qué contiene cada clave de `config` (`header`, `navbar`, `dialog`, `mobile`, `top`, `bottom`, `logo`, `site`, `post`, `blog`, `consent`, `scripts`…), cuáles son ajustes planos y cuáles contienen layouts de builder (`content`).
+- [ ] **Plantillas del builder** (Templates: plantillas para entradas individuales, archivos, búsqueda, 404, tipos de contenido): dónde se guardan (¿`config.templates`?), su estructura (`name`, `type`, `query`/condiciones, `layout`) y cómo decide YOOtheme cuál aplicar.
+- [ ] **Biblioteca de layouts** (secciones guardadas por el usuario): dónde y cómo se guarda.
+- [ ] **Definiciones de elementos**: dónde guarda YOOtheme la definición de cada elemento (campos, tipos, opciones, valores por defecto) dentro del tema, y cómo leerlas desde PHP con las APIs del propio YOOtheme (preferible a leer archivos a mano).
+- [ ] **Caché de YOOtheme**: qué hay que invalidar tras cambiar un layout o el theme config (caché de imágenes en `uploads/yootheme/`, transients…).
+
+### 3.2 Configuración del tema
+- [ ] `spiral-mcp/get-theme-config`: `section` opcional. Sin sección devuelve la lista de secciones con un resumen. Con sección devuelve su contenido. `yootheme_apikey` y cualquier secreto se devuelven enmascarados.
+- [ ] `spiral-mcp/update-theme-config`: `section` + `values` (merge profundo por defecto, o `replace: true`). Hace snapshot antes.
+  - Lista blanca de secciones editables (filtro `spiral_mcp_theme_config_sections`). Por defecto: `site, header, navbar, dialog, mobile, top, bottom, footer, logo, favicon, touchicon, post, blog, consent, lazyload, webp`.
+  - `scripts` (JS personalizado) requiere `spiral_mcp_code`.
+  - No editables: `yootheme_apikey`, `version`, `minimum_stability`, `site_url`.
+- [ ] Generalizar `get-theme-layout` y `update-theme-layout` a todas las áreas con builder que salgan del spike (no solo `footer`).
+
+### 3.3 Edición eficiente de layouts
+Hoy `update-yootheme-layout` exige enviar el árbol completo: es caro y arriesgado en páginas grandes.
+- [ ] `spiral-mcp/get-layout-outline`: árbol resumido de una página o de un área del tema. Una línea por nodo con su **ruta** (`/children/0/children/1/children/2`), `type`, `name` y un extracto de su texto o título. Para que el agente localice qué tocar sin descargar todo el JSON.
+- [ ] `spiral-mcp/get-layout-node`: devuelve un nodo por ruta.
+- [ ] `spiral-mcp/patch-layout`: aplica operaciones sobre un layout (de página por `id`, o de un área del tema por `area`). Operaciones al estilo JSON Patch (RFC 6902): `replace`, `add` (insertar en una posición de `children`), `remove`, `move`, `copy`, con rutas sobre el árbol. Es atómico: si falla una operación, no se guarda nada. Crea una revisión (página) o un snapshot (área del tema).
+- [ ] `spiral-mcp/duplicate-content`: clona una página o entrada con su layout, como borrador.
+
+### 3.4 Catálogo de elementos y validación
+- [ ] `spiral-mcp/list-elements`: los tipos de elemento disponibles (`name`, `title`, `group`, si admite hijos y qué hijos).
+- [ ] `spiral-mcp/get-element-schema`: los campos de un elemento (nombre, tipo, opciones permitidas, valor por defecto).
+- [ ] Validación en `update-yootheme-layout`, `update-theme-layout` y `patch-layout`:
+  - **Error** si hay un `type` desconocido o una estructura imposible (p. ej. un `row` fuera de una `section`).
+  - **Aviso** (no bloquea) si hay props desconocidos o valores fuera de sus opciones.
+  - Los avisos van en la respuesta (`warnings`) para que el agente se corrija.
+
+### 3.5 Plantillas y biblioteca (según el spike)
+- [ ] `spiral-mcp/list-templates`, `get-template`, `create-template`, `update-template`, `delete-template` (este último con `confirm`). Snapshot antes de cada escritura.
+- [ ] `spiral-mcp/list-library`, `get-library-item`, `save-to-library` (desde una ruta de un layout), `insert-from-library` (en una ruta de un layout).
+
+### 3.6 Caché
+- [ ] `spiral-mcp/clear-cache`: caché de YOOtheme (según el spike), `wp_cache_flush()`, y hooks a los plugins de caché más comunes si están activos (LiteSpeed, WP Rocket, W3TC, WP Super Cache). Devuelve qué limpió.
+- [ ] Llamarla automáticamente después de cada escritura de diseño (desactivable con el filtro `spiral_mcp_auto_clear_cache`).
+
+**Terminado cuando:** el agente cambia el header (logo, navbar y su versión móvil), crea una plantilla de YOOtheme para las entradas individuales y edita una sección concreta de una página grande con `patch-layout`, todo validado por el catálogo de elementos.
+
+---
+
+## Fase 1 — Contenido completo
+
+- [ ] `spiral-mcp/list-post-types`: tipos públicos y editables (no solo `page` y `post`). Las abilities de contenido aceptan cualquiera de ellos; el filtro `spiral_mcp_post_types` mantiene la posibilidad de restringirlos.
+- [ ] Ampliar `create-content` y `update-content`: `parent`, `menu_order`, `template` (plantilla de página), `author`, `date` (programar), `comment_status`, `terms` (`{taxonomía: [ids o slugs]}`), `featured_media`, `meta` (solo claves en una lista blanca, filtro `spiral_mcp_allowed_meta`).
+- [ ] `spiral-mcp/trash-content`, `restore-content` (sacar de la papelera), `delete-content` (definitivo, con `confirm`).
+- [ ] `spiral-mcp/list-revisions` y `restore-revision` (con `confirm`; antes guarda el estado actual como revisión).
+- [ ] Taxonomías: `list-taxonomies`, `list-terms`, `create-term`, `update-term`, `delete-term` (con `confirm`).
+- [ ] SEO: `spiral-mcp/get-seo` y `update-seo` con título, meta description, título y descripción Open Graph, canonical y noindex. Si Yoast está activo, usar sus metas (`_yoast_wpseo_title`, `_yoast_wpseo_metadesc`…). Dejar la estructura preparada para Rank Math, sin implementarlo todavía.
+- [ ] Ajustes del sitio: `spiral-mcp/get-site-settings` y `update-site-settings` (`blogname`, `blogdescription`, `show_on_front`, `page_on_front`, `page_for_posts`, `site_icon`). Requiere `spiral_mcp_settings`. Snapshot `option` antes.
+
+**Terminado cuando:** el agente crea una página hija con plantilla, imagen destacada, categorías y SEO completos, la programa para publicarse, y luego la restaura a una revisión anterior.
+
+---
+
+## Fase 4 — Estilos
+
+### 4.1 CSS inmediato
+- [ ] `spiral-mcp/get-custom-css` y `update-custom-css`: el "CSS adicional" de WordPress (`wp_get_custom_css()` / `wp_update_custom_css_post()`). Se aplica al instante y tiene revisiones propias. Snapshot `custom_css` antes.
+
+### 4.2 Estilo de YOOtheme
+- [ ] Spike: catálogo de variables LESS del estilo activo (nombre, valor actual, valor por defecto, grupo) para que el agente sepa qué puede cambiar.
+- [ ] `spiral-mcp/get-theme-style`: `style` (estilo base), `less` (variables modificadas) y `custom_less`.
+- [ ] `spiral-mcp/update-theme-style`: cambia `style`, variables en `less` (merge) o `custom_less`. Snapshot antes. Marca la opción `spiral_mcp_style_dirty` con fecha. La respuesta incluye `needs_recompile: true` y las instrucciones para recompilar.
+- [ ] Spike clave: **¿se puede compilar el LESS de YOOtheme en el servidor?** Investigar cómo compila y guarda el CSS el Personalizador (qué petición hace al guardar, dónde se escribe el CSS) y si hay alguna vía en el servidor. Si no la hay, el flujo oficial es: el agente abre Personalizar → Guardar con un navegador y luego llama a `spiral-mcp/mark-style-compiled`.
+- [ ] `spiral-mcp/get-style-status`: si hay cambios de estilo pendientes de compilar, desde cuándo, y la fecha del CSS compilado actual.
+
+**Terminado cuando:** el agente cambia la paleta de marca (primario, secundario, fondo) y la tipografía, el CSS queda recompilado y la portada se ve con la nueva marca.
+
+---
+
+## Fase 5 — Verificación y flujo de trabajo
+
+- [ ] `spiral-mcp/get-preview-url`: URL temporal (1 h por defecto, máximo 24 h) que permite ver un borrador o una revisión pendiente sin sesión. Token firmado y de un solo post; se puede revocar.
+- [ ] `spiral-mcp/inspect-page`: renderiza una página (publicada o por token de vista previa) y devuelve los encabezados (h1–h6), enlaces internos y externos (marcando los rotos: 404 interno), imágenes sin alt y el título y descripción efectivos de SEO. Sin devolver el HTML completo.
+- [ ] Integración con la Fase 3.6: `clear-cache` tras publicar.
+- [ ] `docs/agent-guide.md`: guía para el agente. Flujo recomendado (leer outline → patch → preview → inspect → publicar), convenciones (rutas relativas, borrador antes de publicar, no tocar fuentes dinámicas sin entenderlas), recetas comunes (añadir una sección, cambiar un botón, subir y usar una imagen) y errores frecuentes. Esta guía se convertirá en un skill de Claude.
+
+**Terminado cuando:** el agente crea un borrador, lo revisa con `get-preview-url` + `inspect-page` (y una captura de pantalla con su navegador), corrige lo que encuentre y lo publica.
+
+---
+
+## Fuera de alcance en esta etapa
+- Instalar, activar o actualizar plugins y temas (se trata aparte).
+- WooCommerce (fase posterior del sitio).
+- Usuarios y roles más allá del rol `spiral_mcp_agent`.
+- Temas distintos de YOOtheme: las abilities de contenido, menús, medios y SEO deben funcionar con cualquier tema; las de diseño pueden exigir YOOtheme y devolver un error claro si no está activo.
+
+## Preguntas abiertas
+- ¿Spiral-MCP será solo para sitios propios, también para clientes o un producto de RasenFx? Afecta a la licencia (hoy GPL-2.0-or-later), a la actualización automática y al nivel de endurecimiento de la Fase 0.
+- ¿Se publicará en wordpress.org? Si es así, revisar desde ya los requisitos de las guías de plugins (prefijos, sanitización y escapado, sin código ofuscado).
