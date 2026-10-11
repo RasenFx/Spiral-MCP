@@ -2,6 +2,17 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.8.0] — 2026-10-11 · Fase 4: estilos
+
+### Añadido
+- **CSS adicional** (`includes/styles.php`): `get-custom-css` y `update-custom-css` (reemplazar o añadir al final; sin HTML y con llaves equilibradas; revisión de WordPress y snapshot `custom_css`). Se aplica al instante.
+- **Estilo de YOOtheme**: `get-theme-style` (estilo, variables cambiadas, LESS propio, estilos disponibles), `list-style-variables` (catálogo del estilo activo con valor por defecto, componente, grupo y tipo, como en el Personalizador; cacheado por estilo y versión) y `update-theme-style` (estilo/variación, merge de variables LESS con validación, LESS propio; snapshot).
+- **Recompilación**: `get-style-status` y `mark-style-compiled`. Mientras haya cambios de estilo pendientes, el plugin fuerza el flag `update` del Styler de YOOtheme: abrir la URL de recompilación en un navegador con sesión recompila y guarda el CSS sin pulsar nada; el pendiente se quita solo al detectar el CSS nuevo.
+
+### Cambiado
+- Restaurar un snapshot de la configuración que cambie el estilo marca el CSS como pendiente de recompilar.
+- `uninstall.php` borra también la opción `spiral_mcp_style_dirty`.
+
 ## [1.7.0] — 2026-10-11 · Fase 1: contenido completo
 
 ### Añadido

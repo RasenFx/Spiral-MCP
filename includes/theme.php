@@ -311,6 +311,14 @@ function spiral_mcp_widget_out( $widget_id, $sidebar = null ) {
 
 /** Restaura el theme mod "config" tal cual (null = no existía). */
 function spiral_mcp_theme_config_restore( $ref, $data ) {
+	// Si cambia el estilo (style, less o custom_less) el CSS queda desfasado: hay que recompilar.
+	$decode = function ( $raw ) {
+		$c = is_string( $raw ) ? json_decode( $raw, true ) : (array) $raw;
+		return array_intersect_key( (array) $c, array_flip( array( 'style', 'less', 'custom_less' ) ) );
+	};
+	if ( $decode( get_theme_mod( 'config', null ) ) != $decode( $data ) && function_exists( 'spiral_mcp_style_mark_dirty' ) ) { // phpcs:ignore Universal.Operators.StrictComparisons.LooseNotEqual
+		spiral_mcp_style_mark_dirty();
+	}
 	if ( null === $data ) {
 		remove_theme_mod( 'config' );
 	} else {

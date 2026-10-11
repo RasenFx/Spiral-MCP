@@ -115,7 +115,8 @@ for name in list-content get-content create-content update-content get-yootheme-
 	create-template update-template delete-template list-library get-library-item save-to-library \
 	insert-from-library clear-cache list-post-types trash-content restore-content delete-content \
 	list-revisions restore-revision list-taxonomies list-terms create-term update-term delete-term \
-	get-seo update-seo get-site-settings update-site-settings; do
+	get-seo update-seo get-site-settings update-site-settings get-custom-css update-custom-css \
+	get-theme-style list-style-variables update-theme-style get-style-status mark-style-compiled; do
 	case "$BODY" in
 		*"\"spiral-mcp\\/$name\""* | *"\"spiral-mcp/$name\""*) ;;
 		*) ko "registrada spiral-mcp/$name" ;;
@@ -385,6 +386,39 @@ fi
 
 call POST spiral-mcp/clear-cache
 check 'clear-cache' 200 cleared
+
+# --- Estilos -------------------------------------------------------------
+call GET spiral-mcp/get-custom-css
+check 'get-custom-css' 200 css stylesheet
+call POST spiral-mcp/update-custom-css '{"css":".smoke-test{color:red}","mode":"append"}'
+check 'update-custom-css (append)' 200 snapshot_id
+SNAP_CSS=$(jget snapshot_id)
+call POST spiral-mcp/update-custom-css '{"css":"</style><script>x</script>"}'
+[ "$STATUS" -ge 400 ] && ok 'update-custom-css rechaza HTML' || ko 'update-custom-css debería rechazar HTML'
+call POST spiral-mcp/restore-snapshot "{\"id\":$SNAP_CSS,\"confirm\":true}"
+check 'restore-snapshot (CSS adicional)' 200
+
+if [ "$YOOTHEME" = 200 ]; then
+	call GET spiral-mcp/get-theme-style '{"include_styles":true}'
+	check 'get-theme-style' 200 style styles status.css
+	call GET spiral-mcp/list-style-variables '{"component":"global","search":"primary-background"}'
+	check 'list-style-variables' 200 total items.0.default
+	call POST spiral-mcp/update-theme-style '{"less":{"@global-primary-background":"#e63946"}}'
+	check 'update-theme-style' 200 snapshot_id recompile_url
+	eq 'update-theme-style: pendiente de recompilar' needs_recompile true
+	SNAP_STYLE=$(jget snapshot_id)
+	call POST spiral-mcp/update-theme-style '{"less":{"@global-primary-background":"red; } body { x"}}'
+	[ "$STATUS" -ge 400 ] && ok 'update-theme-style rechaza valores con ; o llaves' || ko 'update-theme-style debería rechazar el valor'
+	call POST spiral-mcp/restore-snapshot "{\"id\":$SNAP_STYLE,\"confirm\":true}"
+	check 'restore-snapshot (estilo)' 200
+	call POST spiral-mcp/mark-style-compiled '{}'
+	[ "$STATUS" -ge 400 ] && ok 'mark-style-compiled exige force si el CSS es anterior' || ko 'mark-style-compiled debería exigir force'
+	# El CSS no se tocó: el estilo restaurado coincide con el CSS compilado.
+	call POST spiral-mcp/mark-style-compiled '{"force":true}'
+	eq 'mark-style-compiled (force)' needs_recompile false
+	call GET spiral-mcp/get-style-status
+	check 'get-style-status' 200 css.version recompile_url
+fi
 
 # --- Medios --------------------------------------------------------------
 PIXEL='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='

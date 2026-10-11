@@ -145,14 +145,18 @@ Hoy `update-yootheme-layout` exige enviar el árbol completo: es caro y arriesga
 ## Fase 4 — Estilos
 
 ### 4.1 CSS inmediato
-- [ ] `spiral-mcp/get-custom-css` y `update-custom-css`: el "CSS adicional" de WordPress (`wp_get_custom_css()` / `wp_update_custom_css_post()`). Se aplica al instante y tiene revisiones propias. Snapshot `custom_css` antes.
+- [x] `spiral-mcp/get-custom-css` y `update-custom-css`: el "CSS adicional" de WordPress (`wp_get_custom_css()` / `wp_update_custom_css_post()`). Se aplica al instante y tiene revisiones propias. Snapshot `custom_css` antes.
 
 ### 4.2 Estilo de YOOtheme
-- [ ] Spike: catálogo de variables LESS del estilo activo (nombre, valor actual, valor por defecto, grupo) para que el agente sepa qué puede cambiar.
-- [ ] `spiral-mcp/get-theme-style`: `style` (estilo base), `less` (variables modificadas) y `custom_less`.
-- [ ] `spiral-mcp/update-theme-style`: cambia `style`, variables en `less` (merge) o `custom_less`. Snapshot antes. Marca la opción `spiral_mcp_style_dirty` con fecha. La respuesta incluye `needs_recompile: true` y las instrucciones para recompilar.
-- [ ] Spike clave: **¿se puede compilar el LESS de YOOtheme en el servidor?** Investigar cómo compila y guarda el CSS el Personalizador (qué petición hace al guardar, dónde se escribe el CSS) y si hay alguna vía en el servidor. Si no la hay, el flujo oficial es: el agente abre Personalizar → Guardar con un navegador y luego llama a `spiral-mcp/mark-style-compiled`.
-- [ ] `spiral-mcp/get-style-status`: si hay cambios de estilo pendientes de compilar, desde cuándo, y la fecha del CSS compilado actual.
+- [x] Spike: catálogo de variables LESS del estilo activo (nombre, valor actual, valor por defecto, grupo) para que el agente sepa qué puede cambiar.
+- [x] `spiral-mcp/get-theme-style`: `style` (estilo base), `less` (variables modificadas) y `custom_less`.
+- [x] `spiral-mcp/update-theme-style`: cambia `style`, variables en `less` (merge) o `custom_less`. Snapshot antes. Marca la opción `spiral_mcp_style_dirty` con fecha. La respuesta incluye `needs_recompile: true` y las instrucciones para recompilar.
+- [x] Spike clave: **¿se puede compilar el LESS de YOOtheme en el servidor?** Investigar cómo compila y guarda el CSS el Personalizador (qué petición hace al guardar, dónde se escribe el CSS) y si hay alguna vía en el servidor. Si no la hay, el flujo oficial es: el agente abre Personalizar → Guardar con un navegador y luego llama a `spiral-mcp/mark-style-compiled`.
+- [x] `spiral-mcp/get-style-status`: si hay cambios de estilo pendientes de compilar, desde cuándo, y la fecha del CSS compilado actual.
+
+**Resultados de los spikes (YOOtheme 5.0.51, comprobados en local):**
+- **Catálogo de variables**: 48 estilos en `less/theme.<id>.less` (variaciones `id:variación` en `uikit-themes/master-<id>/styles/<variación>.less`). Las fuentes LESS se obtienen en PHP con `Event::emit('styler.imports|filter', [], $id)` (en orden de import) y la agrupación (componente, grupo, tipo de campo) con `StylerConfig` (`components`, `ignore`, `types`), la misma que usa el Personalizador. Los valores por defecto son expresiones LESS sin evaluar (evaluarlas exige less.js). `config.less` guarda `{"@variable": "valor"}` y las fuentes de Google van entre comillas simples (`"'Roboto'"`); YOOtheme las descarga sola al compilar.
+- **Compilación**: no hay compilador LESS en el servidor; el Personalizador compila en el navegador (less.js en un Web Worker) y guarda el CSS con `POST theme/style` (escribe `css/theme.<blog>.css` y, en el sitio principal, `css/theme.css`, con la cabecera `/* YOOtheme Pro vX compiled on FECHA */`). **Si `StylerConfig['update']` es true, al abrir el Personalizador recompila y guarda solo, sin pulsar nada.** El plugin pone ese flag a true mientras haya cambios pendientes (`spiral_mcp_style_dirty`), así que el flujo es: `update-theme-style` → abrir `recompile_url` en un navegador con sesión → `get-style-status` detecta el CSS nuevo y quita el pendiente. Comprobado con Edge headless: cambio de marca recompilado en ~10 s, y deshacer + recompilar devuelve un CSS idéntico al original.
 
 **Terminado cuando:** el agente cambia la paleta de marca (primario, secundario, fondo) y la tipografía, el CSS queda recompilado y la portada se ve con la nueva marca.
 

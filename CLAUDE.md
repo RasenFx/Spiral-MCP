@@ -10,7 +10,7 @@ El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes d
 - YOOtheme Pro activo (o un tema hijo de YOOtheme) para todo lo relacionado con el builder y los estilos.
 - PHP 7.4 como mínimo: no usar sintaxis de PHP 8 (match, nullsafe `?->`, argumentos con nombre, tipos de unión, `readonly`, enums).
 
-## Estructura actual (v1.7.0)
+## Estructura actual (v1.8.0)
 ```
 spiral-mcp-control.php   cabecera, constantes, comprobación de requisitos, require_once y hooks de activación
 uninstall.php            borra el rol y las capacidades (las tablas solo con el filtro spiral_mcp_uninstall_drop_tables)
@@ -31,6 +31,7 @@ includes/cache.php       clear-cache y purga automática tras cada escritura
 includes/taxonomies.php  taxonomías y términos (+ snapshot kind "term")
 includes/seo.php         SEO por contenido: Yoast o salida propia (+ snapshot kind "seo")
 includes/settings.php    ajustes del sitio: identidad y portada (+ snapshot kind "option")
+includes/styles.php      CSS adicional (+ snapshot kind "custom_css") y estilo de YOOtheme: catálogo de variables, cambios y estado de compilación
 tests/smoke.sh           prueba de humo por REST (ver "Entorno de desarrollo")
 tests/fixtures/          layouts de YOOtheme de ejemplo
 dist/                    ZIP para instalar (no versionar)
@@ -40,6 +41,7 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - Contenido: `list-post-types`, `list-content`, `get-content`, `create-content`, `update-content`, `trash-content`, `restore-content`, `delete-content`, `list-revisions`, `restore-revision`, `get-yootheme-layout`, `update-yootheme-layout`.
 - Taxonomías y SEO: `list-taxonomies`, `list-terms`, `create-term`, `update-term`, `delete-term`, `get-seo`, `update-seo`.
 - Ajustes: `get-site-settings`, `update-site-settings`.
+- Estilos: `get-custom-css`, `update-custom-css`, `get-theme-style`, `list-style-variables`, `update-theme-style`, `get-style-status`, `mark-style-compiled`.
 - Menús: `list-menus`, `get-menu`, `create-menu`, `update-menu`, `delete-menu`, `add-menu-item`, `update-menu-item`, `delete-menu-item`.
 - Tema: `get-theme-layout`, `update-theme-layout` (áreas `footer`, `menu_item:<ID>`, `widget:<ID>`, `template:<id>`), `list-widgets`, `update-widget`; `list-theme-backups` y `restore-theme-backup` son alias obsoletos (se quitan en la próxima versión).
 - Layouts: `list-elements`, `get-element-schema`, `get-layout-outline`, `get-layout-node`, `patch-layout`, `duplicate-content`, `insert-from-library`.
@@ -75,7 +77,7 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - **Plantillas**: se aplica la primera activa (orden = prioridad) cuyo tipo y condiciones encajan; una página con layout propio no usa plantillas.- **Widgets de builder** (`builderwidget-N`): guardan su layout como JSON en texto en la clave `content` de la instancia (raíz `"type":"fragment"`). Se editan con `update-widget` o con las abilities de layout y `"area": "widget:builderwidget-N"`.
 - **Fuentes dinámicas**: un elemento puede tener `"source": {"query": {"name": "customMenuItems", "arguments": {...}}, "props": {...}}`. Hay que conservarlas al editar.
 - **Rutas de imagen** en props: relativas a la raíz, p. ej. `wp-content/uploads/2024/11/logo.webp`.
-- **Los estilos (LESS) se compilan en el navegador**, en el Personalizador. Cambiar `config.less` o `config.custom_less` en la BD no cambia el CSS servido hasta que alguien abre Personalizar y guarda.
+- **Los estilos (LESS) se compilan en el navegador**, en el Personalizador. Cambiar `config.style`, `config.less` o `config.custom_less` en la BD no cambia el CSS servido hasta recompilar. Si `StylerConfig['update']` es true, abrir el Personalizador recompila y guarda el CSS solo; este plugin lo fuerza mientras exista la opción `spiral_mcp_style_dirty` (ver `includes/styles.php`). El CSS va a `themes/yootheme/css/theme.<blog>.css` y las fuentes de Google se descargan a `themes/yootheme/fonts/`.
 - **El CSS por elemento** (prop `css` de una sección o elemento) sí se procesa en el servidor al renderizar.
 - `config.yootheme_apikey` es un secreto: no devolverlo nunca en una respuesta (enmascararlo).
 
