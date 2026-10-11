@@ -2,6 +2,24 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.6.0] — 2026-10-11 · Fase 3: YOOtheme completo
+
+### Añadido
+- **Catálogo de elementos** (`includes/elements.php`): `list-elements` y `get-element-schema`, leídos de la API del propio YOOtheme (`Builder::getTypes()`), con opciones de los select, valores por defecto y props de hijos (anchos de columna).
+- **Validación de layouts** en `update-yootheme-layout`, `update-theme-layout`, `update-widget`, `patch-layout`, plantillas e inserciones de biblioteca: error (no se guarda) con tipos desconocidos o anidados imposibles; avisos (`warnings`) con props desconocidos o valores fuera de sus opciones.
+- **Edición por partes** (`includes/layout.php`): `get-layout-outline` (una línea por nodo con su ruta JSON Pointer), `get-layout-node` y `patch-layout` (add, remove, replace, move, copy, test; atómico) sobre páginas, footer, mega menús, widgets de builder y plantillas. `duplicate-content`.
+- **Configuración de YOOtheme** (`includes/theme-config.php`): `get-theme-config` (secciones, valores con secretos ocultos y valores por defecto) y `update-theme-config` (merge profundo o `replace`, lista blanca `spiral_mcp_theme_config_sections`, `scripts` con `spiral_mcp_code`, avisos de claves desconocidas, snapshot).
+- **Plantillas** (`list-templates` con catálogo de tipos, `get-template`, `create-template`, `update-template`, `delete-template`) y **biblioteca** (`list-library`, `get-library-item`, `save-to-library`, `insert-from-library`), escritas con el Storage de YOOtheme y con snapshot `yootheme_storage`.
+- **Caché**: `clear-cache` y purga automática de cachés de página (LiteSpeed, WP Rocket, W3TC, WP Super Cache) tras cada escritura de contenido, diseño o medios (filtro `spiral_mcp_auto_clear_cache`).
+
+### Cambiado
+- `get-theme-layout` / `update-theme-layout` admiten todas las áreas con builder: `footer`, `menu_item:<ID>` (mega menú), `widget:<ID>` (widgets de builder) y `template:<id>`; `get-theme-layout` devuelve `settings` y la lista `areas` (antes `area_config` y `config_keys`).
+- Los layouts se guardan con `version` en la raíz (la de YOOtheme) si falta, para que YOOtheme no les aplique migraciones antiguas. Fixtures actualizados a 5.0.51.
+- La configuración del tema se escribe pasando por el filtro `config.save` de YOOtheme, como el Personalizador.
+
+### Corregido
+- `update-widget` y `list-widgets` aceptan los layouts con raíz `fragment` de los widgets de builder (antes exigían `layout`).
+
 ## [1.5.0] — 2026-10-11 · Fase 2: medios
 
 ### Añadido

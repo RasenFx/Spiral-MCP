@@ -110,7 +110,10 @@ for name in list-content get-content create-content update-content get-yootheme-
 	list-menus get-menu create-menu update-menu delete-menu add-menu-item update-menu-item delete-menu-item \
 	get-theme-layout update-theme-layout list-theme-backups restore-theme-backup list-widgets update-widget \
 	list-activity list-snapshots restore-snapshot upload-media list-media get-media update-media delete-media \
-	set-featured-image find-media-usage; do
+	set-featured-image find-media-usage list-elements get-element-schema get-layout-outline get-layout-node \
+	patch-layout duplicate-content get-theme-config update-theme-config list-templates get-template \
+	create-template update-template delete-template list-library get-library-item save-to-library \
+	insert-from-library clear-cache; do
 	case "$BODY" in
 		*"\"spiral-mcp\\/$name\""* | *"\"spiral-mcp/$name\""*) ;;
 		*) ko "registrada spiral-mcp/$name" ;;
@@ -226,6 +229,101 @@ if [ -n "$WIDGET_ID" ]; then
 else
 	echo 'AVISO no hay widgets con título: se omite update-widget'
 fi
+
+# --- Catálogo de elementos y edición por partes --------------------------
+call GET spiral-mcp/list-elements
+check 'list-elements' 200 total elements.0.name version
+call GET spiral-mcp/get-element-schema '{"type":"headline"}'
+check 'get-element-schema (headline)' 200 props.content props.title_element.options
+
+call POST spiral-mcp/update-yootheme-layout "{\"id\":$PAGE_ID,\"layout\":$(cat "$DIR/fixtures/page-simple.json")}"
+check 'layout de partida para patch-layout' 200 warnings
+call POST spiral-mcp/update-yootheme-layout "{\"id\":$PAGE_ID,\"layout\":{\"type\":\"layout\",\"children\":[{\"type\":\"row\"}]}}"
+eq 'update-yootheme-layout rechaza un row fuera de section' code spiral_mcp_invalid_layout
+
+call GET spiral-mcp/get-layout-outline "{\"id\":$PAGE_ID}"
+check 'get-layout-outline' 200 nodes outline.0
+HEAD='/children/0/children/0/children/0/children/0'
+call GET spiral-mcp/get-layout-node "{\"id\":$PAGE_ID,\"path\":\"$HEAD\"}"
+eq 'get-layout-node: headline' node.type headline
+
+call POST spiral-mcp/patch-layout "{\"id\":$PAGE_ID,\"operations\":[{\"op\":\"test\",\"path\":\"$HEAD/props/content\",\"value\":\"Página de prueba\"},{\"op\":\"replace\",\"path\":\"$HEAD/props/content\",\"value\":\"Título con patch\"},{\"op\":\"copy\",\"from\":\"/children/0\",\"path\":\"/children/-\"}]}"
+check 'patch-layout (test + replace + copy)' 200 updated warnings
+call GET spiral-mcp/get-layout-node "{\"id\":$PAGE_ID,\"path\":\"$HEAD/props/content\"}"
+eq 'patch-layout cambió el título' node 'Título con patch'
+call POST spiral-mcp/patch-layout "{\"id\":$PAGE_ID,\"operations\":[{\"op\":\"replace\",\"path\":\"$HEAD/props/content\",\"value\":\"NO\"},{\"op\":\"remove\",\"path\":\"/children/99\"}]}"
+[ "$STATUS" -ge 400 ] && ok 'patch-layout es atómico (una op falla, nada se guarda)' || ko 'patch-layout debería fallar'
+call GET spiral-mcp/get-layout-node "{\"id\":$PAGE_ID,\"path\":\"$HEAD/props/content\"}"
+eq 'el título no cambió tras el patch fallido' node 'Título con patch'
+
+call POST spiral-mcp/duplicate-content "{\"id\":$PAGE_ID}"
+check 'duplicate-content' 200 id source_id
+eq 'duplicate-content: la copia es un borrador' status draft
+DUP_ID=$(jget id)
+rest DELETE "/wp/v2/pages/$DUP_ID&force=true"
+check 'limpieza: borrar la copia' 200
+
+# --- Configuración de YOOtheme, footer, plantillas y biblioteca ----------
+call GET spiral-mcp/get-theme-config
+YOOTHEME=$STATUS
+if [ "$YOOTHEME" = 200 ]; then
+	ok 'get-theme-config (secciones)'
+	LEAK=$(printf '%s' "$BODY" | php -r '$d = json_decode( stream_get_contents( STDIN ), true ); foreach ( $d["sections"] as $x ) { if ( "yootheme_apikey" === $x["section"] && isset( $x["value"] ) ) { echo "si"; } }')
+	[ -z "$LEAK" ] && ok 'la apikey no sale en el listado' || ko 'la apikey no debe salir en el listado'
+	call GET spiral-mcp/get-theme-config '{"section":"header"}'
+	check 'get-theme-config (header)' 200 value defaults
+	ORIG_LAYOUT=$(jget value.layout)
+	call POST spiral-mcp/update-theme-config '{"section":"header","values":{"layout":"stacked-center-a"}}'
+	check 'update-theme-config (header, merge)' 200 snapshot_id
+	eq 'header.layout cambiado' value.layout stacked-center-a
+	SNAP_CFG=$(jget snapshot_id)
+	call POST spiral-mcp/update-theme-config '{"section":"yootheme_apikey","values":"x"}'
+	[ "$STATUS" -ge 400 ] && ok 'yootheme_apikey no es editable' || ko 'yootheme_apikey no debería ser editable'
+
+	call POST spiral-mcp/update-theme-layout "{\"area\":\"footer\",\"layout\":$(cat "$DIR/fixtures/footer.json")}"
+	check 'update-theme-layout (footer)' 200 snapshot_id
+	call POST spiral-mcp/patch-layout '{"area":"footer","operations":[{"op":"replace","path":"/children/0/children/0/children/0/children/0/props/content","value":"<p>Footer con patch</p>"}]}'
+	check 'patch-layout (footer)' 200 snapshot_id
+	call GET spiral-mcp/get-theme-layout '{"area":"footer"}'
+	check 'get-theme-layout (footer, con áreas)' 200 layout.children areas.0.area
+
+	call POST spiral-mcp/restore-snapshot "{\"id\":$SNAP_CFG,\"confirm\":true}"
+	check 'restore-snapshot (configuración antes de la prueba)' 200
+	call GET spiral-mcp/get-theme-config '{"section":"header"}'
+	eq 'header.layout restaurado' value.layout "$ORIG_LAYOUT"
+else
+	echo "AVISO get-theme-config devolvió $STATUS: ¿YOOtheme activo? Se omiten configuración, footer, plantillas y biblioteca."
+fi
+
+if [ "$YOOTHEME" = 200 ]; then
+	call GET spiral-mcp/list-templates
+	check 'list-templates (con tipos)' 200 templates types.single-post
+	call POST spiral-mcp/create-template "{\"name\":\"Smoke\",\"type\":\"single-post\",\"status\":\"disabled\",\"layout\":$(cat "$DIR/fixtures/page-simple.json")}"
+	check 'create-template (desactivada)' 200 id snapshot_id
+	TPL_ID=$(jget id)
+	call POST spiral-mcp/patch-layout "{\"area\":\"template:$TPL_ID\",\"operations\":[{\"op\":\"replace\",\"path\":\"$HEAD/props/content\",\"value\":\"Plantilla con patch\"}]}"
+	check 'patch-layout (plantilla)' 200
+	call GET spiral-mcp/get-template "{\"id\":\"$TPL_ID\"}"
+	eq 'get-template refleja el patch' "layout.children.0.children.0.children.0.children.0.props.content" 'Plantilla con patch'
+	call POST spiral-mcp/create-template '{"name":"x","type":"tipo-inventado"}'
+	[ "$STATUS" -ge 400 ] && ok 'create-template rechaza tipos inexistentes' || ko 'create-template debería rechazar el tipo'
+	call DELETE spiral-mcp/delete-template "{\"id\":\"$TPL_ID\",\"confirm\":true}"
+	check 'delete-template' 200 deleted
+
+	call POST spiral-mcp/save-to-library "{\"id\":$PAGE_ID,\"path\":\"/children/0\",\"name\":\"Smoke sección\"}"
+	check 'save-to-library (sección)' 200 id snapshot_id
+	LIB_ID=$(jget id)
+	SNAP_LIB=$(jget snapshot_id)
+	call GET spiral-mcp/list-library
+	check 'list-library' 200 items.0.id
+	call POST spiral-mcp/insert-from-library "{\"item_id\":\"$LIB_ID\",\"id\":$PAGE_ID,\"path\":\"/children/-\"}"
+	check 'insert-from-library' 200 updated
+	call POST spiral-mcp/restore-snapshot "{\"id\":$SNAP_LIB,\"confirm\":true}"
+	check 'limpieza: restaurar la biblioteca' 200
+fi
+
+call POST spiral-mcp/clear-cache
+check 'clear-cache' 200 cleared
 
 # --- Medios --------------------------------------------------------------
 PIXEL='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='

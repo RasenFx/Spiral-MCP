@@ -31,8 +31,22 @@ function spiral_mcp_theme_config_read() {
 }
 
 
-/** Escribe la configuración respetando el formato original (string JSON o array). */
+/**
+ * Escribe la configuración respetando el formato original (string JSON o
+ * array). Antes pasa por el filtro config.save de YOOtheme, como hace el
+ * Personalizador al guardar (normaliza los layouts de los mega menús).
+ */
 function spiral_mcp_theme_config_write( array $config, $original_raw ) {
+	if ( class_exists( 'YOOtheme\Event' ) ) {
+		try {
+			$filtered = \YOOtheme\Event::emit( 'config.save|filter', $config );
+			if ( is_array( $filtered ) ) {
+				$config = $filtered;
+			}
+		} catch ( Throwable $e ) {
+			// Si YOOtheme falla aquí se guarda tal cual.
+		}
+	}
 	$value = is_string( $original_raw ) ? spiral_mcp_json( $config ) : $config;
 	if ( false === $value ) {
 		return new WP_Error( 'spiral_mcp_bad_config', 'No se pudo serializar la configuración.' );
@@ -42,22 +56,186 @@ function spiral_mcp_theme_config_write( array $config, $original_raw ) {
 }
 
 /**
- * Áreas del tema que tienen builder propio. Ajustable con el filtro
- * spiral_mcp_theme_builder_areas.
+ * Áreas simples de la configuración con builder propio (config.<área>.content).
+ * Ajustable con el filtro spiral_mcp_theme_builder_areas.
  */
 function spiral_mcp_theme_builder_areas() {
-	return apply_filters( 'spiral_mcp_theme_builder_areas', array( 'footer' ) );
+	return (array) apply_filters( 'spiral_mcp_theme_builder_areas', array( 'footer' ) );
 }
 
-/** Devuelve el layout de un área (decodificado) o null. */
-function spiral_mcp_theme_area_layout( array $config, $area ) {
-	$content = $config[ $area ]['content'] ?? null;
-	if ( is_string( $content ) ) {
-		$content = json_decode( $content, true );
+/**
+ * Interpreta el nombre de un área con builder:
+ * - "footer" (y las de spiral_mcp_theme_builder_areas): config.<área>.content, raíz "layout".
+ * - "menu_item:<ID>": contenido de builder (mega menú) de un elemento de menú, raíz "fragment".
+ * - "widget:<ID del widget>": widget de builder de YOOtheme (header, navbar, top, bottom…), raíz "fragment".
+ */
+function spiral_mcp_theme_area_parse( $area ) {
+	$area = (string) $area;
+	if ( in_array( $area, spiral_mcp_theme_builder_areas(), true ) ) {
+		return array( 'area' => $area, 'kind' => 'config', 'path' => array( $area, 'content' ), 'root' => 'layout' );
 	}
-	return is_array( $content ) ? $content : null;
+	if ( preg_match( '/^menu_item:(\d+)$/', $area, $m ) ) {
+		if ( ! is_nav_menu_item( (int) $m[1] ) ) {
+			return new WP_Error( 'spiral_mcp_item_not_found', sprintf( 'No existe el elemento de menú %d (ver spiral-mcp/get-menu).', $m[1] ) );
+		}
+		return array( 'area' => $area, 'kind' => 'config', 'path' => array( 'menu', 'items', $m[1], 'content' ), 'root' => 'fragment' );
+	}
+	if ( preg_match( '/^widget:(.+-\d+)$/', $area, $m ) ) {
+		$data = spiral_mcp_widget_instance( $m[1] );
+		if ( is_wp_error( $data ) ) {
+			return $data;
+		}
+		if ( 'builderwidget' !== $data[0] ) {
+			return new WP_Error( 'spiral_mcp_bad_area', sprintf( 'El widget "%s" no es un widget de builder de YOOtheme (builderwidget-N).', $m[1] ) );
+		}
+		return array( 'area' => $area, 'kind' => 'widget', 'widget_id' => $m[1], 'root' => 'fragment' );
+	}
+	if ( preg_match( '/^template:([\w-]+)$/', $area, $m ) ) {
+		$tpl = spiral_mcp_template_get( $m[1] );
+		if ( is_wp_error( $tpl ) ) {
+			return $tpl;
+		}
+		return array( 'area' => $area, 'kind' => 'template', 'template_id' => $m[1], 'root' => 'layout' );
+	}
+	return new WP_Error( 'spiral_mcp_bad_area', sprintf( 'Área "%s" no válida. Usa %s, "menu_item:<ID>", "widget:<ID>" o "template:<id>" (lista completa en spiral-mcp/get-theme-layout).', $area, implode( ', ', spiral_mcp_theme_builder_areas() ) ) );
 }
 
+/** Lee un valor anidado de un array por claves. */
+function spiral_mcp_array_get( array $data, array $path ) {
+	foreach ( $path as $key ) {
+		if ( ! is_array( $data ) || ! array_key_exists( $key, $data ) ) {
+			return null;
+		}
+		$data = $data[ $key ];
+	}
+	return $data;
+}
+
+/** Decodifica un layout guardado como array o como JSON en texto. */
+function spiral_mcp_decode_layout( $value ) {
+	if ( is_string( $value ) && '' !== $value ) {
+		$value = json_decode( $value, true );
+	}
+	return is_array( $value ) && isset( $value['type'] ) ? $value : null;
+}
+
+/**
+ * Layout y ajustes de un área. Devuelve [ 'area', 'root', 'layout' (o null),
+ * 'settings' ] o WP_Error.
+ */
+function spiral_mcp_theme_area_get( $area ) {
+	$info = spiral_mcp_theme_area_parse( $area );
+	if ( is_wp_error( $info ) ) {
+		return $info;
+	}
+	if ( 'template' === $info['kind'] ) {
+		$tpl = spiral_mcp_template_get( $info['template_id'] );
+		return array(
+			'area'     => $info['area'],
+			'root'     => $info['root'],
+			'layout'   => spiral_mcp_decode_layout( $tpl['layout'] ?? null ),
+			'settings' => array_diff_key( $tpl, array( 'layout' => 1 ) ),
+		);
+	}
+	if ( 'widget' === $info['kind'] ) {
+		$instance = spiral_mcp_widget_instance( $info['widget_id'] )[3];
+		return array(
+			'area'     => $info['area'],
+			'root'     => $info['root'],
+			'layout'   => spiral_mcp_decode_layout( $instance['content'] ?? null ),
+			'settings' => array_diff_key( $instance, array( 'content' => 1 ) ),
+		);
+	}
+	$read = spiral_mcp_theme_config_read();
+	if ( is_wp_error( $read ) ) {
+		return $read;
+	}
+	$parent = spiral_mcp_array_get( $read['config'], array_slice( $info['path'], 0, -1 ) );
+	return array(
+		'area'     => $info['area'],
+		'root'     => $info['root'],
+		'layout'   => spiral_mcp_decode_layout( is_array( $parent ) ? ( $parent['content'] ?? null ) : null ),
+		'settings' => is_array( $parent ) ? array_diff_key( $parent, array( 'content' => 1 ) ) : array(),
+	);
+}
+
+/**
+ * Guarda el layout de un área. Antes hace snapshot (de toda la configuración
+ * del tema o del widget). Devuelve el ID del snapshot o WP_Error.
+ */
+function spiral_mcp_theme_area_save( $area, array $layout, $note ) {
+	$info = spiral_mcp_theme_area_parse( $area );
+	if ( is_wp_error( $info ) ) {
+		return $info;
+	}
+	if ( ( $layout['type'] ?? '' ) !== $info['root'] ) {
+		return new WP_Error( 'spiral_mcp_bad_layout', sprintf( 'El área "%s" necesita un layout con "type": "%s" en la raíz.', $info['area'], $info['root'] ) );
+	}
+	$layout = spiral_mcp_layout_stamp_version( $layout );
+
+	if ( 'template' === $info['kind'] ) {
+		$tpl           = spiral_mcp_template_get( $info['template_id'] );
+		$tpl['layout'] = spiral_mcp_yootheme_normalize( $layout );
+		return spiral_mcp_template_put( $info['template_id'], $tpl, $note );
+	}
+	if ( 'widget' === $info['kind'] ) {
+		list( $base, $num, $all, $instance ) = spiral_mcp_widget_instance( $info['widget_id'] );
+		$backup = spiral_mcp_snapshot_capture( 'widgets', $info['widget_id'], $note );
+		if ( is_wp_error( $backup ) ) {
+			return $backup;
+		}
+		$instance['content'] = isset( $instance['content'] ) && is_array( $instance['content'] ) ? $layout : spiral_mcp_json( $layout );
+		$all[ $num ]         = $instance;
+		update_option( 'widget_' . $base, $all );
+		return $backup;
+	}
+
+	$read = spiral_mcp_theme_config_read();
+	if ( is_wp_error( $read ) ) {
+		return $read;
+	}
+	$backup = spiral_mcp_snapshot_take( 'theme_config', 'config', $read['raw'], $note );
+	if ( is_wp_error( $backup ) ) {
+		return $backup;
+	}
+	$config = $read['config'];
+	$ref    = &$config;
+	foreach ( array_slice( $info['path'], 0, -1 ) as $key ) {
+		if ( ! isset( $ref[ $key ] ) || ! is_array( $ref[ $key ] ) ) {
+			$ref[ $key ] = array();
+		}
+		$ref = &$ref[ $key ];
+	}
+	// Respeta el formato en que estaba guardado (JSON en texto u objeto).
+	$ref['content'] = is_string( $ref['content'] ?? null ) ? spiral_mcp_json( $layout ) : $layout;
+	unset( $ref );
+
+	$res = spiral_mcp_theme_config_write( $config, $read['raw'] );
+	return is_wp_error( $res ) ? $res : $backup;
+}
+
+/** Todas las áreas con builder que existen ahora, para que el agente las descubra. */
+function spiral_mcp_theme_areas_list() {
+	$out    = array();
+	$read   = spiral_mcp_theme_config_read();
+	$config = is_wp_error( $read ) ? array() : $read['config'];
+	foreach ( spiral_mcp_theme_builder_areas() as $area ) {
+		$out[] = array( 'area' => $area, 'label' => ucfirst( $area ), 'root' => 'layout', 'has_layout' => null !== spiral_mcp_decode_layout( $config[ $area ]['content'] ?? null ) );
+	}
+	foreach ( (array) ( $config['menu']['items'] ?? array() ) as $id => $item ) {
+		if ( is_array( $item ) && null !== spiral_mcp_decode_layout( $item['content'] ?? null ) ) {
+			$post  = get_post( (int) $id );
+			$out[] = array( 'area' => 'menu_item:' . $id, 'label' => 'Mega menú: ' . ( $post ? wp_setup_nav_menu_item( $post )->title : $id ), 'root' => 'fragment', 'has_layout' => true );
+		}
+	}
+	foreach ( (array) get_option( 'widget_builderwidget', array() ) as $num => $instance ) {
+		if ( is_numeric( $num ) && is_array( $instance ) ) {
+			$wid   = 'builderwidget-' . $num;
+			$out[] = array( 'area' => 'widget:' . $wid, 'label' => 'Widget de builder' . ( ! empty( $instance['title'] ) ? ' "' . $instance['title'] . '"' : '' ) . ' en ' . ( spiral_mcp_widget_sidebar_of( $wid ) ?? 'ninguna área' ), 'root' => 'fragment', 'has_layout' => null !== spiral_mcp_decode_layout( $instance['content'] ?? null ) );
+		}
+	}
+	return $out;
+}
 /* -------------------------------------------------------------------------
  * Helpers: widgets
  * ---------------------------------------------------------------------- */
@@ -119,7 +297,7 @@ function spiral_mcp_widget_out( $widget_id, $sidebar = null ) {
 	foreach ( $instance as $key => $value ) {
 		if ( is_string( $value ) && '' !== $value && '{' === $value[0] ) {
 			$decoded = json_decode( $value, true );
-			if ( is_array( $decoded ) && ( $decoded['type'] ?? '' ) === 'layout' ) {
+			if ( is_array( $decoded ) && in_array( $decoded['type'] ?? '', array( 'layout', 'fragment' ), true ) ) {
 				$out['layouts'][ $key ] = $decoded;
 			}
 		}
@@ -206,7 +384,7 @@ function spiral_mcp_theme_backup_find( $backup_id ) {
 add_action( 'wp_abilities_api_categories_init', function () {
 	wp_register_ability_category( 'spiral-mcp-theme', array(
 		'label'       => 'Tema Spiral-MCP',
-		'description' => 'Leer y editar el builder del footer de YOOtheme y los widgets.',
+		'description' => 'Leer y editar la configuración de YOOtheme, los layouts del footer, los mega menús y los widgets de builder, y los widgets.',
 	) );
 } );
 
@@ -223,15 +401,14 @@ add_action( 'wp_abilities_api_init', function () {
 
 	$area_prop = array(
 		'type'        => 'string',
-		'enum'        => spiral_mcp_theme_builder_areas(),
 		'default'     => 'footer',
-		'description' => 'Área del tema con builder propio.',
+		'description' => 'Área con builder: "footer", "menu_item:<ID del elemento de menú>" (mega menú) o "widget:<ID del widget de builder>" (header, navbar, top, bottom… se maquetan con widgets de builder). Lista en "areas" de spiral-mcp/get-theme-layout.',
 	);
 
 	/* 1. Leer layout del footer ------------------------------------------ */
 	spiral_mcp_register_ability( 'spiral-mcp/get-theme-layout', array(
-		'label'               => 'Obtener layout del footer (YOOtheme)',
-		'description'         => 'Devuelve el árbol JSON del builder del footer de YOOtheme (Personalizar > Footer), el mismo formato que los layouts de página. Incluye también las claves de primer nivel de la configuración del tema, para diagnóstico.',
+		'label'               => 'Obtener layout de un área del tema (YOOtheme)',
+		'description'         => 'Devuelve el árbol JSON del builder de un área del tema: el footer (raíz "layout", como una página), el mega menú de un elemento de menú o un widget de builder (raíz "fragment": filas > columnas > elementos, sin secciones). Incluye "settings" (los demás ajustes del área) y "areas": todas las áreas con builder del sitio. En YOOtheme el header, la navbar, top y bottom no tienen layout propio en la configuración: su contenido de builder son widgets de builder en esas posiciones; sus ajustes (disposición, logo, sticky…) se cambian con spiral-mcp/update-theme-config. Para editar por partes usa spiral-mcp/get-layout-outline y spiral-mcp/patch-layout con "area".',
 		'category'            => 'spiral-mcp-theme',
 		'group'               => 'design',
 		'input_schema'        => array(
@@ -240,17 +417,16 @@ add_action( 'wp_abilities_api_init', function () {
 		),
 		'permission_callback' => $can,
 		'execute_callback'    => function ( $input = array() ) {
-			$area = $input['area'] ?? 'footer';
-			$read = spiral_mcp_theme_config_read();
-			if ( is_wp_error( $read ) ) {
-				return $read;
+			$got = spiral_mcp_theme_area_get( ( (array) $input )['area'] ?? 'footer' );
+			if ( is_wp_error( $got ) ) {
+				return $got;
 			}
-			$config = $read['config'];
 			return array(
-				'area'        => $area,
-				'layout'      => spiral_mcp_theme_area_layout( $config, $area ),
-				'area_config' => array_diff_key( (array) ( $config[ $area ] ?? array() ), array( 'content' => 1 ) ),
-				'config_keys' => array_keys( $config ),
+				'area'     => $got['area'],
+				'root'     => $got['root'],
+				'layout'   => $got['layout'],
+				'settings' => (object) $got['settings'],
+				'areas'    => spiral_mcp_theme_areas_list(),
 			);
 		},
 		'meta'                => spiral_mcp_meta( true, false, true ),
@@ -258,8 +434,8 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 2. Actualizar layout del footer ------------------------------------ */
 	spiral_mcp_register_ability( 'spiral-mcp/update-theme-layout', array(
-		'label'               => 'Actualizar layout del footer (YOOtheme)',
-		'description'         => 'Reemplaza el árbol JSON completo del builder del footer de YOOtheme. Primero léelo con spiral-mcp/get-theme-layout, modifícalo y envíalo entero. Antes de escribir guarda un snapshot de toda la configuración del tema ("snapshot_id"; se deshace con spiral-mcp/restore-snapshot).',
+		'label'               => 'Actualizar layout de un área del tema (YOOtheme)',
+		'description'         => 'Reemplaza el árbol JSON completo del builder de un área del tema ("footer", "menu_item:<ID>" o "widget:<ID>"; ver spiral-mcp/get-theme-layout). La raíz debe ser "layout" en el footer y "fragment" en mega menús y widgets. Para cambios pequeños usa spiral-mcp/patch-layout. Valida el árbol con el catálogo de elementos: los errores bloquean el guardado y los avisos vuelven en "warnings". Antes guarda un snapshot ("snapshot_id"; se deshace con spiral-mcp/restore-snapshot).',
 		'category'            => 'spiral-mcp-theme',
 		'group'               => 'design',
 		'log'                 => array(
@@ -273,41 +449,25 @@ add_action( 'wp_abilities_api_init', function () {
 			'required'   => array( 'layout' ),
 			'properties' => array(
 				'area'   => $area_prop,
-				'layout' => array( 'type' => 'object', 'description' => 'Árbol completo con "type": "layout" en la raíz.' ),
+				'layout' => array( 'type' => 'object', 'description' => 'Árbol completo: raíz "layout" (footer) o "fragment" (mega menú, widget).' ),
 			),
 		),
 		'permission_callback' => $can,
 		'execute_callback'    => function ( $input ) {
-			$area   = $input['area'] ?? 'footer';
+			$area   = (string) ( $input['area'] ?? 'footer' );
 			$layout = $input['layout'] ?? null;
-			if ( ! in_array( $area, spiral_mcp_theme_builder_areas(), true ) ) {
-				return new WP_Error( 'spiral_mcp_bad_area', 'Área no permitida.' );
+			if ( ! is_array( $layout ) ) {
+				return new WP_Error( 'spiral_mcp_bad_layout', 'El layout debe ser un objeto JSON.' );
 			}
-			if ( ! is_array( $layout ) || ( $layout['type'] ?? '' ) !== 'layout' ) {
-				return new WP_Error( 'spiral_mcp_bad_layout', 'El layout debe ser un objeto con "type": "layout".' );
+			$warnings = spiral_mcp_layout_check( $layout );
+			if ( is_wp_error( $warnings ) ) {
+				return $warnings;
 			}
-			$read = spiral_mcp_theme_config_read();
-			if ( is_wp_error( $read ) ) {
-				return $read;
-			}
-			$config = $read['config'];
-			$backup = spiral_mcp_snapshot_take( 'theme_config', 'config', $read['raw'], 'update-theme-layout:' . $area );
+			$backup = spiral_mcp_theme_area_save( $area, $layout, 'update-theme-layout:' . $area );
 			if ( is_wp_error( $backup ) ) {
 				return $backup;
 			}
-
-			// Respeta el formato en que estaba guardado el contenido del área.
-			$was_string = is_string( $config[ $area ]['content'] ?? null );
-			if ( ! isset( $config[ $area ] ) || ! is_array( $config[ $area ] ) ) {
-				$config[ $area ] = array();
-			}
-			$config[ $area ]['content'] = $was_string ? spiral_mcp_json( $layout ) : $layout;
-
-			$res = spiral_mcp_theme_config_write( $config, $read['raw'] );
-			if ( is_wp_error( $res ) ) {
-				return $res;
-			}
-			return array( 'area' => $area, 'updated' => true, 'backup_id' => $backup, 'snapshot_id' => $backup );
+			return array( 'area' => $area, 'updated' => true, 'backup_id' => $backup, 'snapshot_id' => $backup, 'warnings' => $warnings );
 		},
 		'meta'                => spiral_mcp_meta( false, false, true ),
 	) );
@@ -413,7 +573,7 @@ add_action( 'wp_abilities_api_init', function () {
 			'properties' => array(
 				'widget_id'  => array( 'type' => 'string', 'description' => 'ID del widget, p. ej. nav_menu-4.' ),
 				'instance'   => array( 'type' => 'object', 'description' => 'Claves de configuración a cambiar.' ),
-				'layout'     => array( 'type' => 'object', 'description' => 'Layout de YOOtheme (type: layout) para widgets de builder.' ),
+				'layout'     => array( 'type' => 'object', 'description' => 'Layout de YOOtheme para widgets de builder (raíz "fragment"). También se puede editar con spiral-mcp/patch-layout y "area": "widget:<ID>".' ),
 				'layout_key' => array( 'type' => 'string', 'default' => 'content' ),
 				'sidebar'    => array( 'type' => 'string', 'description' => 'Área destino. "wp_inactive_widgets" = desactivar.' ),
 			),
@@ -454,9 +614,14 @@ add_action( 'wp_abilities_api_init', function () {
 			}
 			if ( isset( $input['layout'] ) ) {
 				$layout = $input['layout'];
-				if ( ! is_array( $layout ) || ( $layout['type'] ?? '' ) !== 'layout' ) {
-					return new WP_Error( 'spiral_mcp_bad_layout', 'El layout debe ser un objeto con "type": "layout".' );
+				if ( ! is_array( $layout ) || ! in_array( $layout['type'] ?? '', array( 'layout', 'fragment' ), true ) ) {
+					return new WP_Error( 'spiral_mcp_bad_layout', 'El layout debe ser un objeto con "type": "fragment" (o "layout").' );
 				}
+				$warnings = spiral_mcp_layout_check( $layout );
+				if ( is_wp_error( $warnings ) ) {
+					return $warnings;
+				}
+				$layout           = spiral_mcp_layout_stamp_version( $layout );
 				$key              = (string) ( $input['layout_key'] ?? 'content' );
 				$was_array        = isset( $instance[ $key ] ) && is_array( $instance[ $key ] );
 				$instance[ $key ] = $was_array ? $layout : spiral_mcp_json( $layout );

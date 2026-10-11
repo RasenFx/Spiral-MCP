@@ -81,6 +81,22 @@ function spiral_mcp_save( array $postarr ) {
 	return $result;
 }
 
+/** Reemplaza el layout de YOOtheme de un post (crea revisión). Devuelve el ID o WP_Error. */
+function spiral_mcp_layout_save_post( WP_Post $post, $layout ) {
+	if ( ! is_array( $layout ) || ( $layout['type'] ?? '' ) !== 'layout' || empty( $layout['children'] ) ) {
+		return new WP_Error( 'spiral_mcp_bad_layout', 'El layout debe ser un objeto con "type": "layout" y al menos una sección.' );
+	}
+	$json = spiral_mcp_json( spiral_mcp_layout_stamp_version( $layout ) );
+	if ( false === $json || false !== strpos( $json, '-->' ) ) {
+		return new WP_Error( 'spiral_mcp_bad_layout', 'No se pudo serializar el layout (contiene "-->" o datos inválidos).' );
+	}
+	list( $html ) = spiral_mcp_split_layout( $post->post_content );
+	return spiral_mcp_save( array(
+		'ID'           => $post->ID,
+		'post_content' => $html . '<!-- ' . $json . ' -->',
+	) );
+}
+
 /* -------------------------------------------------------------------------
  * Categoría
  * ---------------------------------------------------------------------- */
@@ -315,7 +331,7 @@ add_action( 'wp_abilities_api_init', function () {
 	/* 6. Actualizar layout YOOtheme -------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/update-yootheme-layout', array(
 		'label'               => 'Actualizar layout de YOOtheme',
-		'description'         => 'Reemplaza el árbol JSON completo del constructor de YOOtheme de una página. Primero lee el layout con spiral-mcp/get-yootheme-layout, modifícalo y envíalo entero. Guarda una revisión.',
+		'description'         => 'Reemplaza el árbol JSON completo del constructor de YOOtheme de una página. Primero lee el layout con spiral-mcp/get-yootheme-layout, modifícalo y envíalo entero; para cambios pequeños usa spiral-mcp/patch-layout. Valida el árbol con el catálogo de elementos (spiral-mcp/list-elements): los tipos desconocidos y las estructuras imposibles bloquean el guardado; los props desconocidos o fuera de sus opciones vuelven como "warnings". Si falta "version" en la raíz se añade la de YOOtheme. Guarda una revisión.',
 		'category'            => 'spiral-mcp-content',
 		'log'                 => array( 'type' => 'post' ),
 		'input_schema'        => array(
@@ -334,23 +350,16 @@ add_action( 'wp_abilities_api_init', function () {
 			if ( is_wp_error( $post ) ) {
 				return $post;
 			}
-			$layout = $input['layout'] ?? null;
-			if ( ! is_array( $layout ) || ( $layout['type'] ?? '' ) !== 'layout' || empty( $layout['children'] ) ) {
-				return new WP_Error( 'spiral_mcp_bad_layout', 'El layout debe ser un objeto con "type": "layout" y al menos una sección.' );
+			$layout   = $input['layout'] ?? null;
+			$warnings = is_array( $layout ) ? spiral_mcp_layout_check( $layout ) : array();
+			if ( is_wp_error( $warnings ) ) {
+				return $warnings;
 			}
-			$json = spiral_mcp_json( $layout );
-			if ( false === $json || false !== strpos( $json, '-->' ) ) {
-				return new WP_Error( 'spiral_mcp_bad_layout', 'No se pudo serializar el layout (contiene "-->" o datos inválidos).' );
-			}
-			list( $html ) = spiral_mcp_split_layout( $post->post_content );
-			$result       = spiral_mcp_save( array(
-				'ID'           => $post->ID,
-				'post_content' => $html . '<!-- ' . $json . ' -->',
-			) );
+			$result = spiral_mcp_layout_save_post( $post, $layout );
 			if ( is_wp_error( $result ) ) {
 				return $result;
 			}
-			return array_merge( spiral_mcp_summary( get_post( $result ) ), array( 'updated' => true ) );
+			return array_merge( spiral_mcp_summary( get_post( $post->ID ) ), array( 'updated' => true, 'warnings' => $warnings ) );
 		},
 		'meta'                => spiral_mcp_meta( false ),
 	) );

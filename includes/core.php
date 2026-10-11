@@ -87,8 +87,12 @@ function spiral_mcp_register_ability( $name, array $args ) {
 
 	if ( empty( $args['meta']['annotations']['readonly'] ) && isset( $args['execute_callback'] ) ) {
 		$execute                  = $args['execute_callback'];
-		$args['execute_callback'] = function ( $input = null ) use ( $name, $execute, $log ) {
-			return spiral_mcp_log_run( $name, $execute, $input, $log );
+		$args['execute_callback'] = function ( $input = null ) use ( $name, $execute, $log, $groups ) {
+			$result = spiral_mcp_log_run( $name, $execute, $input, $log );
+			if ( ! is_wp_error( $result ) ) {
+				spiral_mcp_maybe_auto_clear_cache( $name, $groups );
+			}
+			return $result;
 		};
 	}
 

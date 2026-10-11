@@ -10,7 +10,7 @@ El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes d
 - YOOtheme Pro activo (o un tema hijo de YOOtheme) para todo lo relacionado con el builder y los estilos.
 - PHP 7.4 como mínimo: no usar sintaxis de PHP 8 (match, nullsafe `?->`, argumentos con nombre, tipos de unión, `readonly`, enums).
 
-## Estructura actual (v1.5.0)
+## Estructura actual (v1.6.0)
 ```
 spiral-mcp-control.php   cabecera, constantes, comprobación de requisitos, require_once y hooks de activación
 uninstall.php            borra el rol y las capacidades (las tablas solo con el filtro spiral_mcp_uninstall_drop_tables)
@@ -23,6 +23,11 @@ includes/content.php     helpers y abilities de páginas/entradas y layouts de p
 includes/menus.php       abilities de menús y elementos de menú (+ snapshot kind "menu")
 includes/theme.php       footer de YOOtheme (builder) y widgets (+ snapshot kinds "theme_config" y "widgets")
 includes/media.php       subir, listar, editar y borrar medios, imagen destacada y usos (+ snapshot kinds "media_meta" y "post_meta")
+includes/elements.php    catálogo de elementos de YOOtheme (list-elements, get-element-schema) y validación de layouts
+includes/layout.php      JSON Pointer, get-layout-outline, get-layout-node, patch-layout y duplicate-content
+includes/theme-config.php get-theme-config y update-theme-config (lista blanca de secciones)
+includes/templates.php   plantillas y biblioteca de YOOtheme vía su Storage (+ snapshot kind "yootheme_storage")
+includes/cache.php       clear-cache y purga automática tras cada escritura
 tests/smoke.sh           prueba de humo por REST (ver "Entorno de desarrollo")
 tests/fixtures/          layouts de YOOtheme de ejemplo
 dist/                    ZIP para instalar (no versionar)
@@ -31,7 +36,9 @@ dist/                    ZIP para instalar (no versionar)
 Abilities existentes (todas con prefijo `spiral-mcp/`):
 - Contenido: `list-content`, `get-content`, `create-content`, `update-content`, `get-yootheme-layout`, `update-yootheme-layout`.
 - Menús: `list-menus`, `get-menu`, `create-menu`, `update-menu`, `delete-menu`, `add-menu-item`, `update-menu-item`, `delete-menu-item`.
-- Tema: `get-theme-layout`, `update-theme-layout`, `list-widgets`, `update-widget`; `list-theme-backups` y `restore-theme-backup` son alias obsoletos (se quitan en la próxima versión).
+- Tema: `get-theme-layout`, `update-theme-layout` (áreas `footer`, `menu_item:<ID>`, `widget:<ID>`, `template:<id>`), `list-widgets`, `update-widget`; `list-theme-backups` y `restore-theme-backup` son alias obsoletos (se quitan en la próxima versión).
+- Layouts: `list-elements`, `get-element-schema`, `get-layout-outline`, `get-layout-node`, `patch-layout`, `duplicate-content`, `insert-from-library`.
+- YOOtheme: `get-theme-config`, `update-theme-config`, `list-templates`, `get-template`, `create-template`, `update-template`, `delete-template`, `list-library`, `get-library-item`, `save-to-library`, `clear-cache`.
 - Medios: `upload-media`, `list-media`, `get-media`, `update-media`, `delete-media`, `set-featured-image`, `find-media-usage`.
 - Auditoría y snapshots: `list-activity`, `list-snapshots`, `restore-snapshot`.
 
@@ -44,6 +51,7 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - **Permisos**: el wrapper exige la capacidad `spiral_mcp_*` del grupo; además, `permission_callback` comprueba la nativa del objeto (`edit_post` con ese ID, `edit_theme_options`…). Nunca `__return_true`.
 - **Acciones destructivas** (borrar, restaurar, reemplazar algo sin revisión): exigir `"confirm": true` con `spiral_mcp_require_confirm()` y marcar `destructive => true`.
 - **Antes de escribir en opciones o theme mods, guardar una copia** (snapshot). Los posts ya tienen revisiones; lo demás no.
+- **Esquemas con varios tipos** (`'type' => array( … )`): poner `string` primero y `array` antes que `object`. El core convierte la entrada al primer tipo que la valide y un texto con espacios pasa como lista (`wp_parse_list`).
 - **Escritura de posts**: siempre con `wp_slash()` antes de `wp_insert_post` / `wp_update_post` (si no, se rompen las `\` del JSON de YOOtheme).
 - **JSON**: `spiral_mcp_json( $x )` (`wp_json_encode` con `JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE`).
 - **Errores**: devolver `WP_Error` con mensaje en español que diga cómo corregir la llamada. No lanzar excepciones hacia fuera.
@@ -54,7 +62,12 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - **Layout de una página**: JSON al final de `post_content`, dentro del último comentario `<!-- {…} -->`. Raíz `{"type":"layout","children":[section > row > column > elementos]}`. Lo que va antes del comentario es el HTML de respaldo. Ver `spiral_mcp_split_layout()`.
 - **Configuración del tema**: theme mod `config` (JSON en texto). Claves de primer nivel vistas: `menu, site, header, navbar, dialog, mobile, top, main_sidebar, bottom, footer, webp, consent, less, custom_less, style, post, blog, minimum_stability, lazyload, version, logo, favicon, touchicon, yootheme_apikey, jquery, site_url, favicon_svg, search_filter, scripts, image_urls`.
 - **Footer**: `config.footer.content` es un layout con el mismo formato que una página.
-- **Widgets de builder** (`builderwidget-N`): guardan su layout como JSON en texto en la clave `content` de la instancia (raíz `"type":"fragment"`).
+- **Mega menús**: `config.menu.items.<ID del elemento de menú>.content`, raíz `"type":"fragment"`.
+- **Header, navbar, top, bottom…** no tienen layout en `config`: son ajustes planos; su contenido de builder son widgets `builderwidget` en esas posiciones.
+- **`version` en la raíz de todo layout** (`"5.0.51"`): sin ella YOOtheme asume 1.0.0 y aplica todas sus migraciones al renderizar. Las funciones de guardado la añaden (`spiral_mcp_layout_stamp_version()`).
+- **Plantillas y biblioteca**: opción `yootheme` (JSON) bajo `templates.<id>` y `library.<id>`. Escribir **solo** con `\YOOtheme\app(\YOOtheme\Storage::class)`: guarda la opción entera en `shutdown` y pisaría un `update_option()` hecho en la misma petición.
+- **Elementos**: `\YOOtheme\app(\YOOtheme\Builder::class)->getTypes()`; `json_encode` resuelve los campos compartidos. `YOOtheme\Config` es una **interfaz** (usar `interface_exists`, no `class_exists`).
+- **Plantillas**: se aplica la primera activa (orden = prioridad) cuyo tipo y condiciones encajan; una página con layout propio no usa plantillas.- **Widgets de builder** (`builderwidget-N`): guardan su layout como JSON en texto en la clave `content` de la instancia (raíz `"type":"fragment"`). Se editan con `update-widget` o con las abilities de layout y `"area": "widget:builderwidget-N"`.
 - **Fuentes dinámicas**: un elemento puede tener `"source": {"query": {"name": "customMenuItems", "arguments": {...}}, "props": {...}}`. Hay que conservarlas al editar.
 - **Rutas de imagen** en props: relativas a la raíz, p. ej. `wp-content/uploads/2024/11/logo.webp`.
 - **Los estilos (LESS) se compilan en el navegador**, en el Personalizador. Cambiar `config.less` o `config.custom_less` en la BD no cambia el CSS servido hasta que alguien abre Personalizar y guarda.

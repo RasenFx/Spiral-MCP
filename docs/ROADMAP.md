@@ -76,42 +76,51 @@ Sin medios, el agente no puede poner logos ni fotos en los diseños.
 ## Fase 3 — YOOtheme completo
 
 ### 3.1 Spikes (hacer primero y anotar los resultados aquí)
-- [ ] **Áreas de la configuración**: qué contiene cada clave de `config` (`header`, `navbar`, `dialog`, `mobile`, `top`, `bottom`, `logo`, `site`, `post`, `blog`, `consent`, `scripts`…), cuáles son ajustes planos y cuáles contienen layouts de builder (`content`).
-- [ ] **Plantillas del builder** (Templates: plantillas para entradas individuales, archivos, búsqueda, 404, tipos de contenido): dónde se guardan (¿`config.templates`?), su estructura (`name`, `type`, `query`/condiciones, `layout`) y cómo decide YOOtheme cuál aplicar.
-- [ ] **Biblioteca de layouts** (secciones guardadas por el usuario): dónde y cómo se guarda.
-- [ ] **Definiciones de elementos**: dónde guarda YOOtheme la definición de cada elemento (campos, tipos, opciones, valores por defecto) dentro del tema, y cómo leerlas desde PHP con las APIs del propio YOOtheme (preferible a leer archivos a mano).
-- [ ] **Caché de YOOtheme**: qué hay que invalidar tras cambiar un layout o el theme config (caché de imágenes en `uploads/yootheme/`, transients…).
+- [x] **Áreas de la configuración**: qué contiene cada clave de `config` (`header`, `navbar`, `dialog`, `mobile`, `top`, `bottom`, `logo`, `site`, `post`, `blog`, `consent`, `scripts`…), cuáles son ajustes planos y cuáles contienen layouts de builder (`content`).
+- [x] **Plantillas del builder** (Templates: plantillas para entradas individuales, archivos, búsqueda, 404, tipos de contenido): dónde se guardan (¿`config.templates`?), su estructura (`name`, `type`, `query`/condiciones, `layout`) y cómo decide YOOtheme cuál aplicar.
+- [x] **Biblioteca de layouts** (secciones guardadas por el usuario): dónde y cómo se guarda.
+- [x] **Definiciones de elementos**: dónde guarda YOOtheme la definición de cada elemento (campos, tipos, opciones, valores por defecto) dentro del tema, y cómo leerlas desde PHP con las APIs del propio YOOtheme (preferible a leer archivos a mano).
+- [x] **Caché de YOOtheme**: qué hay que invalidar tras cambiar un layout o el theme config (caché de imágenes en `uploads/yootheme/`, transients…).
+
+**Resultados de los spikes (YOOtheme 5.0.51, comprobados en local):**
+- **Configuración**: theme mod `config` (JSON en texto); YOOtheme la lee en `wp_loaded` (`~theme` en su contenedor) y el Personalizador la reemplaza entera pasando antes por el filtro `config.save`. Sin `version`, su `Updater` aplica todas las migraciones. Solo hay dos sitios con layouts de builder: `footer.content` (raíz `layout`) y `menu.items.<ID del nav_menu_item>.content` (mega menús, raíz `fragment`). `header`, `navbar`, `dialog`, `mobile`, `top`, `bottom`, `logo`, `site`, `post`, `blog`, `consent`… son ajustes planos. Los valores por defecto (y por tanto las claves válidas) están en `theme.defaults` del contenedor. Algunas claves llevan punto en el nombre (`search_dropdown.stretch`): son literales.
+- **Contenido de builder en header/navbar/top/bottom…**: son **widgets de builder** (`widget_builderwidget[n]['content']`, JSON en texto, raíz `fragment`) asignados a esas posiciones en `sidebars_widgets`.
+- **Plantillas**: opción `yootheme` (JSON, servicio `YOOtheme\Storage`), clave `templates.<id>` → `{name, type, status, query, params, layout}`. `type`: `single-<post_type>`, `archive-<post_type>`, `taxonomy-<tax>`, `author-archive`, `date-archive`, `search`, `_search`, `error-404` (catálogo y campos de `query`/`params` en `BuilderConfig['templates']`). Se aplica la **primera** plantilla activa (orden = prioridad) cuyo tipo coincide y cuyas condiciones no vacías encajan; una página con layout propio ignora las plantillas. IDs: 8 caracteres.
+- **Biblioteca**: misma opción, `library.<id>` → nodo (`type: "layout"` para layouts, o el tipo del elemento) con `name`, `modified` y `version`.
+- **Storage**: escribe la opción **entera** en `shutdown` si se modificó. Hay que escribir siempre con `\YOOtheme\app(\YOOtheme\Storage::class)->set()/del()`; un `update_option('yootheme')` en la misma petición se pierde.
+- **Definiciones de elementos**: `element.php` (no JSON) en `packages/builder/elements/*` y otros paquetes; se leen con `\YOOtheme\app(\YOOtheme\Builder::class)->getTypes()` (59 tipos en local). Serializados con JSON traen los campos compartidos (`${builder.xxx}`) resueltos. Estructura: layout > section > row > column > elementos; `fragment` (sublayout) contiene filas; cada elemento múltiple tiene su `<tipo>_item` (campo `content-items`). Los anchos de columna (`width_default`, `width_small`…) son `child-prop` de la fila. PHP no valida el anidado (lo hace el JS del Personalizador): lo valida este plugin.
+- **Caché**: YOOtheme no cachea el HTML (páginas, plantillas, footer y widgets se renderizan en cada petición) ni hay que invalidar nada suyo; la caché de imágenes (`uploads/yootheme/cache`) va por contenido. Solo hay que purgar plugins de caché de página. El CSS del tema se compila en el navegador (Fase 4).
 
 ### 3.2 Configuración del tema
-- [ ] `spiral-mcp/get-theme-config`: `section` opcional. Sin sección devuelve la lista de secciones con un resumen. Con sección devuelve su contenido. `yootheme_apikey` y cualquier secreto se devuelven enmascarados.
-- [ ] `spiral-mcp/update-theme-config`: `section` + `values` (merge profundo por defecto, o `replace: true`). Hace snapshot antes.
+- [x] `spiral-mcp/get-theme-config`: `section` opcional. Sin sección devuelve la lista de secciones con un resumen. Con sección devuelve su contenido. `yootheme_apikey` y cualquier secreto se devuelven enmascarados.
+- [x] `spiral-mcp/update-theme-config`: `section` + `values` (merge profundo por defecto, o `replace: true`). Hace snapshot antes.
   - Lista blanca de secciones editables (filtro `spiral_mcp_theme_config_sections`). Por defecto: `site, header, navbar, dialog, mobile, top, bottom, footer, logo, favicon, touchicon, post, blog, consent, lazyload, webp`.
   - `scripts` (JS personalizado) requiere `spiral_mcp_code`.
   - No editables: `yootheme_apikey`, `version`, `minimum_stability`, `site_url`.
-- [ ] Generalizar `get-theme-layout` y `update-theme-layout` a todas las áreas con builder que salgan del spike (no solo `footer`).
+- [x] Generalizar `get-theme-layout` y `update-theme-layout` a todas las áreas con builder que salgan del spike (no solo `footer`).
 
 ### 3.3 Edición eficiente de layouts
 Hoy `update-yootheme-layout` exige enviar el árbol completo: es caro y arriesgado en páginas grandes.
-- [ ] `spiral-mcp/get-layout-outline`: árbol resumido de una página o de un área del tema. Una línea por nodo con su **ruta** (`/children/0/children/1/children/2`), `type`, `name` y un extracto de su texto o título. Para que el agente localice qué tocar sin descargar todo el JSON.
-- [ ] `spiral-mcp/get-layout-node`: devuelve un nodo por ruta.
-- [ ] `spiral-mcp/patch-layout`: aplica operaciones sobre un layout (de página por `id`, o de un área del tema por `area`). Operaciones al estilo JSON Patch (RFC 6902): `replace`, `add` (insertar en una posición de `children`), `remove`, `move`, `copy`, con rutas sobre el árbol. Es atómico: si falla una operación, no se guarda nada. Crea una revisión (página) o un snapshot (área del tema).
-- [ ] `spiral-mcp/duplicate-content`: clona una página o entrada con su layout, como borrador.
+- [x] `spiral-mcp/get-layout-outline`: árbol resumido de una página o de un área del tema. Una línea por nodo con su **ruta** (`/children/0/children/1/children/2`), `type`, `name` y un extracto de su texto o título. Para que el agente localice qué tocar sin descargar todo el JSON.
+- [x] `spiral-mcp/get-layout-node`: devuelve un nodo por ruta.
+- [x] `spiral-mcp/patch-layout`: aplica operaciones sobre un layout (de página por `id`, o de un área del tema por `area`). Operaciones al estilo JSON Patch (RFC 6902): `replace`, `add` (insertar en una posición de `children`), `remove`, `move`, `copy`, con rutas sobre el árbol. Es atómico: si falla una operación, no se guarda nada. Crea una revisión (página) o un snapshot (área del tema).
+- [x] `spiral-mcp/duplicate-content`: clona una página o entrada con su layout, como borrador.
 
 ### 3.4 Catálogo de elementos y validación
-- [ ] `spiral-mcp/list-elements`: los tipos de elemento disponibles (`name`, `title`, `group`, si admite hijos y qué hijos).
-- [ ] `spiral-mcp/get-element-schema`: los campos de un elemento (nombre, tipo, opciones permitidas, valor por defecto).
-- [ ] Validación en `update-yootheme-layout`, `update-theme-layout` y `patch-layout`:
+- [x] `spiral-mcp/list-elements`: los tipos de elemento disponibles (`name`, `title`, `group`, si admite hijos y qué hijos).
+- [x] `spiral-mcp/get-element-schema`: los campos de un elemento (nombre, tipo, opciones permitidas, valor por defecto).
+- [x] Validación en `update-yootheme-layout`, `update-theme-layout` y `patch-layout`:
   - **Error** si hay un `type` desconocido o una estructura imposible (p. ej. un `row` fuera de una `section`).
   - **Aviso** (no bloquea) si hay props desconocidos o valores fuera de sus opciones.
   - Los avisos van en la respuesta (`warnings`) para que el agente se corrija.
 
 ### 3.5 Plantillas y biblioteca (según el spike)
-- [ ] `spiral-mcp/list-templates`, `get-template`, `create-template`, `update-template`, `delete-template` (este último con `confirm`). Snapshot antes de cada escritura.
-- [ ] `spiral-mcp/list-library`, `get-library-item`, `save-to-library` (desde una ruta de un layout), `insert-from-library` (en una ruta de un layout).
+- [x] `spiral-mcp/list-templates`, `get-template`, `create-template`, `update-template`, `delete-template` (este último con `confirm`). Snapshot antes de cada escritura.
+- [x] `spiral-mcp/list-library`, `get-library-item`, `save-to-library` (desde una ruta de un layout), `insert-from-library` (en una ruta de un layout).
 
 ### 3.6 Caché
-- [ ] `spiral-mcp/clear-cache`: caché de YOOtheme (según el spike), `wp_cache_flush()`, y hooks a los plugins de caché más comunes si están activos (LiteSpeed, WP Rocket, W3TC, WP Super Cache). Devuelve qué limpió.
-- [ ] Llamarla automáticamente después de cada escritura de diseño (desactivable con el filtro `spiral_mcp_auto_clear_cache`).
+- [x] `spiral-mcp/clear-cache`: caché de YOOtheme (según el spike), `wp_cache_flush()`, y hooks a los plugins de caché más comunes si están activos (LiteSpeed, WP Rocket, W3TC, WP Super Cache). Devuelve qué limpió.
+- [x] Llamarla automáticamente después de cada escritura de diseño (desactivable con el filtro `spiral_mcp_auto_clear_cache`).
 
 **Terminado cuando:** el agente cambia el header (logo, navbar y su versión móvil), crea una plantilla de YOOtheme para las entradas individuales y edita una sección concreta de una página grande con `patch-layout`, todo validado por el catálogo de elementos.
 
