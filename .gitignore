@@ -3,3 +3,6 @@
 
 # ZIP de instalación (no versionar)
 dist/
+
+# Dependencias de desarrollo
+node_modules/

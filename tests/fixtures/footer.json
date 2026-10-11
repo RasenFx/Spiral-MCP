@@ -1,0 +1,64 @@
+{
+  "type": "layout",
+  "children": [
+    {
+      "type": "section",
+      "props": {
+        "style": "secondary",
+        "padding": "small"
+      },
+      "children": [
+        {
+          "type": "row",
+          "children": [
+            {
+              "type": "column",
+              "props": {
+                "width_medium": "1-2"
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "props": {
+                    "content": "<p>© Spiral-MCP. Todos los derechos reservados.</p>"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "column",
+              "props": {
+                "width_medium": "1-2"
+              },
+              "children": [
+                {
+                  "type": "nav",
+                  "props": {
+                    "nav_style": "default"
+                  },
+                  "children": [
+                    {
+                      "type": "nav_item",
+                      "props": {
+                        "content": "Aviso legal",
+                        "link": "/aviso-legal/"
+                      }
+                    },
+                    {
+                      "type": "nav_item",
+                      "props": {
+                        "content": "Contacto",
+                        "link": "/contacto/"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "version": "4.5.0"
+}

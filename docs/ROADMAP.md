@@ -15,39 +15,39 @@ Leyenda: `[ ]` pendiente · `[x]` hecho · **Spike** = investigar en el entorno 
 Antes de dar más poder al agente: trazabilidad, deshacer y permisos acotados.
 
 ### 0.1 Reorganización
-- [ ] Mover las abilities de contenido de `spiral-mcp-control.php` a `includes/content.php`. El archivo principal queda con la cabecera, las constantes (`SPIRAL_MCP_VERSION`, `SPIRAL_MCP_DIR`), la comprobación de requisitos y los `require_once`.
-- [ ] `includes/core.php` con los helpers compartidos:
+- [x] Mover las abilities de contenido de `spiral-mcp-control.php` a `includes/content.php`. El archivo principal queda con la cabecera, las constantes (`SPIRAL_MCP_VERSION`, `SPIRAL_MCP_DIR`), la comprobación de requisitos y los `require_once`.
+- [x] `includes/core.php` con los helpers compartidos:
   - `spiral_mcp_register_ability( $name, $args )`: envuelve `wp_register_ability`. Envuelve `execute_callback` para registrar en la auditoría, rellena `meta` por defecto y fuerza el prefijo `spiral-mcp/`.
   - `spiral_mcp_meta( $readonly, $destructive, $idempotent )`.
   - `spiral_mcp_json( $data )`: `wp_json_encode` con los flags del proyecto.
   - `spiral_mcp_require_confirm( $input )`: devuelve un `WP_Error` si falta `"confirm": true`.
-- [ ] Migrar todas las abilities existentes al wrapper, sin cambiar sus nombres ni sus esquemas.
-- [ ] Añadir `.gitignore` (`dist/`, `node_modules/`, `.idea/`) y `CHANGELOG.md`.
+- [x] Migrar todas las abilities existentes al wrapper, sin cambiar sus nombres ni sus esquemas.
+- [x] Añadir `.gitignore` (`dist/`, `node_modules/`, `.idea/`) y `CHANGELOG.md`.
 
 ### 0.2 Registro de auditoría
-- [ ] Tabla `{prefix}spiral_mcp_log`, creada con `dbDelta` en la activación y en cada actualización de versión: `id, created_at, user_id, ability, object_type, object_id, input_json, result ('ok'|código de error), snapshot_id, duration_ms`.
-- [ ] El wrapper registra **solo las abilities que escriben** (`readonly = false`). `input_json` se trunca a 8 KB y se redactan las claves sensibles (`password`, `token`, `apikey`, `yootheme_apikey`, `key`).
-- [ ] Ability `spiral-mcp/list-activity`: filtros por ability, objeto, usuario y fechas, con paginación. Solo lectura.
-- [ ] Retención configurable (filtro `spiral_mcp_log_retention_days`, 90 días por defecto) con limpieza diaria vía WP-Cron.
+- [x] Tabla `{prefix}spiral_mcp_log`, creada con `dbDelta` en la activación y en cada actualización de versión: `id, created_at, user_id, ability, object_type, object_id, input_json, result ('ok'|código de error), snapshot_id, duration_ms`.
+- [x] El wrapper registra **solo las abilities que escriben** (`readonly = false`). `input_json` se trunca a 8 KB y se redactan las claves sensibles (`password`, `token`, `apikey`, `yootheme_apikey`, `key`).
+- [x] Ability `spiral-mcp/list-activity`: filtros por ability, objeto, usuario y fechas, con paginación. Solo lectura.
+- [x] Retención configurable (filtro `spiral_mcp_log_retention_days`, 90 días por defecto) con limpieza diaria vía WP-Cron.
 
 ### 0.3 Snapshots genéricos
-- [ ] Tabla `{prefix}spiral_mcp_snapshots`: `id, created_at, user_id, kind, ref, data (longtext), note`.
+- [x] Tabla `{prefix}spiral_mcp_snapshots`: `id, created_at, user_id, kind, ref, data (longtext), note`.
   - `kind`: `theme_config`, `menu`, `widgets`, `option`, `custom_css`, `post_meta`, `media_meta`.
-- [ ] Helpers `spiral_mcp_snapshot_take( $kind, $ref, $data, $note )` y `spiral_mcp_snapshot_restore( $id )`. Restaurar también guarda un snapshot del estado actual.
-- [ ] Usar los snapshots en todo lo que escribe fuera de posts: theme config, menús (el árbol completo antes de cada cambio), widgets (`sidebars_widgets` y la opción `widget_<base>` afectada).
-- [ ] Migrar `rasenfx_ca_yootheme_config_backups` / `spiral_mcp_yootheme_config_backups` (opción de la 1.3.0) a la tabla y borrar la opción. `list-theme-backups` y `restore-theme-backup` pasan a `list-snapshots` y `restore-snapshot` (con `confirm`). Se mantienen los nombres viejos como alias durante una versión.
+- [x] Helpers `spiral_mcp_snapshot_take( $kind, $ref, $data, $note )` y `spiral_mcp_snapshot_restore( $id )`. Restaurar también guarda un snapshot del estado actual.
+- [x] Usar los snapshots en todo lo que escribe fuera de posts: theme config, menús (el árbol completo antes de cada cambio), widgets (`sidebars_widgets` y la opción `widget_<base>` afectada).
+- [x] Migrar `rasenfx_ca_yootheme_config_backups` / `spiral_mcp_yootheme_config_backups` (opción de la 1.3.0) a la tabla y borrar la opción. `list-theme-backups` y `restore-theme-backup` pasan a `list-snapshots` y `restore-snapshot` (con `confirm`). Se mantienen los nombres viejos como alias durante una versión.
 
 ### 0.4 Permisos
-- [ ] Capacidades propias: `spiral_mcp_content`, `spiral_mcp_design` (builder, menús, widgets, estilos), `spiral_mcp_media`, `spiral_mcp_settings`, `spiral_mcp_code` (scripts y JS personalizado: el riesgo es mayor).
-- [ ] Rol `spiral_mcp_agent` con esas capacidades más las nativas necesarias (`edit_pages`, `edit_others_pages`, `publish_pages`, `edit_posts`, `upload_files`, `edit_theme_options`…), sin `install_plugins`, `edit_plugins`, `manage_options`, `promote_users` ni `delete_users`.
-- [ ] Los administradores reciben todas las capacidades `spiral_mcp_*` en la activación.
-- [ ] Cada ability comprueba la capacidad `spiral_mcp_*` de su grupo y, además, la nativa del objeto (`edit_post` para ese ID, etc.).
-- [ ] La desinstalación (`uninstall.php`) elimina el rol y las capacidades. **No** borra las tablas salvo que el filtro `spiral_mcp_uninstall_drop_tables` devuelva true.
+- [x] Capacidades propias: `spiral_mcp_content`, `spiral_mcp_design` (builder, menús, widgets, estilos), `spiral_mcp_media`, `spiral_mcp_settings`, `spiral_mcp_code` (scripts y JS personalizado: el riesgo es mayor).
+- [x] Rol `spiral_mcp_agent` con esas capacidades más las nativas necesarias (`edit_pages`, `edit_others_pages`, `publish_pages`, `edit_posts`, `upload_files`, `edit_theme_options`…), sin `install_plugins`, `edit_plugins`, `manage_options`, `promote_users` ni `delete_users`.
+- [x] Los administradores reciben todas las capacidades `spiral_mcp_*` en la activación.
+- [x] Cada ability comprueba la capacidad `spiral_mcp_*` de su grupo y, además, la nativa del objeto (`edit_post` para ese ID, etc.).
+- [x] La desinstalación (`uninstall.php`) elimina el rol y las capacidades. **No** borra las tablas salvo que el filtro `spiral_mcp_uninstall_drop_tables` devuelva true.
 
 ### 0.5 Pruebas
-- [ ] `tests/smoke.sh`: llama por REST a cada ability con una Application Password del rol `spiral_mcp_agent` contra el WordPress local. Comprueba códigos HTTP y claves de la respuesta. Variables: `WP_URL`, `WP_USER`, `WP_APP_PASSWORD`.
-- [ ] `tests/fixtures/`: layouts de YOOtheme de ejemplo (página simple, página con fuentes dinámicas, footer).
-- [ ] Spike: comprobar la ruta REST de la Abilities API en el entorno local y anotarla en `CLAUDE.md`.
+- [x] `tests/smoke.sh`: llama por REST a cada ability con una Application Password del rol `spiral_mcp_agent` contra el WordPress local. Comprueba códigos HTTP y claves de la respuesta. Variables: `WP_URL`, `WP_USER`, `WP_APP_PASSWORD`.
+- [x] `tests/fixtures/`: layouts de YOOtheme de ejemplo (página simple, página con fuentes dinámicas, footer).
+- [x] Spike: comprobar la ruta REST de la Abilities API en el entorno local y anotarla en `CLAUDE.md`. **Resultado (WP 7.1.3):** `/wp-abilities/v1/abilities/<nombre>/run`; `GET` si readonly, `DELETE` si destructive + idempotent, `POST` en el resto. Detalle en `CLAUDE.md`.
 
 **Terminado cuando:** todas las abilities existentes pasan por el wrapper, cada escritura queda en el log, cualquier cambio de menú, widget o theme config se puede restaurar, y `smoke.sh` pasa con el rol `spiral_mcp_agent`.
 

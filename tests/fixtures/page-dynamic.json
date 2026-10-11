@@ -1,0 +1,64 @@
+{
+  "type": "layout",
+  "children": [
+    {
+      "type": "section",
+      "props": {
+        "style": "muted",
+        "css": ".el-section { border-top: 1px solid #ddd; }"
+      },
+      "children": [
+        {
+          "type": "row",
+          "children": [
+            {
+              "type": "column",
+              "props": {
+                "width_medium": "1-1"
+              },
+              "children": [
+                {
+                  "type": "headline",
+                  "props": {
+                    "content": "Navegación",
+                    "title_element": "h2"
+                  }
+                },
+                {
+                  "type": "list",
+                  "source": {
+                    "query": {
+                      "name": "customMenuItems",
+                      "arguments": {
+                        "menu": "2",
+                        "parent": "0"
+                      }
+                    },
+                    "props": {
+                      "content": {
+                        "name": "title"
+                      },
+                      "link": {
+                        "name": "url"
+                      }
+                    }
+                  },
+                  "children": [
+                    {
+                      "type": "list_item",
+                      "props": {
+                        "content": "Elemento de menú",
+                        "link": "/"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "version": "4.5.0"
+}

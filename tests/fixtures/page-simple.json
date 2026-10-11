@@ -1,0 +1,62 @@
+{
+  "type": "layout",
+  "children": [
+    {
+      "type": "section",
+      "props": {
+        "style": "default",
+        "width": "default",
+        "padding": "large"
+      },
+      "children": [
+        {
+          "type": "row",
+          "children": [
+            {
+              "type": "column",
+              "props": {
+                "width_medium": "1-1"
+              },
+              "children": [
+                {
+                  "type": "headline",
+                  "props": {
+                    "content": "Página de prueba",
+                    "title_element": "h1"
+                  }
+                },
+                {
+                  "type": "text",
+                  "props": {
+                    "content": "<p>Texto con \"comillas\", barra invertida \\ y acentos: áéíóú ñ.</p>"
+                  }
+                },
+                {
+                  "type": "button",
+                  "children": [
+                    {
+                      "type": "button_item",
+                      "props": {
+                        "content": "Contacto",
+                        "link": "/contacto/",
+                        "button_style": "primary"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "image",
+                  "props": {
+                    "image": "wp-content/uploads/2024/11/logo.webp",
+                    "image_alt": "Logo"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "version": "4.5.0"
+}

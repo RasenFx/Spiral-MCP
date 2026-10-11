@@ -12,12 +12,6 @@ defined( 'ABSPATH' ) || exit;
  * Helpers: configuración de YOOtheme
  * ---------------------------------------------------------------------- */
 
-/** Nombre de la opción donde se guardan las copias de la configuración. */
-const SPIRAL_MCP_THEME_BACKUPS = 'spiral_mcp_yootheme_config_backups';
-
-/** Cuántas copias se conservan. */
-const SPIRAL_MCP_THEME_BACKUPS_MAX = 10;
-
 /**
  * Lee la configuración de YOOtheme. YOOtheme Pro la guarda como JSON en el
  * theme mod "config" del tema activo.
@@ -36,30 +30,10 @@ function spiral_mcp_theme_config_read() {
 	return array( 'config' => $config, 'raw' => $raw );
 }
 
-/** Guarda una copia de la configuración actual antes de modificarla. */
-function spiral_mcp_theme_config_backup( $raw, $reason ) {
-	$backups = get_option( SPIRAL_MCP_THEME_BACKUPS, array() );
-	if ( ! is_array( $backups ) ) {
-		$backups = array();
-	}
-	$id        = gmdate( 'Ymd-His' ) . '-' . wp_generate_password( 4, false, false );
-	$backups[] = array(
-		'id'     => $id,
-		'date'   => gmdate( 'c' ),
-		'user'   => get_current_user_id(),
-		'reason' => $reason,
-		'raw'    => $raw,
-	);
-	$backups = array_slice( $backups, -SPIRAL_MCP_THEME_BACKUPS_MAX );
-	update_option( SPIRAL_MCP_THEME_BACKUPS, $backups, false ); // Sin autoload: puede pesar.
-	return $id;
-}
 
 /** Escribe la configuración respetando el formato original (string JSON o array). */
 function spiral_mcp_theme_config_write( array $config, $original_raw ) {
-	$value = is_string( $original_raw )
-		? wp_json_encode( $config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE )
-		: $config;
+	$value = is_string( $original_raw ) ? spiral_mcp_json( $config ) : $config;
 	if ( false === $value ) {
 		return new WP_Error( 'spiral_mcp_bad_config', 'No se pudo serializar la configuración.' );
 	}
@@ -154,6 +128,78 @@ function spiral_mcp_widget_out( $widget_id, $sidebar = null ) {
 }
 
 /* -------------------------------------------------------------------------
+ * Snapshots
+ * ---------------------------------------------------------------------- */
+
+/** Restaura el theme mod "config" tal cual (null = no existía). */
+function spiral_mcp_theme_config_restore( $ref, $data ) {
+	if ( null === $data ) {
+		remove_theme_mod( 'config' );
+	} else {
+		set_theme_mod( 'config', $data );
+	}
+	return true;
+}
+
+/** Estado de un widget: su opción widget_<base> y la asignación de áreas. */
+function spiral_mcp_widget_capture( $widget_id ) {
+	$parsed = spiral_mcp_widget_parse_id( $widget_id );
+	$base   = is_wp_error( $parsed ) ? '' : $parsed[0];
+	return array(
+		'base'     => $base,
+		'option'   => '' === $base ? null : get_option( 'widget_' . $base, null ),
+		'sidebars' => get_option( 'sidebars_widgets', null ),
+	);
+}
+
+function spiral_mcp_widget_restore( $widget_id, $data ) {
+	if ( ! is_array( $data ) || ! array_key_exists( 'sidebars', $data ) ) {
+		return new WP_Error( 'spiral_mcp_bad_snapshot', 'El snapshot del widget está incompleto.' );
+	}
+	if ( ! empty( $data['base'] ) && null !== $data['option'] ) {
+		update_option( 'widget_' . $data['base'], $data['option'] );
+	}
+	if ( null !== $data['sidebars'] ) {
+		update_option( 'sidebars_widgets', $data['sidebars'] );
+	}
+	return true;
+}
+
+add_filter( 'spiral_mcp_snapshot_kinds', function ( $kinds ) {
+	$kinds['theme_config'] = array(
+		'group'   => 'design',
+		'cap'     => 'edit_theme_options',
+		'capture' => function () {
+			return get_theme_mod( 'config', null );
+		},
+		'restore' => 'spiral_mcp_theme_config_restore',
+	);
+	$kinds['widgets']      = array(
+		'group'   => 'design',
+		'cap'     => 'edit_theme_options',
+		'capture' => 'spiral_mcp_widget_capture',
+		'restore' => 'spiral_mcp_widget_restore',
+	);
+	return $kinds;
+} );
+
+/**
+ * Busca el snapshot de theme_config de un ID de copia de la 1.3.0
+ * ("20241102-153000-abcd") o de un ID numérico de snapshot.
+ */
+function spiral_mcp_theme_backup_find( $backup_id ) {
+	global $wpdb;
+	$table = spiral_mcp_table( 'snapshots' );
+	if ( ctype_digit( (string) $backup_id ) ) {
+		$id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM $table WHERE id = %d AND kind = 'theme_config'", (int) $backup_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	} else {
+		$like = '%' . $wpdb->esc_like( '[legacy:' . $backup_id . ']' );
+		$id   = (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM $table WHERE kind = 'theme_config' AND note LIKE %s ORDER BY id DESC LIMIT 1", $like ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	}
+	return $id ? $id : new WP_Error( 'spiral_mcp_backup_not_found', 'No existe una copia con ese ID. Búscala con spiral-mcp/list-snapshots (kind theme_config).' );
+}
+
+/* -------------------------------------------------------------------------
  * Categoría
  * ---------------------------------------------------------------------- */
 
@@ -174,13 +220,6 @@ add_action( 'wp_abilities_api_init', function () {
 		return current_user_can( 'edit_theme_options' );
 	};
 
-	$meta = function ( $readonly, $destructive = false, $idempotent = false ) {
-		return array(
-			'show_in_rest' => true,
-			'annotations'  => array( 'readonly' => $readonly, 'destructive' => $destructive, 'idempotent' => $idempotent ),
-			'mcp'          => array( 'public' => true ),
-		);
-	};
 
 	$area_prop = array(
 		'type'        => 'string',
@@ -190,10 +229,11 @@ add_action( 'wp_abilities_api_init', function () {
 	);
 
 	/* 1. Leer layout del footer ------------------------------------------ */
-	wp_register_ability( 'spiral-mcp/get-theme-layout', array(
+	spiral_mcp_register_ability( 'spiral-mcp/get-theme-layout', array(
 		'label'               => 'Obtener layout del footer (YOOtheme)',
 		'description'         => 'Devuelve el árbol JSON del builder del footer de YOOtheme (Personalizar > Footer), el mismo formato que los layouts de página. Incluye también las claves de primer nivel de la configuración del tema, para diagnóstico.',
 		'category'            => 'spiral-mcp-theme',
+		'group'               => 'design',
 		'input_schema'        => array(
 			'type'       => 'object',
 			'properties' => array( 'area' => $area_prop ),
@@ -213,14 +253,21 @@ add_action( 'wp_abilities_api_init', function () {
 				'config_keys' => array_keys( $config ),
 			);
 		},
-		'meta'                => $meta( true, false, true ),
+		'meta'                => spiral_mcp_meta( true, false, true ),
 	) );
 
 	/* 2. Actualizar layout del footer ------------------------------------ */
-	wp_register_ability( 'spiral-mcp/update-theme-layout', array(
+	spiral_mcp_register_ability( 'spiral-mcp/update-theme-layout', array(
 		'label'               => 'Actualizar layout del footer (YOOtheme)',
-		'description'         => 'Reemplaza el árbol JSON completo del builder del footer de YOOtheme. Primero léelo con spiral-mcp/get-theme-layout, modifícalo y envíalo entero. Antes de escribir guarda una copia de toda la configuración del tema (ver spiral-mcp/list-theme-backups y spiral-mcp/restore-theme-backup).',
+		'description'         => 'Reemplaza el árbol JSON completo del builder del footer de YOOtheme. Primero léelo con spiral-mcp/get-theme-layout, modifícalo y envíalo entero. Antes de escribir guarda un snapshot de toda la configuración del tema ("snapshot_id"; se deshace con spiral-mcp/restore-snapshot).',
 		'category'            => 'spiral-mcp-theme',
+		'group'               => 'design',
+		'log'                 => array(
+			'type' => 'theme_area',
+			'id'   => function ( $in ) {
+				return $in['area'] ?? 'footer';
+			},
+		),
 		'input_schema'        => array(
 			'type'       => 'object',
 			'required'   => array( 'layout' ),
@@ -244,53 +291,58 @@ add_action( 'wp_abilities_api_init', function () {
 				return $read;
 			}
 			$config = $read['config'];
-			$backup = spiral_mcp_theme_config_backup( $read['raw'], 'update-theme-layout:' . $area );
+			$backup = spiral_mcp_snapshot_take( 'theme_config', 'config', $read['raw'], 'update-theme-layout:' . $area );
+			if ( is_wp_error( $backup ) ) {
+				return $backup;
+			}
 
 			// Respeta el formato en que estaba guardado el contenido del área.
 			$was_string = is_string( $config[ $area ]['content'] ?? null );
 			if ( ! isset( $config[ $area ] ) || ! is_array( $config[ $area ] ) ) {
 				$config[ $area ] = array();
 			}
-			$config[ $area ]['content'] = $was_string
-				? wp_json_encode( $layout, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE )
-				: $layout;
+			$config[ $area ]['content'] = $was_string ? spiral_mcp_json( $layout ) : $layout;
 
 			$res = spiral_mcp_theme_config_write( $config, $read['raw'] );
 			if ( is_wp_error( $res ) ) {
 				return $res;
 			}
-			return array( 'area' => $area, 'updated' => true, 'backup_id' => $backup );
+			return array( 'area' => $area, 'updated' => true, 'backup_id' => $backup, 'snapshot_id' => $backup );
 		},
-		'meta'                => $meta( false, false, true ),
+		'meta'                => spiral_mcp_meta( false, false, true ),
 	) );
 
 	/* 3. Listar copias de la configuración ------------------------------- */
-	wp_register_ability( 'spiral-mcp/list-theme-backups', array(
+	spiral_mcp_register_ability( 'spiral-mcp/list-theme-backups', array(
 		'label'               => 'Listar copias de la configuración del tema',
-		'description'         => 'Lista las copias de la configuración de YOOtheme que se guardan automáticamente antes de cada cambio (las últimas 10).',
+		'description'         => 'OBSOLETA: usa spiral-mcp/list-snapshots con kind "theme_config". Se eliminará en la próxima versión. Lista las copias de la configuración de YOOtheme guardadas antes de cada cambio (las últimas 50); "id" es el ID del snapshot.',
 		'category'            => 'spiral-mcp-theme',
+		'group'               => 'design',
 		'input_schema'        => array( 'type' => 'object', 'properties' => new stdClass() ),
 		'permission_callback' => $can,
 		'execute_callback'    => function () {
-			$out = array();
-			foreach ( (array) get_option( SPIRAL_MCP_THEME_BACKUPS, array() ) as $b ) {
+			$out  = array();
+			$list = spiral_mcp_snapshot_list( array( 'kind' => 'theme_config' ), 50 );
+			foreach ( $list['items'] as $snap ) {
 				$out[] = array(
-					'id'     => $b['id'] ?? '',
-					'date'   => $b['date'] ?? '',
-					'user'   => $b['user'] ?? 0,
-					'reason' => $b['reason'] ?? '',
+					'id'     => (string) $snap['id'],
+					'date'   => $snap['created_at'],
+					'user'   => $snap['user_id'],
+					'reason' => $snap['note'],
 				);
 			}
-			return array( 'backups' => array_reverse( $out ) );
+			return array( 'backups' => $out );
 		},
-		'meta'                => $meta( true, false, true ),
+		'meta'                => spiral_mcp_meta( true, false, true ),
 	) );
 
 	/* 4. Restaurar copia -------------------------------------------------- */
-	wp_register_ability( 'spiral-mcp/restore-theme-backup', array(
+	spiral_mcp_register_ability( 'spiral-mcp/restore-theme-backup', array(
 		'label'               => 'Restaurar copia de la configuración del tema',
-		'description'         => 'Restaura TODA la configuración de YOOtheme a una copia anterior. Antes guarda una copia del estado actual. Requiere "confirm": true.',
+		'description'         => 'OBSOLETA: usa spiral-mcp/restore-snapshot. Se eliminará en la próxima versión. Restaura TODA la configuración de YOOtheme a una copia anterior (acepta el ID de snapshot o un ID de copia de la 1.3.0). Antes guarda un snapshot del estado actual. Requiere "confirm": true.',
 		'category'            => 'spiral-mcp-theme',
+		'group'               => 'design',
+		'log'                 => array( 'type' => 'snapshot', 'id' => 'backup_id' ),
 		'input_schema'        => array(
 			'type'       => 'object',
 			'required'   => array( 'backup_id', 'confirm' ),
@@ -301,27 +353,29 @@ add_action( 'wp_abilities_api_init', function () {
 		),
 		'permission_callback' => $can,
 		'execute_callback'    => function ( $input ) {
-			if ( true !== ( $input['confirm'] ?? false ) ) {
-				return new WP_Error( 'spiral_mcp_confirm', 'Para restaurar envía "confirm": true.' );
+			$ok = spiral_mcp_require_confirm( $input, 'restaurar' );
+			if ( is_wp_error( $ok ) ) {
+				return $ok;
 			}
-			foreach ( (array) get_option( SPIRAL_MCP_THEME_BACKUPS, array() ) as $b ) {
-				if ( ( $b['id'] ?? '' ) === ( $input['backup_id'] ?? '' ) ) {
-					$current = get_theme_mod( 'config', null );
-					$new_id  = spiral_mcp_theme_config_backup( $current, 'restore:' . $b['id'] );
-					set_theme_mod( 'config', $b['raw'] );
-					return array( 'restored' => $b['id'], 'backup_of_previous' => $new_id );
-				}
+			$id = spiral_mcp_theme_backup_find( $input['backup_id'] ?? '' );
+			if ( is_wp_error( $id ) ) {
+				return $id;
 			}
-			return new WP_Error( 'spiral_mcp_backup_not_found', 'No existe una copia con ese ID.' );
+			$res = spiral_mcp_snapshot_restore( $id );
+			if ( is_wp_error( $res ) ) {
+				return $res;
+			}
+			return array( 'restored' => (string) $input['backup_id'], 'backup_of_previous' => (string) $res['snapshot_of_previous'] );
 		},
-		'meta'                => $meta( false, true, false ),
+		'meta'                => spiral_mcp_meta( false, true, false ),
 	) );
 
 	/* 5. Listar widgets --------------------------------------------------- */
-	wp_register_ability( 'spiral-mcp/list-widgets', array(
+	spiral_mcp_register_ability( 'spiral-mcp/list-widgets', array(
 		'label'               => 'Listar widgets',
 		'description'         => 'Lista las áreas de widgets del tema y los widgets de cada una (incluidos los inactivos), con su configuración. Los nav_menu indican qué menú muestran y los widgets de builder de YOOtheme devuelven su layout decodificado en "layouts".',
 		'category'            => 'spiral-mcp-theme',
+		'group'               => 'design',
 		'input_schema'        => array( 'type' => 'object', 'properties' => new stdClass() ),
 		'permission_callback' => $can,
 		'execute_callback'    => function () {
@@ -343,14 +397,16 @@ add_action( 'wp_abilities_api_init', function () {
 			}
 			return array( 'areas' => $areas );
 		},
-		'meta'                => $meta( true, false, true ),
+		'meta'                => spiral_mcp_meta( true, false, true ),
 	) );
 
 	/* 6. Actualizar widget ------------------------------------------------ */
-	wp_register_ability( 'spiral-mcp/update-widget', array(
+	spiral_mcp_register_ability( 'spiral-mcp/update-widget', array(
 		'label'               => 'Actualizar widget',
-		'description'         => 'Cambia la configuración de un widget (solo las claves enviadas en "instance"; p. ej. "title" o "nav_menu" con el ID del menú) y/o lo mueve a otra área con "sidebar" ("wp_inactive_widgets" lo desactiva sin borrarlo). En widgets de builder de YOOtheme, "layout" reemplaza el layout guardado en la clave "layout_key" (por defecto "content").',
+		'description'         => 'Cambia la configuración de un widget (solo las claves enviadas en "instance"; p. ej. "title" o "nav_menu" con el ID del menú) y/o lo mueve a otra área con "sidebar" ("wp_inactive_widgets" lo desactiva sin borrarlo). En widgets de builder de YOOtheme, "layout" reemplaza el layout guardado en la clave "layout_key" (por defecto "content"). Antes guarda un snapshot del widget y de las áreas ("snapshot_id").',
 		'category'            => 'spiral-mcp-theme',
+		'group'               => 'design',
+		'log'                 => array( 'type' => 'widget', 'id' => 'widget_id' ),
 		'input_schema'        => array(
 			'type'       => 'object',
 			'required'   => array( 'widget_id' ),
@@ -373,11 +429,24 @@ add_action( 'wp_abilities_api_init', function () {
 			list( $base, $num, $all, $instance ) = $data;
 			$changed                             = false;
 
+			// Se valida el área antes de escribir nada.
+			$target = (string) ( $input['sidebar'] ?? '' );
+			if ( '' !== $target && 'wp_inactive_widgets' !== $target && ! isset( $wp_registered_sidebars[ $target ] ) ) {
+				return new WP_Error( 'spiral_mcp_bad_sidebar', sprintf( 'El área "%s" no existe. Disponibles: %s', $target, implode( ', ', array_keys( (array) $wp_registered_sidebars ) ) ) );
+			}
+			if ( empty( $input['instance'] ) && ! isset( $input['layout'] ) && '' === $target ) {
+				return new WP_Error( 'spiral_mcp_nothing', 'No se envió ningún cambio (instance, layout o sidebar).' );
+			}
+			$snapshot = spiral_mcp_snapshot_capture( 'widgets', $wid, 'update-widget' );
+			if ( is_wp_error( $snapshot ) ) {
+				return $snapshot;
+			}
+
 			if ( ! empty( $input['instance'] ) && is_array( $input['instance'] ) ) {
 				foreach ( $input['instance'] as $key => $value ) {
 					// Si el valor original era JSON en texto y llega un objeto, se vuelve a codificar.
 					if ( is_array( $value ) && isset( $instance[ $key ] ) && is_string( $instance[ $key ] ) ) {
-						$value = wp_json_encode( $value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+						$value = spiral_mcp_json( $value );
 					}
 					$instance[ $key ] = $value;
 				}
@@ -390,7 +459,7 @@ add_action( 'wp_abilities_api_init', function () {
 				}
 				$key              = (string) ( $input['layout_key'] ?? 'content' );
 				$was_array        = isset( $instance[ $key ] ) && is_array( $instance[ $key ] );
-				$instance[ $key ] = $was_array ? $layout : wp_json_encode( $layout, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+				$instance[ $key ] = $was_array ? $layout : spiral_mcp_json( $layout );
 				$changed          = true;
 			}
 			if ( 'nav_menu' === $base && isset( $instance['nav_menu'] ) && $instance['nav_menu'] && ! wp_get_nav_menu_object( (int) $instance['nav_menu'] ) ) {
@@ -401,11 +470,7 @@ add_action( 'wp_abilities_api_init', function () {
 				update_option( 'widget_' . $base, $all );
 			}
 
-			if ( ! empty( $input['sidebar'] ) ) {
-				$target = (string) $input['sidebar'];
-				if ( 'wp_inactive_widgets' !== $target && ! isset( $wp_registered_sidebars[ $target ] ) ) {
-					return new WP_Error( 'spiral_mcp_bad_sidebar', sprintf( 'El área "%s" no existe. Disponibles: %s', $target, implode( ', ', array_keys( (array) $wp_registered_sidebars ) ) ) );
-				}
+			if ( '' !== $target ) {
 				$sidebars = wp_get_sidebars_widgets();
 				foreach ( $sidebars as $s => $ids ) {
 					if ( is_array( $ids ) ) {
@@ -415,13 +480,9 @@ add_action( 'wp_abilities_api_init', function () {
 				$sidebars[ $target ]   = isset( $sidebars[ $target ] ) && is_array( $sidebars[ $target ] ) ? $sidebars[ $target ] : array();
 				$sidebars[ $target ][] = $wid;
 				wp_set_sidebars_widgets( $sidebars );
-				$changed = true;
 			}
-			if ( ! $changed ) {
-				return new WP_Error( 'spiral_mcp_nothing', 'No se envió ningún cambio (instance, layout o sidebar).' );
-			}
-			return spiral_mcp_widget_out( $wid );
+			return spiral_mcp_widget_out( $wid ) + array( 'snapshot_id' => $snapshot );
 		},
-		'meta'                => $meta( false, false, true ),
+		'meta'                => spiral_mcp_meta( false, false, true ),
 	) );
 } );

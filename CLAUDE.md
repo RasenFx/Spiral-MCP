@@ -10,29 +10,40 @@ El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes d
 - YOOtheme Pro activo (o un tema hijo de YOOtheme) para todo lo relacionado con el builder y los estilos.
 - PHP 7.4 como mínimo: no usar sintaxis de PHP 8 (match, nullsafe `?->`, argumentos con nombre, tipos de unión, `readonly`, enums).
 
-## Estructura actual (v1.3.0)
+## Estructura actual (v1.4.0)
 ```
-spiral-mcp-control.php   cabecera del plugin, helpers de contenido y abilities de páginas/entradas y layouts de página
-includes/menus.php       abilities de menús y elementos de menú
-includes/theme.php       footer de YOOtheme (builder), copias de la configuración del tema y widgets
+spiral-mcp-control.php   cabecera, constantes, comprobación de requisitos, require_once y hooks de activación
+uninstall.php            borra el rol y las capacidades (las tablas solo con el filtro spiral_mcp_uninstall_drop_tables)
+includes/core.php        spiral_mcp_register_ability(), spiral_mcp_meta(), spiral_mcp_json(), spiral_mcp_require_confirm()…
+includes/permissions.php capacidades spiral_mcp_* y rol spiral_mcp_agent
+includes/activity.php    registro de auditoría ({prefix}spiral_mcp_log), list-activity y limpieza diaria
+includes/snapshots.php   snapshots ({prefix}spiral_mcp_snapshots), list-snapshots y restore-snapshot
+includes/install.php     dbDelta, rol, migraciones y cron; se ejecuta al activar y al cambiar SPIRAL_MCP_VERSION
+includes/content.php     helpers y abilities de páginas/entradas y layouts de página
+includes/menus.php       abilities de menús y elementos de menú (+ snapshot kind "menu")
+includes/theme.php       footer de YOOtheme (builder) y widgets (+ snapshot kinds "theme_config" y "widgets")
+tests/smoke.sh           prueba de humo por REST (ver "Entorno de desarrollo")
+tests/fixtures/          layouts de YOOtheme de ejemplo
 dist/                    ZIP para instalar (no versionar)
 ```
 
 Abilities existentes (todas con prefijo `spiral-mcp/`):
 - Contenido: `list-content`, `get-content`, `create-content`, `update-content`, `get-yootheme-layout`, `update-yootheme-layout`.
 - Menús: `list-menus`, `get-menu`, `create-menu`, `update-menu`, `delete-menu`, `add-menu-item`, `update-menu-item`, `delete-menu-item`.
-- Tema: `get-theme-layout`, `update-theme-layout`, `list-theme-backups`, `restore-theme-backup`, `list-widgets`, `update-widget`.
+- Tema: `get-theme-layout`, `update-theme-layout`, `list-widgets`, `update-widget`; `list-theme-backups` y `restore-theme-backup` son alias obsoletos (se quitan en la próxima versión).
+- Auditoría y snapshots: `list-activity`, `list-snapshots`, `restore-snapshot`.
 
 ## Convenciones (obligatorias)
 - **Nombres**: abilities `spiral-mcp/<verbo>-<objeto>` en kebab-case; funciones PHP `spiral_mcp_*`; constantes `SPIRAL_MCP_*`; códigos de `WP_Error` `spiral_mcp_*`; filtros y acciones `spiral_mcp_*`; categorías `spiral-mcp-<módulo>`.
 - **Un módulo por archivo** en `includes/`, cada uno con su categoría y sus abilities, registrado desde el archivo principal con `require_once`.
-- **Patrón de registro**: copiar el de `includes/menus.php` (closures `$can` y `$meta( $readonly, $destructive, $idempotent )`, `input_schema` con `required`, `'meta' => [ 'show_in_rest' => true, 'mcp' => [ 'public' => true ], 'annotations' => … ]`). Desde la Fase 0, registrar siempre con el wrapper `spiral_mcp_register_ability()` (ver ROADMAP), que añade la auditoría.
+- **Patrón de registro**: copiar el de `includes/menus.php`. Registrar siempre con `spiral_mcp_register_ability()`, nunca con `wp_register_ability()` directamente. Argumentos extra del wrapper: `'group'` (`content`, `design`, `media`, `settings`, `code`, o un array si basta con uno: exige la capacidad `spiral_mcp_<grupo>`) y `'log' => [ 'type' => …, 'id' => clave de la entrada o callable( $input, $result ) ]` (objeto para la auditoría). `'meta' => spiral_mcp_meta( $readonly, $destructive, $idempotent )`. `input_schema` con `required`. El wrapper registra en el log toda ability con `readonly = false`.
+- **Snapshots**: cada módulo registra sus tipos con el filtro `spiral_mcp_snapshot_kinds` (`group`, `cap`, `capture`, `restore`) y llama a `spiral_mcp_snapshot_capture( $kind, $ref, $note )` antes de escribir. Si devuelve `WP_Error`, no escribir. Devolver `snapshot_id` en la respuesta.
 - **Descripciones en español, escritas para un agente**: qué hace, qué leer antes ("primero lee con X"), qué devuelve y qué es irreversible. Las descripciones son la documentación que verá el agente.
-- **Permisos**: cada ability comprueba una capacidad concreta en `permission_callback`. Nunca `__return_true`.
-- **Acciones destructivas** (borrar, restaurar, reemplazar algo sin revisión): exigir `"confirm": true` y marcar `destructive => true`.
+- **Permisos**: el wrapper exige la capacidad `spiral_mcp_*` del grupo; además, `permission_callback` comprueba la nativa del objeto (`edit_post` con ese ID, `edit_theme_options`…). Nunca `__return_true`.
+- **Acciones destructivas** (borrar, restaurar, reemplazar algo sin revisión): exigir `"confirm": true` con `spiral_mcp_require_confirm()` y marcar `destructive => true`.
 - **Antes de escribir en opciones o theme mods, guardar una copia** (snapshot). Los posts ya tienen revisiones; lo demás no.
 - **Escritura de posts**: siempre con `wp_slash()` antes de `wp_insert_post` / `wp_update_post` (si no, se rompen las `\` del JSON de YOOtheme).
-- **JSON**: `wp_json_encode( $x, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE )`.
+- **JSON**: `spiral_mcp_json( $x )` (`wp_json_encode` con `JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE`).
 - **Errores**: devolver `WP_Error` con mensaje en español que diga cómo corregir la llamada. No lanzar excepciones hacia fuera.
 - **Enlaces internos**: rutas relativas (`/contacto/`), nunca el dominio completo. Aplica a ejemplos, descripciones y valores por defecto.
 - **Sin dependencias externas** (ni Composer en runtime): el plugin debe instalarse subiendo un ZIP.
@@ -51,8 +62,10 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 ## Entorno de desarrollo
 - WordPress local de pruebas con YOOtheme Pro, MCP Adapter y este plugin enlazado (symlink o copia de la carpeta en `wp-content/plugins/spiral-mcp-control`).
 - Nunca probar contra un sitio en producción.
-- Comprobación mínima antes de cada commit: `php -l` en todos los archivos PHP. Desde la Fase 0 también el script de humo `tests/smoke.sh` (ver ROADMAP).
-- Las abilities se pueden ejecutar sin cliente MCP vía REST de la Abilities API (verificar la ruta exacta en el entorno local; en WP 6.9 es `/wp-json/wp-abilities/v1/...`) con una Application Password.
+- Entorno local actual: `D:\web-data\www\spiral-mcp-control` (Laragon), WordPress 7.1.3, prefijo `smc_`, base de datos `spiral-mcp-controler`, `home` = `https://spiral-mcp-control.test`. Los enlaces permanentes son los "simples" (`/wp-json/` da 404: usar `?rest_route=`).
+- Comprobación mínima antes de cada commit: `php -l` en todos los archivos PHP y `tests/smoke.sh`:
+  `WP_URL=https://spiral-mcp-control.test WP_USER=<usuario con rol spiral_mcp_agent> WP_APP_PASSWORD='…' bash tests/smoke.sh`
+- **Ruta REST de la Abilities API** (comprobada en WP 7.1.3): `/wp-abilities/v1/abilities` (listado) y `/wp-abilities/v1/abilities/<nombre>/run` (ejecutar). El método HTTP depende de las anotaciones: `GET` si `readonly`, `DELETE` si `destructive` e `idempotent`, `POST` en el resto. En `GET`/`DELETE` la entrada va en la query (`input[id]=5`) y el core la convierte a los tipos del esquema; en `POST`, en el cuerpo JSON `{"input": {…}}`. Con enlaces permanentes simples: `/?rest_route=/wp-abilities/v1/abilities/spiral-mcp/list-content/run`. Las Application Passwords exigen HTTPS (o `WP_ENVIRONMENT_TYPE` = `local`).
 
 ## Versionado y entrega
 - SemVer en la cabecera del plugin (`Version:`) y en `SPIRAL_MCP_VERSION`.

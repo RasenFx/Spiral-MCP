@@ -320,6 +320,99 @@ function spiral_mcp_menu_set_locations( $menu_id, array $locations ) {
 }
 
 /* -------------------------------------------------------------------------
+ * Snapshots
+ * ---------------------------------------------------------------------- */
+
+/** Estado completo de un menú (nombre, ubicaciones y elementos), o null si no existe. */
+function spiral_mcp_menu_capture( $menu_id ) {
+	$menu = wp_get_nav_menu_object( (int) $menu_id );
+	if ( ! $menu ) {
+		return null;
+	}
+	$items = array();
+	foreach ( spiral_mcp_menu_items( $menu->term_id ) as $item ) {
+		$items[ (int) $item->ID ] = spiral_mcp_menu_item_base( $item->ID );
+	}
+	return array(
+		'name'      => $menu->name,
+		'locations' => spiral_mcp_menu_locations_of( $menu->term_id ),
+		'items'     => $items,
+	);
+}
+
+/**
+ * Devuelve un menú al estado capturado. Los elementos que siguen existiendo
+ * conservan su ID; los borrados se recrean con IDs nuevos. $data = null
+ * significa que el menú no existía: se borra.
+ */
+function spiral_mcp_menu_restore( $menu_id, $data ) {
+	$menu = wp_get_nav_menu_object( (int) $menu_id );
+	if ( null === $data ) {
+		if ( $menu ) {
+			spiral_mcp_menu_set_locations( $menu->term_id, array() );
+			wp_delete_nav_menu( $menu->term_id );
+		}
+		return array( 'menu_id' => 0, 'deleted' => (bool) $menu );
+	}
+	if ( ! is_array( $data ) || ! isset( $data['name'], $data['items'] ) ) {
+		return new WP_Error( 'spiral_mcp_bad_snapshot', 'El snapshot del menú está incompleto.' );
+	}
+
+	if ( $menu ) {
+		$id = (int) $menu->term_id;
+		if ( $menu->name !== $data['name'] ) {
+			$res = wp_update_nav_menu_object( $id, array( 'menu-name' => $data['name'] ) );
+			if ( is_wp_error( $res ) ) {
+				return $res;
+			}
+		}
+	} else {
+		$id = wp_create_nav_menu( $data['name'] );
+		if ( is_wp_error( $id ) ) {
+			return $id;
+		}
+	}
+
+	// Primero todos en la raíz; los padres se asignan después con los IDs ya conocidos.
+	$current = array_map( 'intval', wp_list_pluck( spiral_mcp_menu_items( $id ), 'ID' ) );
+	$map     = array();
+	foreach ( (array) $data['items'] as $old_id => $args ) {
+		$args['menu-item-parent-id'] = 0;
+		$new                         = wp_update_nav_menu_item( $id, in_array( (int) $old_id, $current, true ) ? (int) $old_id : 0, $args );
+		if ( is_wp_error( $new ) ) {
+			return $new;
+		}
+		$map[ (int) $old_id ] = (int) $new;
+	}
+	foreach ( $current as $item_id ) {
+		if ( ! isset( $map[ $item_id ] ) ) {
+			wp_delete_post( $item_id, true );
+		}
+	}
+	foreach ( (array) $data['items'] as $old_id => $args ) {
+		$parent = (int) $args['menu-item-parent-id'];
+		update_post_meta( $map[ (int) $old_id ], '_menu_item_menu_item_parent', (string) ( $map[ $parent ] ?? 0 ) );
+		wp_update_post( array( 'ID' => $map[ (int) $old_id ], 'menu_order' => (int) $args['menu-item-position'] ) );
+	}
+	spiral_mcp_menu_reorder( $id );
+
+	// Solo las ubicaciones que el tema actual sigue registrando.
+	$locations = array_values( array_intersect( (array) $data['locations'], array_keys( get_registered_nav_menus() ) ) );
+	spiral_mcp_menu_set_locations( $id, $locations );
+	return array( 'menu_id' => (int) $id );
+}
+
+add_filter( 'spiral_mcp_snapshot_kinds', function ( $kinds ) {
+	$kinds['menu'] = array(
+		'group'   => 'design',
+		'cap'     => 'edit_theme_options',
+		'capture' => 'spiral_mcp_menu_capture',
+		'restore' => 'spiral_mcp_menu_restore',
+	);
+	return $kinds;
+} );
+
+/* -------------------------------------------------------------------------
  * Categoría
  * ---------------------------------------------------------------------- */
 
@@ -340,13 +433,13 @@ add_action( 'wp_abilities_api_init', function () {
 		return current_user_can( 'edit_theme_options' );
 	};
 
-	$meta = function ( $readonly, $destructive = false, $idempotent = false ) {
-		return array(
-			'show_in_rest' => true,
-			'annotations'  => array( 'readonly' => $readonly, 'destructive' => $destructive, 'idempotent' => $idempotent ),
-			'mcp'          => array( 'public' => true ),
-		);
-	};
+	// ID del menú afectado, para el registro de auditoría.
+	$log_menu = array(
+		'type' => 'menu',
+		'id'   => function ( $in, $res ) {
+			return $res['id'] ?? ( $res['menu']['id'] ?? ( $in['menu'] ?? '' ) );
+		},
+	);
 
 	$menu_ref = array(
 		'type'        => array( 'integer', 'string' ),
@@ -363,10 +456,11 @@ add_action( 'wp_abilities_api_init', function () {
 	);
 
 	/* 1. Listar menús ---------------------------------------------------- */
-	wp_register_ability( 'spiral-mcp/list-menus', array(
+	spiral_mcp_register_ability( 'spiral-mcp/list-menus', array(
 		'label'               => 'Listar menús',
 		'description'         => 'Lista los menús de navegación (ID, nombre, nº de elementos, ubicaciones asignadas) y las ubicaciones de menú que registra el tema.',
 		'category'            => 'spiral-mcp-menus',
+		'group'               => 'design',
 		'input_schema'        => array( 'type' => 'object', 'properties' => new stdClass() ),
 		'permission_callback' => $can,
 		'execute_callback'    => function () {
@@ -391,14 +485,15 @@ add_action( 'wp_abilities_api_init', function () {
 			}
 			return array( 'menus' => $menus, 'locations' => $locations );
 		},
-		'meta'                => $meta( true, false, true ),
+		'meta'                => spiral_mcp_meta( true, false, true ),
 	) );
 
 	/* 2. Obtener menú ---------------------------------------------------- */
-	wp_register_ability( 'spiral-mcp/get-menu', array(
+	spiral_mcp_register_ability( 'spiral-mcp/get-menu', array(
 		'label'               => 'Obtener menú',
 		'description'         => 'Devuelve un menú con sus elementos en árbol (id, título, url, tipo, padre, posición, hijos).',
 		'category'            => 'spiral-mcp-menus',
+		'group'               => 'design',
 		'input_schema'        => array(
 			'type'       => 'object',
 			'required'   => array( 'menu' ),
@@ -409,14 +504,16 @@ add_action( 'wp_abilities_api_init', function () {
 			$menu = spiral_mcp_menu_get( $input['menu'] ?? 0 );
 			return is_wp_error( $menu ) ? $menu : spiral_mcp_menu_out( $menu );
 		},
-		'meta'                => $meta( true, false, true ),
+		'meta'                => spiral_mcp_meta( true, false, true ),
 	) );
 
 	/* 3. Crear menú ------------------------------------------------------ */
-	wp_register_ability( 'spiral-mcp/create-menu', array(
+	spiral_mcp_register_ability( 'spiral-mcp/create-menu', array(
 		'label'               => 'Crear menú',
-		'description'         => 'Crea un menú nuevo. Opcionalmente le agrega elementos (con "children" para submenús) y lo asigna a ubicaciones del tema.',
+		'description'         => 'Crea un menú nuevo. Opcionalmente le agrega elementos (con "children" para submenús) y lo asigna a ubicaciones del tema. Guarda un snapshot que, al restaurarlo con spiral-mcp/restore-snapshot, borra el menú.',
 		'category'            => 'spiral-mcp-menus',
+		'group'               => 'design',
+		'log'                 => $log_menu,
 		'input_schema'        => array(
 			'type'       => 'object',
 			'required'   => array( 'name' ),
@@ -440,6 +537,11 @@ add_action( 'wp_abilities_api_init', function () {
 			if ( is_wp_error( $id ) ) {
 				return $id;
 			}
+			$snapshot = spiral_mcp_snapshot_take( 'menu', $id, null, 'create-menu: el menú no existía' );
+			if ( is_wp_error( $snapshot ) ) {
+				wp_delete_nav_menu( $id );
+				return $snapshot;
+			}
 			if ( ! empty( $input['items'] ) ) {
 				$res = spiral_mcp_menu_add_items( $id, (array) $input['items'] );
 				if ( is_wp_error( $res ) ) {
@@ -454,16 +556,18 @@ add_action( 'wp_abilities_api_init', function () {
 					return $res;
 				}
 			}
-			return spiral_mcp_menu_out( wp_get_nav_menu_object( $id ) );
+			return spiral_mcp_menu_out( wp_get_nav_menu_object( $id ) ) + array( 'snapshot_id' => $snapshot );
 		},
-		'meta'                => $meta( false ),
+		'meta'                => spiral_mcp_meta( false ),
 	) );
 
 	/* 4. Editar menú ----------------------------------------------------- */
-	wp_register_ability( 'spiral-mcp/update-menu', array(
+	spiral_mcp_register_ability( 'spiral-mcp/update-menu', array(
 		'label'               => 'Editar menú',
-		'description'         => 'Renombra un menú y/o cambia sus ubicaciones. "locations" reemplaza la lista completa de ubicaciones de este menú (envía [] para quitarlo de todas).',
+		'description'         => 'Renombra un menú y/o cambia sus ubicaciones. "locations" reemplaza la lista completa de ubicaciones de este menú (envía [] para quitarlo de todas). Antes guarda un snapshot del menú.',
 		'category'            => 'spiral-mcp-menus',
+		'group'               => 'design',
+		'log'                 => $log_menu,
 		'input_schema'        => array(
 			'type'       => 'object',
 			'required'   => array( 'menu' ),
@@ -482,6 +586,10 @@ add_action( 'wp_abilities_api_init', function () {
 			if ( ! isset( $input['name'] ) && ! isset( $input['locations'] ) ) {
 				return new WP_Error( 'spiral_mcp_nothing', 'Envía "name" y/o "locations".' );
 			}
+			$snapshot = spiral_mcp_snapshot_capture( 'menu', $menu->term_id, 'update-menu' );
+			if ( is_wp_error( $snapshot ) ) {
+				return $snapshot;
+			}
 			if ( isset( $input['name'] ) && $input['name'] !== $menu->name ) {
 				$res = wp_update_nav_menu_object( $menu->term_id, array( 'menu-name' => (string) $input['name'] ) );
 				if ( is_wp_error( $res ) ) {
@@ -494,16 +602,18 @@ add_action( 'wp_abilities_api_init', function () {
 					return $res;
 				}
 			}
-			return spiral_mcp_menu_out( wp_get_nav_menu_object( $menu->term_id ) );
+			return spiral_mcp_menu_out( wp_get_nav_menu_object( $menu->term_id ) ) + array( 'snapshot_id' => $snapshot );
 		},
-		'meta'                => $meta( false, false, true ),
+		'meta'                => spiral_mcp_meta( false, false, true ),
 	) );
 
 	/* 5. Borrar menú ----------------------------------------------------- */
-	wp_register_ability( 'spiral-mcp/delete-menu', array(
+	spiral_mcp_register_ability( 'spiral-mcp/delete-menu', array(
 		'label'               => 'Borrar menú',
-		'description'         => 'Borra un menú completo con todos sus elementos y lo quita de sus ubicaciones. No se puede deshacer. Requiere "confirm": true.',
+		'description'         => 'Borra un menú completo con todos sus elementos y lo quita de sus ubicaciones. Antes guarda un snapshot ("snapshot_id"): spiral-mcp/restore-snapshot lo recrea, con IDs nuevos para el menú y sus elementos. Requiere "confirm": true.',
 		'category'            => 'spiral-mcp-menus',
+		'group'               => 'design',
+		'log'                 => $log_menu,
 		'input_schema'        => array(
 			'type'       => 'object',
 			'required'   => array( 'menu', 'confirm' ),
@@ -514,12 +624,17 @@ add_action( 'wp_abilities_api_init', function () {
 		),
 		'permission_callback' => $can,
 		'execute_callback'    => function ( $input ) {
-			if ( true !== ( $input['confirm'] ?? false ) ) {
-				return new WP_Error( 'spiral_mcp_confirm', 'Para borrar el menú envía "confirm": true.' );
+			$ok = spiral_mcp_require_confirm( $input, 'borrar el menú' );
+			if ( is_wp_error( $ok ) ) {
+				return $ok;
 			}
 			$menu = spiral_mcp_menu_get( $input['menu'] ?? 0 );
 			if ( is_wp_error( $menu ) ) {
 				return $menu;
+			}
+			$snapshot_id = spiral_mcp_snapshot_capture( 'menu', $menu->term_id, 'delete-menu' );
+			if ( is_wp_error( $snapshot_id ) ) {
+				return $snapshot_id;
 			}
 			$snapshot = spiral_mcp_menu_out( $menu ); // Se devuelve para poder recrearlo si hace falta.
 			spiral_mcp_menu_set_locations( $menu->term_id, array() );
@@ -527,16 +642,18 @@ add_action( 'wp_abilities_api_init', function () {
 			if ( is_wp_error( $res ) || ! $res ) {
 				return is_wp_error( $res ) ? $res : new WP_Error( 'spiral_mcp_delete_failed', 'No se pudo borrar el menú.' );
 			}
-			return array( 'deleted' => true, 'menu' => $snapshot );
+			return array( 'deleted' => true, 'menu' => $snapshot, 'snapshot_id' => $snapshot_id );
 		},
-		'meta'                => $meta( false, true, true ),
+		'meta'                => spiral_mcp_meta( false, true, true ),
 	) );
 
 	/* 6. Agregar elemento ------------------------------------------------ */
-	wp_register_ability( 'spiral-mcp/add-menu-item', array(
+	spiral_mcp_register_ability( 'spiral-mcp/add-menu-item', array(
 		'label'               => 'Agregar elemento a un menú',
-		'description'         => 'Agrega un enlace a un menú: personalizado (type=custom + url) o a una página/entrada/categoría (type + object_id). "parent_id" lo convierte en subelemento y "position" (1 = primero) lo ubica entre sus hermanos; por defecto va al final.',
+		'description'         => 'Agrega un enlace a un menú: personalizado (type=custom + url) o a una página/entrada/categoría (type + object_id). "parent_id" lo convierte en subelemento y "position" (1 = primero) lo ubica entre sus hermanos; por defecto va al final. Antes guarda un snapshot del menú.',
 		'category'            => 'spiral-mcp-menus',
+		'group'               => 'design',
+		'log'                 => array( 'type' => 'menu_item', 'id' => 'item_id' ),
 		'input_schema'        => array(
 			'type'       => 'object',
 			'required'   => array( 'menu', 'type' ),
@@ -560,21 +677,27 @@ add_action( 'wp_abilities_api_init', function () {
 			if ( is_wp_error( $args ) ) {
 				return $args;
 			}
+			$snapshot = spiral_mcp_snapshot_capture( 'menu', $menu->term_id, 'add-menu-item' );
+			if ( is_wp_error( $snapshot ) ) {
+				return $snapshot;
+			}
 			$id = wp_update_nav_menu_item( $menu->term_id, 0, $args );
 			if ( is_wp_error( $id ) ) {
 				return $id;
 			}
 			spiral_mcp_menu_reorder( $menu->term_id, (int) $id, $input['position'] ?? null );
-			return array( 'item_id' => (int) $id ) + spiral_mcp_menu_out( wp_get_nav_menu_object( $menu->term_id ) );
+			return array( 'item_id' => (int) $id ) + spiral_mcp_menu_out( wp_get_nav_menu_object( $menu->term_id ) ) + array( 'snapshot_id' => $snapshot );
 		},
-		'meta'                => $meta( false ),
+		'meta'                => spiral_mcp_meta( false ),
 	) );
 
 	/* 7. Editar elemento ------------------------------------------------- */
-	wp_register_ability( 'spiral-mcp/update-menu-item', array(
+	spiral_mcp_register_ability( 'spiral-mcp/update-menu-item', array(
 		'label'               => 'Editar elemento de menú',
-		'description'         => 'Cambia texto, enlace, destino, clases, padre o posición de un elemento. Solo se modifican los campos enviados. "position" (1 = primero) lo reubica entre sus hermanos.',
+		'description'         => 'Cambia texto, enlace, destino, clases, padre o posición de un elemento. Solo se modifican los campos enviados. "position" (1 = primero) lo reubica entre sus hermanos. Antes guarda un snapshot del menú.',
 		'category'            => 'spiral-mcp-menus',
+		'group'               => 'design',
+		'log'                 => array( 'type' => 'menu_item', 'id' => 'item_id' ),
 		'input_schema'        => array(
 			'type'       => 'object',
 			'required'   => array( 'item_id' ),
@@ -601,21 +724,27 @@ add_action( 'wp_abilities_api_init', function () {
 			if ( is_wp_error( $args ) ) {
 				return $args;
 			}
+			$snapshot = spiral_mcp_snapshot_capture( 'menu', $menu->term_id, 'update-menu-item' );
+			if ( is_wp_error( $snapshot ) ) {
+				return $snapshot;
+			}
 			$res = wp_update_nav_menu_item( $menu->term_id, $item_id, $args );
 			if ( is_wp_error( $res ) ) {
 				return $res;
 			}
 			spiral_mcp_menu_reorder( $menu->term_id, $item_id, $input['position'] ?? null );
-			return spiral_mcp_menu_out( wp_get_nav_menu_object( $menu->term_id ) );
+			return spiral_mcp_menu_out( wp_get_nav_menu_object( $menu->term_id ) ) + array( 'snapshot_id' => $snapshot );
 		},
-		'meta'                => $meta( false, false, true ),
+		'meta'                => spiral_mcp_meta( false, false, true ),
 	) );
 
 	/* 8. Borrar elemento ------------------------------------------------- */
-	wp_register_ability( 'spiral-mcp/delete-menu-item', array(
+	spiral_mcp_register_ability( 'spiral-mcp/delete-menu-item', array(
 		'label'               => 'Borrar elemento de menú',
-		'description'         => 'Borra un elemento de un menú. Sus subelementos suben un nivel (pasan a su padre) salvo que envíes "delete_children": true. No se puede deshacer.',
+		'description'         => 'Borra un elemento de un menú. Sus subelementos suben un nivel (pasan a su padre) salvo que envíes "delete_children": true. Antes guarda un snapshot del menú ("snapshot_id"); restaurarlo con spiral-mcp/restore-snapshot recrea los elementos borrados con IDs nuevos.',
 		'category'            => 'spiral-mcp-menus',
+		'group'               => 'design',
+		'log'                 => array( 'type' => 'menu_item', 'id' => 'item_id' ),
 		'input_schema'        => array(
 			'type'       => 'object',
 			'required'   => array( 'item_id' ),
@@ -630,6 +759,10 @@ add_action( 'wp_abilities_api_init', function () {
 			$menu    = spiral_mcp_menu_of_item( $item_id );
 			if ( is_wp_error( $menu ) ) {
 				return $menu;
+			}
+			$snapshot = spiral_mcp_snapshot_capture( 'menu', $menu->term_id, 'delete-menu-item' );
+			if ( is_wp_error( $snapshot ) ) {
+				return $snapshot;
 			}
 			$items   = spiral_mcp_menu_items( $menu->term_id );
 			$parents = array_map( 'intval', wp_list_pluck( $items, 'menu_item_parent', 'ID' ) );
@@ -665,8 +798,8 @@ add_action( 'wp_abilities_api_init', function () {
 				return new WP_Error( 'spiral_mcp_delete_failed', 'No se pudo borrar el elemento.' );
 			}
 			spiral_mcp_menu_reorder( $menu->term_id );
-			return array( 'deleted' => $deleted ) + spiral_mcp_menu_out( wp_get_nav_menu_object( $menu->term_id ) );
+			return array( 'deleted' => $deleted ) + spiral_mcp_menu_out( wp_get_nav_menu_object( $menu->term_id ) ) + array( 'snapshot_id' => $snapshot );
 		},
-		'meta'                => $meta( false, true, true ),
+		'meta'                => spiral_mcp_meta( false, true, true ),
 	) );
 } );
