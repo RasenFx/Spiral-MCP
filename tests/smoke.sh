@@ -116,7 +116,8 @@ for name in list-content get-content create-content update-content get-yootheme-
 	insert-from-library clear-cache list-post-types trash-content restore-content delete-content \
 	list-revisions restore-revision list-taxonomies list-terms create-term update-term delete-term \
 	get-seo update-seo get-site-settings update-site-settings get-custom-css update-custom-css \
-	get-theme-style list-style-variables update-theme-style get-style-status mark-style-compiled; do
+	get-theme-style list-style-variables update-theme-style get-style-status mark-style-compiled \
+	get-preview-url revoke-preview-url inspect-page; do
 	case "$BODY" in
 		*"\"spiral-mcp\\/$name\""* | *"\"spiral-mcp/$name\""*) ;;
 		*) ko "registrada spiral-mcp/$name" ;;
@@ -419,6 +420,33 @@ if [ "$YOOTHEME" = 200 ]; then
 	call GET spiral-mcp/get-style-status
 	check 'get-style-status' 200 css.version recompile_url
 fi
+
+# --- Verificación: vista previa sin sesión e inspección ------------------
+call POST spiral-mcp/create-content '{"title":"Smoke vista previa","content":"<h1>SMOKE-PREVIEW</h1>","status":"draft"}'
+check 'borrador para la vista previa' 200 id
+PREV_ID=$(jget id)
+call POST spiral-mcp/get-preview-url "{\"id\":$PREV_ID,\"hours\":1}"
+check 'get-preview-url' 200 url token_id expires_at
+# La URL usa el dominio del sitio: se pide a WP_URL con la misma query.
+PREV_URL="${WP_URL%/}/?$(jget url | php -r 'echo parse_url( stream_get_contents( STDIN ), PHP_URL_QUERY );')"
+ANON=$(curl -sk "$PREV_URL")
+case "$ANON" in *SMOKE-PREVIEW*) ok 'la vista previa se ve sin sesión' ;; *) ko 'la vista previa debería verse sin sesión' ;; esac
+ANON=$(curl -sk "$(printf '%s' "$PREV_URL" | sed 's/spiral_preview=[^&]*/spiral_preview=1.9999999999.x.y/')")
+case "$ANON" in *SMOKE-PREVIEW*) ko 'un token falso no debería abrir el borrador' ;; *) ok 'un token falso no abre el borrador' ;; esac
+call POST spiral-mcp/revoke-preview-url "{\"id\":$PREV_ID}"
+eq 'revoke-preview-url' revoked 1
+ANON=$(curl -sk "$PREV_URL")
+case "$ANON" in *SMOKE-PREVIEW*) ko 'el token revocado no debería servir' ;; *) ok 'el token revocado ya no sirve' ;; esac
+if [ "${SMOKE_INSPECT:-0}" = 1 ]; then
+	# inspect-page pide la página al propio servidor: no funciona con servidores de un solo hilo (php -S).
+	call GET spiral-mcp/inspect-page "{\"id\":$PREV_ID,\"check_links\":false}"
+	check 'inspect-page' 200 status headings seo warnings
+else
+	echo 'AVISO inspect-page omitido (SMOKE_INSPECT=1 para probarlo; necesita un servidor que se alcance a sí mismo)'
+fi
+call POST spiral-mcp/trash-content "{\"id\":$PREV_ID}"
+call DELETE spiral-mcp/delete-content "{\"id\":$PREV_ID,\"confirm\":true}"
+check 'limpieza: borrar el borrador de la vista previa' 200 deleted
 
 # --- Medios --------------------------------------------------------------
 PIXEL='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='

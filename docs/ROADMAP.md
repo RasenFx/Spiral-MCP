@@ -164,10 +164,12 @@ Hoy `update-yootheme-layout` exige enviar el árbol completo: es caro y arriesga
 
 ## Fase 5 — Verificación y flujo de trabajo
 
-- [ ] `spiral-mcp/get-preview-url`: URL temporal (1 h por defecto, máximo 24 h) que permite ver un borrador o una revisión pendiente sin sesión. Token firmado y de un solo post; se puede revocar.
-- [ ] `spiral-mcp/inspect-page`: renderiza una página (publicada o por token de vista previa) y devuelve los encabezados (h1–h6), enlaces internos y externos (marcando los rotos: 404 interno), imágenes sin alt y el título y descripción efectivos de SEO. Sin devolver el HTML completo.
-- [ ] Integración con la Fase 3.6: `clear-cache` tras publicar.
-- [ ] `docs/agent-guide.md`: guía para el agente. Flujo recomendado (leer outline → patch → preview → inspect → publicar), convenciones (rutas relativas, borrador antes de publicar, no tocar fuentes dinámicas sin entenderlas), recetas comunes (añadir una sección, cambiar un botón, subir y usar una imagen) y errores frecuentes. Esta guía se convertirá en un skill de Claude.
+- [x] `spiral-mcp/get-preview-url`: URL temporal (1 h por defecto, máximo 24 h) que permite ver un borrador o una revisión pendiente sin sesión. Token firmado y de un solo post; se puede revocar.
+- [x] `spiral-mcp/inspect-page`: renderiza una página (publicada o por token de vista previa) y devuelve los encabezados (h1–h6), enlaces internos y externos (marcando los rotos: 404 interno), imágenes sin alt y el título y descripción efectivos de SEO. Sin devolver el HTML completo.
+- [x] Integración con la Fase 3.6: `clear-cache` tras publicar.
+- [x] `docs/agent-guide.md`: guía para el agente. Flujo recomendado (leer outline → patch → preview → inspect → publicar), convenciones (rutas relativas, borrador antes de publicar, no tocar fuentes dinámicas sin entenderlas), recetas comunes (añadir una sección, cambiar un botón, subir y usar una imagen) y errores frecuentes. Esta guía se convertirá en un skill de Claude.
+
+**Notas de implementación:** los tokens de vista previa son `post.caducidad.id.firma` (HMAC con una sal de WordPress); el id se guarda en el meta `_spiral_mcp_previews` y borrarlo los revoca. La vista previa sale con noindex y sin caché. `inspect-page` pide la página al propio servidor (si no se alcanza por su dominio: filtro `spiral_mcp_inspect_base_url`); con servidores de un solo hilo (`php -S`) esa petición se bloquea, por eso `smoke.sh` solo la prueba con `SMOKE_INSPECT=1`. La purga de cachés tras publicar ya la hace el wrapper después de cada escritura (Fase 3.6). Comprobado con un borrador con errores (h3 sin h2, enlace roto, imagen sin alt, sin description): `inspect-page` los detectó, se corrigieron con `patch-layout` y `update-seo`, se publicó, y la vista previa sin sesión se capturó con Edge headless.
 
 **Terminado cuando:** el agente crea un borrador, lo revisa con `get-preview-url` + `inspect-page` (y una captura de pantalla con su navegador), corrige lo que encuentre y lo publica.
 

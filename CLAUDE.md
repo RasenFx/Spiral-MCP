@@ -2,7 +2,7 @@
 
 Plugin de WordPress que registra *abilities* (Abilities API de WordPress 6.9+) y las expone a agentes de IA a través del plugin **MCP Adapter**. Objetivo: que un agente (Claude) pueda controlar por completo un sitio WordPress con **YOOtheme Pro**: contenido, diseño, menús, medios, estilos y ajustes, sin entrar al wp-admin.
 
-El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes de empezar cualquier tarea.
+El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes de empezar cualquier tarea. La guía de uso para el agente (flujo, convenciones, recetas, errores frecuentes) está en [`docs/agent-guide.md`](docs/agent-guide.md): actualízala cuando cambie una ability.
 
 ## Requisitos
 - WordPress 6.9+ (Abilities API: `wp_register_ability`, `wp_register_ability_category`).
@@ -10,7 +10,7 @@ El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes d
 - YOOtheme Pro activo (o un tema hijo de YOOtheme) para todo lo relacionado con el builder y los estilos.
 - PHP 7.4 como mínimo: no usar sintaxis de PHP 8 (match, nullsafe `?->`, argumentos con nombre, tipos de unión, `readonly`, enums).
 
-## Estructura actual (v1.8.0)
+## Estructura actual (v1.9.0)
 ```
 spiral-mcp-control.php   cabecera, constantes, comprobación de requisitos, require_once y hooks de activación
 uninstall.php            borra el rol y las capacidades (las tablas solo con el filtro spiral_mcp_uninstall_drop_tables)
@@ -31,6 +31,7 @@ includes/cache.php       clear-cache y purga automática tras cada escritura
 includes/taxonomies.php  taxonomías y términos (+ snapshot kind "term")
 includes/seo.php         SEO por contenido: Yoast o salida propia (+ snapshot kind "seo")
 includes/settings.php    ajustes del sitio: identidad y portada (+ snapshot kind "option")
+includes/preview.php     URLs de vista previa sin sesión (token firmado) e inspect-page
 includes/styles.php      CSS adicional (+ snapshot kind "custom_css") y estilo de YOOtheme: catálogo de variables, cambios y estado de compilación
 tests/smoke.sh           prueba de humo por REST (ver "Entorno de desarrollo")
 tests/fixtures/          layouts de YOOtheme de ejemplo
@@ -41,6 +42,7 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - Contenido: `list-post-types`, `list-content`, `get-content`, `create-content`, `update-content`, `trash-content`, `restore-content`, `delete-content`, `list-revisions`, `restore-revision`, `get-yootheme-layout`, `update-yootheme-layout`.
 - Taxonomías y SEO: `list-taxonomies`, `list-terms`, `create-term`, `update-term`, `delete-term`, `get-seo`, `update-seo`.
 - Ajustes: `get-site-settings`, `update-site-settings`.
+- Verificación: `get-preview-url`, `revoke-preview-url`, `inspect-page`.
 - Estilos: `get-custom-css`, `update-custom-css`, `get-theme-style`, `list-style-variables`, `update-theme-style`, `get-style-status`, `mark-style-compiled`.
 - Menús: `list-menus`, `get-menu`, `create-menu`, `update-menu`, `delete-menu`, `add-menu-item`, `update-menu-item`, `delete-menu-item`.
 - Tema: `get-theme-layout`, `update-theme-layout` (áreas `footer`, `menu_item:<ID>`, `widget:<ID>`, `template:<id>`), `list-widgets`, `update-widget`; `list-theme-backups` y `restore-theme-backup` son alias obsoletos (se quitan en la próxima versión).

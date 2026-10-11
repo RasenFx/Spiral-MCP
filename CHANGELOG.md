@@ -2,6 +2,15 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.9.0] — 2026-10-11 · Fase 5: verificación y flujo de trabajo
+
+### Añadido
+- `spiral-mcp/get-preview-url`: URL temporal (1 h por defecto, máximo 24 h) para ver borradores, pendientes o programados sin sesión. Token firmado (HMAC) de un solo post, revocable; la vista previa sale con noindex y sin caché.
+- `spiral-mcp/revoke-preview-url`: revoca un token o todos los de un contenido.
+- `spiral-mcp/inspect-page`: renderiza una página (por ID, también borradores, o por ruta relativa) y devuelve código HTTP, SEO efectivo, encabezados, enlaces internos (con los rotos) y externos, imágenes sin alt y avisos. Filtro `spiral_mcp_inspect_base_url` para servidores que no se alcanzan por su dominio.
+- `docs/agent-guide.md`: guía para el agente (principios, convenciones, mapa de abilities, flujo recomendado, recetas y errores frecuentes).
+- Pruebas de vista previa en `tests/smoke.sh` (`SMOKE_INSPECT=1` para `inspect-page`).
+
 ## [1.8.0] — 2026-10-11 · Fase 4: estilos
 
 ### Añadido
