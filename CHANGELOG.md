@@ -2,6 +2,19 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.14.0] — 2026-10-11 · Fase 6.1: cachés independientes de la herramienta
+
+### Añadido
+- **Adaptadores de caché** (`includes/cache.php`, filtro `spiral_mcp_cache_providers`): cada herramienta declara si está activa y qué sabe hacer. Incluidos: WP Super Cache (completo y probado), WP Rocket, LiteSpeed Cache y W3 Total Cache (purga total, por post y por URL según su API pública; sin probar) y la caché de objetos.
+- `spiral-mcp/get-cache-status`: herramientas activas, capacidades y estado (activada, modo, caducidad, precarga, archivos y tamaño).
+- `spiral-mcp/purge-cache`: todo, un post o una ruta relativa, en todas las herramientas activas o en una.
+- `spiral-mcp/preload-cache`: lanzar, parar o consultar la precarga.
+- `spiral-mcp/get-cache-settings`: ajustes con un vocabulario común (enabled, lifetime, cache_logged_in, mobile, compression, exclude_urls, clear_on_edit) más los propios de cada herramienta.
+
+### Cambiado
+- La purga automática tras cada escritura es dirigida: si el cambio afecta a un solo contenido, purga ese contenido (y lo que la herramienta asocie: portada, listados); si es de diseño global, todo.
+- `clear-cache` pasa a ser un alias obsoleto de `purge-cache`.
+
 ## [1.13.0] — 2026-10-11
 
 ### Añadido

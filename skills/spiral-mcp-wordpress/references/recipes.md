@@ -19,6 +19,7 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 - [Cambiar la marca (colores y tipografía)](#cambiar-la-marca-colores-y-tipografía)
 - [Programar una publicación](#programar-una-publicación)
 - [Página hija con plantilla, categorías y SEO](#página-hija-con-plantilla-categorías-y-seo)
+- [Un cambio no se ve (cachés)](#un-cambio-no-se-ve-cachés)
 - [Deshacer un cambio](#deshacer-un-cambio)
 
 ## Crear una página nueva a partir de otra
@@ -195,6 +196,16 @@ La librería de YOOtheme tiene cientos de diseños hechos por su equipo (página
 2. `create-content {"title": "Consultoría", "parent": <id madre>, "template": "<plantilla>", "featured_media": <id>, "status": "draft"}`.
 3. Términos: `create-term` si no existen, y luego `terms: {"category": ["noticias"]}` en `create-content` o `update-content` (solo en tipos que los admiten).
 4. `update-seo {"id": <id>, "title": "...", "description": "..."}`.
+
+## Un cambio no se ve (cachés)
+
+Las escrituras ya purgan solas la caché de lo que cambian (un contenido: esa página, la portada y sus listados; un cambio de diseño global: todo). Si aun así algo no se ve:
+
+1. ¿Es un estilo (colores, tipografía, LESS)? Entonces no es caché: falta recompilar (`get-style-status`).
+2. `get-cache-status`: qué herramientas de caché hay (WP Super Cache, WP Rocket, LiteSpeed, W3 Total Cache, caché de objetos…), qué admite cada una (`supports`) y si están activadas. Sin herramientas, no hay caché que purgar: el problema es otro (el navegador del usuario, una CDN externa).
+3. Purga lo justo: `purge-cache {"scope": "url", "url": "/contacto/"}` o `{"scope": "post", "post_id": 12}`; si no basta, `{"scope": "all"}`. La respuesta dice qué purgó cada herramienta (`purged`: si una no sabe purgar una sola página, purga todo).
+4. Tras cambios grandes (rediseño, muchas páginas), `preload-cache {"action": "start"}` regenera la caché en segundo plano, si la herramienta lo admite. No lo hagas tras cada edición: consume recursos.
+5. Si el usuario sigue sin verlo, puede ser su navegador: que recargue sin caché (Ctrl+F5) o pruebe en una ventana privada.
 
 ## Deshacer un cambio
 

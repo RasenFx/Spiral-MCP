@@ -1,6 +1,6 @@
 # Referencia de abilities spiral-mcp/*
 
-Generada a partir de los esquemas registrados por el plugin (v1.13.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
+Generada a partir de los esquemas registrados por el plugin (v1.14.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
 
 Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; destructiva = requiere `"confirm": true`.
 
@@ -79,7 +79,10 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 | `list-online-library` | lectura | kind `"layout" / "element"`, group `string`, type `string`, website `string`, search `string`, per_page `integer`, page `integer`, refresh `boolean` |
 | `get-online-library-item` | lectura | **id** `string`, kind `"layout" / "element"`, include_tree `boolean` |
 | `import-from-online-library` | escritura | **id** `string`, kind `"layout" / "element"`, **target** `"template" / "library" / "insert"`, name `string`, template_type `string`, status `"enabled" / "disabled"`, post_id `integer`, area `string`, path `string` |
+| `get-cache-status` | lectura | include_stats `boolean` |
+| `purge-cache` | escritura | scope `"all" / "post" / "url"`, post_id `integer`, url `string`, provider `string`, object_cache `boolean` |
 | `clear-cache` | escritura | — |
+| `preload-cache` | escritura | action `"start" / "stop" / "status"`, provider `string` |
 
 ## Menús
 
@@ -130,6 +133,7 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 
 | Ability | Tipo | Parámetros |
 |---|---|---|
+| `get-cache-settings` | lectura | provider `string` |
 | `get-site-settings` | lectura | — |
 | `update-site-settings` | escritura | blogname `string`, blogdescription `string`, show_on_front `"posts" / "page"`, page_on_front `integer`, page_for_posts `integer`, site_icon `integer`, timezone_string `string` |
 

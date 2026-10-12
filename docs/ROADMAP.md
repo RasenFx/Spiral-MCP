@@ -4,7 +4,7 @@
 
 **Criterio de éxito global:** desde un cliente MCP, el agente puede (1) crear una página completa con imágenes propias subidas por él, (2) cambiar el header, el footer y la paleta de marca, (3) previsualizar el resultado antes de publicar y (4) deshacer cualquier cambio. Todo con registro de auditoría.
 
-**Orden de las fases:** 0 → 2 → 3 → 1 → 4 → 5. Medios y YOOtheme son lo que más bloquea el trabajo de diseño hoy.
+**Orden de las fases:** 0 → 2 → 3 → 1 → 4 → 5 → 6. Medios y YOOtheme son lo que más bloquea el trabajo de diseño hoy.
 
 Leyenda: `[ ]` pendiente · `[x]` hecho · **Spike** = investigar en el entorno local antes de implementar, y anotar el resultado en este documento.
 
@@ -172,6 +172,45 @@ Hoy `update-yootheme-layout` exige enviar el árbol completo: es caro y arriesga
 **Notas de implementación:** los tokens de vista previa son `post.caducidad.id.firma` (HMAC con una sal de WordPress); el id se guarda en el meta `_spiral_mcp_previews` y borrarlo los revoca. La vista previa sale con noindex y sin caché. `inspect-page` pide la página al propio servidor (si no se alcanza por su dominio: filtro `spiral_mcp_inspect_base_url`); con servidores de un solo hilo (`php -S`) esa petición se bloquea, por eso `smoke.sh` solo la prueba con `SMOKE_INSPECT=1`. La purga de cachés tras publicar ya la hace el wrapper después de cada escritura (Fase 3.6). Comprobado con un borrador con errores (h3 sin h2, enlace roto, imagen sin alt, sin description): `inspect-page` los detectó, se corrigieron con `patch-layout` y `update-seo`, se publicó, y la vista previa sin sesión se capturó con Edge headless.
 
 **Terminado cuando:** el agente crea un borrador, lo revisa con `get-preview-url` + `inspect-page` (y una captura de pantalla con su navegador), corrige lo que encuentre y lo publica.
+
+---
+
+## Fase 6 — Cachés (independiente de la herramienta)
+
+El plugin se instala en sitios con distintas herramientas de caché (o ninguna, o varias a la vez: un plugin más la caché del hosting). El agente ve siempre las mismas abilities; por dentro, un **adaptador** por herramienta traduce cada operación a su API. Cada adaptador declara si su herramienta está activa y qué sabe hacer (`purge_all`, `purge_post`, `purge_url`, `preload`, `read_settings`, `write_settings`); el agente lo ve en `get-cache-status` y solo se le ofrece lo que el sitio permite. Filtro `spiral_mcp_cache_providers` para añadir adaptadores sin tocar el plugin.
+
+**Vocabulario común de ajustes** (cada adaptador mapea los que su herramienta tenga): `enabled`, `lifetime` (segundos), `cache_logged_in`, `mobile`, `compression`, `exclude_urls`, `clear_on_edit`. Lo propio de cada herramienta va en `provider_settings`, con lista blanca por adaptador.
+
+**Decisiones:** cambiar ajustes exige la capacidad nueva `spiral_mcp_cache`, que el rol del agente **no** tiene por defecto (operar la caché —ver estado, purgar, precargar— sí). Fuera de alcance: modos que reescriben `.htaccess` o la configuración del servidor (modo Expert de WP Super Cache, reglas de Nginx…), porque un fallo deja el sitio caído.
+
+### 6.1 Base + WP Super Cache
+- [x] `includes/cache.php` reorganizado: registro de adaptadores, detección, interfaz común y adaptadores de compatibilidad para lo que ya purgaba `clear-cache` (LiteSpeed, WP Rocket, W3TC con purga total, por post y por URL según su API pública, marcados "sin probar"; caché de objetos).
+- [x] Adaptador completo de WP Super Cache (estado, purga total / por post / por URL, precarga, lectura de ajustes).
+- [x] `spiral-mcp/get-cache-status`: herramientas detectadas, capacidades y estado de cada una (activa, modo, caducidad, precarga, tamaño y número de archivos si se puede).
+- [x] `spiral-mcp/purge-cache`: todo, un post (`post_id`) o una URL relativa, en todas las herramientas activas. `clear-cache` queda como alias.
+- [x] `spiral-mcp/preload-cache`: iniciar, parar o consultar la precarga (si la herramienta la admite).
+- [x] `spiral-mcp/get-cache-settings`: ajustes comunes + `provider_settings` por herramienta.
+- [x] Purga automática dirigida tras cada escritura: el post cambiado, la portada y sus listados (`purge_post`) cuando la herramienta lo admite; si no, purga total como hasta ahora.
+
+**Resultado 6.1 (WP Super Cache 3.1.4, modo Simple):** purgar `/blog/` por URL borra solo esa página; purgar un post borra el post, la portada y la página de entradas (`wp_cache_post_change`); editar el SEO de una página purga esa página y la portada; un cambio de diseño global purga todo. La precarga arranca con WP-Cron, se consulta y se detiene. Las abilities de caché no disparan la purga automática (si no, una purga por URL acababa purgando todo).
+
+### 6.2 Ajustes
+- [ ] Capacidad `spiral_mcp_cache` (administradores sí; rol del agente no, por defecto).
+- [ ] `spiral-mcp/update-cache-settings`: ajustes comunes y `provider_settings`, por herramienta. Snapshot `cache_settings` antes; `restore-snapshot` lo deshace.
+- [ ] Adaptador de escritura para WP Super Cache (`wp_cache_setting()`, activar/desactivar con sus funciones; sin modo Expert).
+
+### 6.3 Más herramientas: purga y estado
+- [ ] WP Rocket, LiteSpeed Cache, W3 Total Cache, WP Fastest Cache, SiteGround Optimizer, Nginx Helper y cachés de hosting (Kinsta, WP Engine…).
+
+### 6.4 Más herramientas: ajustes
+- [ ] WP Rocket (`wp_rocket_settings`), LiteSpeed Cache y WP Fastest Cache. W3 Total Cache solo lectura al principio.
+
+### 6.5 Pruebas y documentación
+- [ ] `tests/smoke.sh`: pruebas según la herramienta detectada.
+- [ ] Probar cada adaptador instalando la herramienta en local de una en una (W3TC, LiteSpeed, WP Fastest Cache, Nginx Helper son gratuitos). Los que no se puedan probar (WP Rocket, de pago; cachés de hosting) se marcan "sin probar" en la tabla de compatibilidad.
+- [ ] Skill: receta "un cambio no se ve" y "acelerar el sitio". Tabla de herramientas compatibles en el README.
+
+**Terminado cuando:** en un sitio con cualquiera de las herramientas compatibles, el agente sabe qué caché hay, la purga (toda o una página), lanza la precarga si existe y, con permiso, cambia los ajustes básicos y puede deshacerlo.
 
 ---
 

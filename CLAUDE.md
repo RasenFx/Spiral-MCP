@@ -10,7 +10,7 @@ El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes d
 - YOOtheme Pro activo (o un tema hijo de YOOtheme) para todo lo relacionado con el builder y los estilos.
 - PHP 7.4 como mínimo: no usar sintaxis de PHP 8 (match, nullsafe `?->`, argumentos con nombre, tipos de unión, `readonly`, enums).
 
-## Estructura actual (v1.13.0)
+## Estructura actual (v1.14.0)
 ```
 spiral-mcp-control.php   cabecera, constantes, comprobación de requisitos, require_once y hooks de activación
 uninstall.php            borra el rol y las capacidades (las tablas solo con el filtro spiral_mcp_uninstall_drop_tables)
@@ -28,7 +28,7 @@ includes/layout.php      JSON Pointer, get-layout-outline, get-layout-texts, get
 includes/theme-config.php get-theme-config y update-theme-config (lista blanca de secciones)
 includes/templates.php   plantillas y biblioteca de YOOtheme vía su Storage (+ snapshot kind "yootheme_storage")
 includes/online-library.php librería online de YOOtheme (api.yootheme.com): catálogo, vista previa e importación
-includes/cache.php       clear-cache y purga automática tras cada escritura
+includes/cache.php       cachés con un adaptador por herramienta (WP Super Cache, WP Rocket, LiteSpeed, W3TC, objetos): estado, purga, precarga, ajustes y purga automática dirigida
 includes/taxonomies.php  taxonomías y términos (+ snapshot kind "term")
 includes/seo.php         SEO por contenido: Yoast o salida propia (+ snapshot kind "seo")
 includes/settings.php    ajustes del sitio: identidad y portada (+ snapshot kind "option")
@@ -50,8 +50,9 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - Menús: `list-menus`, `get-menu`, `create-menu`, `update-menu`, `delete-menu`, `add-menu-item`, `update-menu-item`, `delete-menu-item`.
 - Tema: `get-theme-layout`, `update-theme-layout` (áreas `footer`, `menu_item:<ID>`, `widget:<ID>`, `template:<id>`), `list-widgets`, `create-widget`, `update-widget`, `delete-widget`; `list-theme-backups` y `restore-theme-backup` son alias obsoletos (se quitan en la próxima versión).
 - Layouts: `list-elements`, `get-element-schema`, `get-layout-outline`, `get-layout-texts`, `get-layout-node`, `patch-layout`, `duplicate-content`, `insert-from-library`.
-- YOOtheme: `get-theme-config`, `update-theme-config`, `list-templates`, `get-template`, `create-template`, `update-template`, `delete-template`, `list-library`, `get-library-item`, `save-to-library`, `clear-cache`; librería online: `list-online-library`, `get-online-library-item`, `import-from-online-library`.
+- YOOtheme: `get-theme-config`, `update-theme-config`, `list-templates`, `get-template`, `create-template`, `update-template`, `delete-template`, `list-library`, `get-library-item`, `save-to-library`; librería online: `list-online-library`, `get-online-library-item`, `import-from-online-library`.
 - Medios: `upload-media`, `list-media`, `get-media`, `update-media`, `delete-media`, `set-featured-image`, `find-media-usage`.
+- Cachés: `get-cache-status`, `purge-cache`, `preload-cache`, `get-cache-settings`; `clear-cache` es un alias obsoleto de `purge-cache`.
 - Auditoría y snapshots: `list-activity`, `list-snapshots`, `restore-snapshot`.
 
 ## Convenciones (obligatorias)
@@ -84,6 +85,7 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - **Fuentes dinámicas**: un elemento puede tener `"source": {"query": {"name": "customMenuItems", "arguments": {...}}, "props": {...}}`. Hay que conservarlas al editar.
 - **Rutas de imagen** en props: relativas a la raíz, p. ej. `wp-content/uploads/2024/11/logo.webp`.
 - **Los estilos (LESS) se compilan en el navegador**, en el Personalizador. Cambiar `config.style`, `config.less` o `config.custom_less` en la BD no cambia el CSS servido hasta recompilar. Si `StylerConfig['update']` es true, abrir el Personalizador recompila y guarda el CSS solo; este plugin lo fuerza mientras exista la opción `spiral_mcp_style_dirty` (ver `includes/styles.php`). El CSS va a `themes/yootheme/css/theme.<blog>.css` y las fuentes de Google se descargan a `themes/yootheme/fonts/`.
+- **Cachés**: cada herramienta es un adaptador en `spiral_mcp_cache_providers()` (filtro del mismo nombre) con `detect`, `supports` y callables (`purge_all`, `purge_post`, `purge_url`, `preload`, `settings`, `status`). Las abilities de caché llevan `'log' => ['type' => 'cache']`: el wrapper no hace purga automática tras ellas (si no, una purga por URL acabaría purgando todo). WP Super Cache guarda sus ajustes en variables globales cargadas de `wp-content/wp-cache-config.php`; `wp_cache_post_change()` purga el post, su autor, la portada y la página de entradas.
 - **El CSS por elemento** (prop `css` de una sección o elemento) sí se procesa en el servidor al renderizar.
 - **Librería online** (`https://api.yootheme.com/v1/library/layout` y `/element`): el catálogo es público; cada diseño se descarga en `<link>?key=<yootheme_apikey>`. El JSON trae `images` (`src` firmado que caduca en 1 h + `md5`): hay que descargarlas a `uploads` sin subcarpeta (deduplicando por md5, como `BuilderController::loadImage`) y cambiar las URLs. Las plantillas de la librería son contenido de muestra fijo: no traen fuentes dinámicas.
 - `config.yootheme_apikey` es un secreto: no devolverlo nunca en una respuesta (enmascararlo). Se usa solo en el servidor (`spiral_mcp_online_fetch()`); los errores pasan por `spiral_mcp_online_scrub()`.

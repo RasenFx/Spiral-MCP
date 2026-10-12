@@ -43,7 +43,7 @@ Si necesitas los parámetros de una herramienta concreta, consulta `references/a
    ]}
    ```
 5. Revisa: `inspect-page {"id": 12}` (encabezados, enlaces rotos, imágenes sin alt, SEO efectivo y avisos). Los avisos miran solo el contenido: los encabezados con `"in_content": false` son del tema (widgets, comentarios) y no se arreglan en la página. Para cambios globales (menú, footer, header, estilos) inspecciona la portada: `{"path": "/"}`. Si tienes navegador, abre la URL de `get-preview-url` y haz una captura: es la única forma de ver el diseño de verdad.
-6. Publica si era un borrador: `update-content {"id": 12, "status": "publish"}`. Las cachés de página se purgan solas tras cada escritura.
+6. Publica si era un borrador: `update-content {"id": 12, "status": "publish"}`. Las cachés de página se purgan solas tras cada escritura; si algo no se ve, mira la receta «Un cambio no se ve (cachés)».
 7. Cuenta al usuario qué cambiaste, qué avisos quedaron y cómo deshacerlo (`undo_revision_id` o `snapshot_id`). Si lo dejas en borrador, dale la URL de `get-preview-url` y cuándo caduca.
 
 El mismo flujo sirve para el footer, los mega menús, los widgets de builder y las plantillas: usa `"area"` en lugar de `"id"` (`"footer"`, `"menu_item:80"`, `"widget:builderwidget-3"`, `"template:<id>"`).

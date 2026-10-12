@@ -90,7 +90,7 @@ function spiral_mcp_register_ability( $name, array $args ) {
 		$args['execute_callback'] = function ( $input = null ) use ( $name, $execute, $log, $groups ) {
 			$result = spiral_mcp_log_run( $name, $execute, $input, $log );
 			if ( ! is_wp_error( $result ) ) {
-				spiral_mcp_maybe_auto_clear_cache( $name, $groups );
+				spiral_mcp_maybe_auto_clear_cache( $name, $groups, $input, $result, $log );
 			}
 			return $result;
 		};
