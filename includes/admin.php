@@ -125,6 +125,38 @@ add_action( 'admin_post_spiral_mcp_save_caps', function () {
 	exit;
 } );
 
+add_action( 'admin_post_spiral_mcp_save_behavior', function () {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( 'No tienes permiso para cambiar esto.', 403 );
+	}
+	check_admin_referer( 'spiral_mcp_save_behavior' );
+	$before = array();
+	foreach ( array_keys( spiral_mcp_settings_defaults() ) as $key ) {
+		$before[ $key ] = spiral_mcp_setting( $key );
+	}
+	$days = function ( $field ) {
+		$v = isset( $_POST[ $field ] ) ? absint( wp_unslash( $_POST[ $field ] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		return min( 3650, $v );
+	};
+	$new = array(
+		'auto_purge'               => ! empty( $_POST['auto_purge'] ),
+		'log_retention_days'       => $days( 'log_retention_days' ),
+		'snapshot_retention_days'  => $days( 'snapshot_retention_days' ),
+		'online_download'          => ! empty( $_POST['online_download'] ),
+		'drop_tables_on_uninstall' => ! empty( $_POST['drop_tables_on_uninstall'] ),
+	);
+	update_option( 'spiral_mcp_settings', $new, true );
+	$changed = array();
+	foreach ( $new as $key => $value ) {
+		if ( $before[ $key ] !== $value ) {
+			$changed[ $key ] = array( 'from' => $before[ $key ], 'to' => $value );
+		}
+	}
+	spiral_mcp_admin_log( 'settings', array( 'changed' => $changed ) );
+	wp_safe_redirect( spiral_mcp_admin_url( 'behavior', array( 'updated' => 1 ) ) );
+	exit;
+} );
+
 /* -------------------------------------------------------------------------
  * Pintar
  * ---------------------------------------------------------------------- */
@@ -133,11 +165,13 @@ function spiral_mcp_admin_render() {
 	if ( ! current_user_can( 'manage_options' ) ) {
 		return;
 	}
-	$tab  = isset( $_GET['tab'] ) && 'permissions' === $_GET['tab'] ? 'permissions' : 'abilities'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 	$tabs = array(
 		'abilities'   => 'Abilities',
 		'permissions' => 'Permisos del agente',
+		'behavior'    => 'Comportamiento',
 	);
+	$tab  = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'abilities'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	$tab  = isset( $tabs[ $tab ] ) ? $tab : 'abilities';
 	echo '<div class="wrap spiral-mcp-admin"><h1>Spiral-MCP</h1>';
 	if ( ! empty( $_GET['updated'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		echo '<div class="notice notice-success is-dismissible"><p>Cambios guardados. Los clientes MCP conectados verán la lista nueva de herramientas al volver a pedirla (en algunos hay que reconectar).</p></div>';
@@ -149,6 +183,8 @@ function spiral_mcp_admin_render() {
 	echo '</nav>';
 	if ( 'permissions' === $tab ) {
 		spiral_mcp_admin_render_permissions();
+	} elseif ( 'behavior' === $tab ) {
+		spiral_mcp_admin_render_behavior();
 	} else {
 		spiral_mcp_admin_render_abilities();
 	}
@@ -257,6 +293,55 @@ function spiral_mcp_admin_render_permissions() {
 			<p><strong>El rol del agente no existe.</strong> Desactiva y activa el plugin para crearlo.</p>
 		<?php endif; ?>
 		<?php submit_button( 'Guardar permisos' ); ?>
+	</form>
+	<?php
+}
+
+function spiral_mcp_admin_render_behavior() {
+	$v       = function ( $key ) {
+		return spiral_mcp_setting( $key );
+	};
+	$filters = array();
+	foreach ( array( 'spiral_mcp_auto_clear_cache', 'spiral_mcp_log_retention_days', 'spiral_mcp_snapshot_retention_days', 'spiral_mcp_uninstall_drop_tables' ) as $hook ) {
+		if ( has_filter( $hook ) ) {
+			$filters[] = $hook;
+		}
+	}
+	?>
+	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+		<input type="hidden" name="action" value="spiral_mcp_save_behavior">
+		<?php wp_nonce_field( 'spiral_mcp_save_behavior' ); ?>
+		<table class="form-table" role="presentation">
+			<tr>
+				<th scope="row">Purga automática de la caché</th>
+				<td><label><input type="checkbox" name="auto_purge" value="1" <?php checked( $v( 'auto_purge' ) ); ?>> Purgar la caché de páginas de lo que cambia después de cada escritura del agente</label>
+				<p class="description">Si un contenido cambia, se purga ese contenido, la portada y sus listados; si es un cambio de diseño global, todo. Desactívalo solo si prefieres purgar a mano (el agente puede seguir usando <code>purge-cache</code>).</p></td>
+			</tr>
+			<tr>
+				<th scope="row"><label for="log_retention_days">Conservar el registro de actividad</label></th>
+				<td><input type="number" min="0" max="3650" id="log_retention_days" name="log_retention_days" value="<?php echo (int) $v( 'log_retention_days' ); ?>" class="small-text"> días
+				<p class="description">0 = no borrar nunca. La limpieza se hace una vez al día.</p></td>
+			</tr>
+			<tr>
+				<th scope="row"><label for="snapshot_retention_days">Conservar los snapshots</label></th>
+				<td><input type="number" min="0" max="3650" id="snapshot_retention_days" name="snapshot_retention_days" value="<?php echo (int) $v( 'snapshot_retention_days' ); ?>" class="small-text"> días
+				<p class="description">Las copias que permiten deshacer cambios de configuración, menús, widgets, medios… Pasado este plazo ya no se pueden restaurar. 0 = no borrar nunca.</p></td>
+			</tr>
+			<tr>
+				<th scope="row">Librería online de YOOtheme</th>
+				<td><label><input type="checkbox" name="online_download" value="1" <?php checked( $v( 'online_download' ) ); ?>> Permitir que el agente descargue e importe diseños usando la clave de API de YOOtheme del sitio</label>
+				<p class="description">El catálogo se puede consultar siempre (es público). La clave nunca se muestra al agente.</p></td>
+			</tr>
+			<tr>
+				<th scope="row">Al desinstalar</th>
+				<td><label><input type="checkbox" name="drop_tables_on_uninstall" value="1" <?php checked( $v( 'drop_tables_on_uninstall' ) ); ?>> Borrar también el registro de actividad y los snapshots</label>
+				<p class="description">Si no se marca, las tablas se conservan por si se vuelve a instalar el plugin.</p></td>
+			</tr>
+		</table>
+		<?php if ( $filters ) : ?>
+			<p><strong>Atención:</strong> hay código que modifica estos ajustes con filtros (<code><?php echo esc_html( implode( '</code>, <code>', $filters ) ); ?></code>); tienen la última palabra sobre lo que se guarde aquí.</p>
+		<?php endif; ?>
+		<?php submit_button( 'Guardar' ); ?>
 	</form>
 	<?php
 }

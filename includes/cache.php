@@ -148,7 +148,7 @@ function spiral_mcp_maybe_auto_clear_cache( $ability, array $groups, $input = nu
 	if ( 'cache' === ( $log['type'] ?? '' ) || ! array_intersect( $groups, array( 'content', 'design', 'media' ) ) ) {
 		return;
 	}
-	if ( ! apply_filters( 'spiral_mcp_auto_clear_cache', true, $ability ) ) {
+	if ( ! apply_filters( 'spiral_mcp_auto_clear_cache', spiral_mcp_setting( 'auto_purge' ), $ability ) ) {
 		return;
 	}
 	$post_id = 0;

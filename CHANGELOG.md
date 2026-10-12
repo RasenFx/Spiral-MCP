@@ -2,6 +2,12 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.19.0] — 2026-10-12 · Fase 7.2: comportamiento
+
+### Añadido
+- Pestaña **Comportamiento** en Ajustes > Spiral-MCP: purga automática de la caché tras cada escritura, días que se conservan el registro de actividad y los snapshots (0 = siempre), permitir o no las descargas de la librería online de YOOtheme con la clave de API, y borrar las tablas al desinstalar. Los filtros existentes reciben estos valores y siguen mandando.
+- `list-online-library` devuelve `download_enabled`; con las descargas desactivadas, ver o importar un diseño responde `spiral_mcp_online_disabled`.
+
 ## [1.18.0] — 2026-10-12 · Fase 7.1: página de ajustes
 
 ### Añadido

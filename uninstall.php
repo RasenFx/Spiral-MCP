@@ -2,8 +2,8 @@
 /**
  * Desinstalación: elimina el rol spiral_mcp_agent, las capacidades
  * spiral_mcp_* y las opciones del plugin. Las tablas de auditoría y
- * snapshots solo se borran si el filtro spiral_mcp_uninstall_drop_tables
- * devuelve true (definido, por ejemplo, en un mu-plugin).
+ * snapshots solo se borran si se marcó en Ajustes > Spiral-MCP >
+ * Comportamiento o si el filtro spiral_mcp_uninstall_drop_tables devuelve true.
  *
  * @package Spiral_MCP_Control
  */
@@ -24,8 +24,10 @@ delete_option( 'spiral_mcp_db_version' );
 delete_option( 'spiral_mcp_style_dirty' );
 delete_option( 'spiral_mcp_disabled_abilities' );
 delete_option( 'spiral_mcp_agent_caps' );
+$spiral_mcp_settings = (array) get_option( 'spiral_mcp_settings', array() );
+delete_option( 'spiral_mcp_settings' );
 
-if ( apply_filters( 'spiral_mcp_uninstall_drop_tables', false ) ) {
+if ( apply_filters( 'spiral_mcp_uninstall_drop_tables', ! empty( $spiral_mcp_settings['drop_tables_on_uninstall'] ) ) ) {
 	global $wpdb;
 	$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}spiral_mcp_log, {$wpdb->prefix}spiral_mcp_snapshots" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 }

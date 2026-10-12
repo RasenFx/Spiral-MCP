@@ -136,6 +136,9 @@ function spiral_mcp_online_fetch( $kind, $id ) {
 	if ( is_wp_error( $entry ) ) {
 		return $entry;
 	}
+	if ( ! spiral_mcp_setting( 'online_download' ) ) {
+		return new WP_Error( 'spiral_mcp_online_disabled', 'El administrador ha desactivado las descargas de la librería online de YOOtheme (Ajustes > Spiral-MCP > Comportamiento). El catálogo se puede consultar, pero no descargar ni importar diseños.' );
+	}
 	$key = spiral_mcp_online_apikey();
 	if ( '' === $key ) {
 		return new WP_Error( 'spiral_mcp_no_apikey', 'Para descargar diseños de la librería hace falta la clave de API de YOOtheme: pide al usuario que la ponga en Personalizar > Ajustes > API Key.' );
@@ -312,6 +315,7 @@ add_action( 'wp_abilities_api_init', function () {
 				'items'       => array_slice( $items, ( $page - 1 ) * $per, $per ),
 				'facets'      => $facets,
 				'has_api_key' => '' !== spiral_mcp_online_apikey(),
+				'download_enabled' => spiral_mcp_setting( 'online_download' ),
 			);
 		},
 		'meta'                => spiral_mcp_meta( true, false, true ),

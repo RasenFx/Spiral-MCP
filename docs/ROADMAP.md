@@ -261,7 +261,9 @@ Página *Ajustes > Spiral-MCP* (solo administradores, `manage_options`) para dec
 **Resultado 7.1** (`includes/admin.php`, solo en `is_admin()`; guarda por `admin-post.php` con nonce y `manage_options`): comprobado con una sesión de administrador contra el sitio local. "Solo lectura" deja al agente 39 de 84 herramientas (las de lectura más `restore-snapshot`) y `update-content` responde `rest_ability_not_found`; desactivar solo `delete-media` la quita de la lista; las protegidas no se pueden desactivar aunque se omitan en el formulario. Quitar `spiral_mcp_code` y dar `spiral_mcp_cache` cambia el rol al momento (el agente ya puede cambiar ajustes de caché y no puede tocar `scripts`) y se mantiene tras la sincronización de una actualización. Sin sesión: HTTP 400; con nonce falso: 403. Cada guardado queda en el registro como `admin/abilities` o `admin/agent_caps` (`object_type` `settings`).
 
 ### 7.2 Comportamiento
-- [ ] Ajustes que hoy son filtros: purga automática tras cada escritura, días de retención del registro, librería online de YOOtheme sí/no, borrar las tablas al desinstalar.
+- [x] Ajustes que hoy son filtros: purga automática tras cada escritura, días de retención del registro, librería online de YOOtheme sí/no, borrar las tablas al desinstalar.
+
+**Resultado 7.2:** pestaña *Comportamiento* (opción `spiral_mcp_settings`, leída con `spiral_mcp_setting()`): purga automática, retención del registro y de los snapshots (0 = nunca), descargas de la librería online con la clave de API y borrar tablas al desinstalar. Los filtros de siempre reciben el valor guardado y tienen la última palabra (la página avisa si hay alguno). Comprobado: sin purga automática, editar el SEO de una página deja su caché de WP Super Cache intacta; con 30 días de retención la limpieza diaria borra un registro de hace 40 días y con 0 conserva un snapshot de hace 400; sin descargas, `import-from-online-library` responde `spiral_mcp_online_disabled` y `list-online-library` indica `download_enabled: false`.
 
 ### 7.3 Actividad
 - [ ] Pestaña con los últimos cambios del agente y su snapshot.

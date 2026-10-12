@@ -61,6 +61,29 @@ function spiral_mcp_table( $name ) {
  * Fuerza el prefijo spiral-mcp/, rellena 'meta' con spiral_mcp_meta( false )
  * y, si la ability escribe (readonly = false), registra cada ejecución.
  */
+/**
+ * Ajustes de comportamiento (Ajustes > Spiral-MCP > Comportamiento), opción spiral_mcp_settings.
+ * Los filtros de siempre (spiral_mcp_auto_clear_cache, spiral_mcp_log_retention_days…) reciben
+ * este valor y siguen teniendo la última palabra.
+ */
+function spiral_mcp_settings_defaults() {
+	return array(
+		'auto_purge'               => true,  // Purgar la caché de lo que cambia tras cada escritura.
+		'log_retention_days'       => 90,    // 0 = no borrar nunca.
+		'snapshot_retention_days'  => 90,    // 0 = no borrar nunca.
+		'online_download'          => true,  // Descargar diseños de la librería online con la clave de API.
+		'drop_tables_on_uninstall' => false, // Borrar auditoría y snapshots al desinstalar.
+	);
+}
+
+/** Valor de un ajuste de comportamiento (con su valor por defecto). */
+function spiral_mcp_setting( $key ) {
+	$defaults = spiral_mcp_settings_defaults();
+	$saved    = (array) get_option( 'spiral_mcp_settings', array() );
+	$value    = array_key_exists( $key, $saved ) ? $saved[ $key ] : ( $defaults[ $key ] ?? null );
+	return is_bool( $defaults[ $key ] ?? null ) ? (bool) $value : ( is_int( $defaults[ $key ] ?? null ) ? (int) $value : $value );
+}
+
 /** Abilities que no se pueden desactivar: sin ellas el agente no podría ver ni deshacer cambios. */
 function spiral_mcp_protected_abilities() {
 	return array( 'spiral-mcp/list-activity', 'spiral-mcp/list-snapshots', 'spiral-mcp/restore-snapshot' );

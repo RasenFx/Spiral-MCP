@@ -142,11 +142,11 @@ function spiral_mcp_log_date( $value ) {
 
 add_action( 'spiral_mcp_daily_cleanup', function () {
 	global $wpdb;
-	$days = (int) apply_filters( 'spiral_mcp_log_retention_days', 90 );
+	$days = (int) apply_filters( 'spiral_mcp_log_retention_days', spiral_mcp_setting( 'log_retention_days' ) );
 	if ( $days > 0 ) {
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM ' . spiral_mcp_table( 'log' ) . ' WHERE created_at < %s', gmdate( 'Y-m-d H:i:s', time() - $days * DAY_IN_SECONDS ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	}
-	$days = (int) apply_filters( 'spiral_mcp_snapshot_retention_days', 90 );
+	$days = (int) apply_filters( 'spiral_mcp_snapshot_retention_days', spiral_mcp_setting( 'snapshot_retention_days' ) );
 	if ( $days > 0 ) {
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM ' . spiral_mcp_table( 'snapshots' ) . ' WHERE created_at < %s', gmdate( 'Y-m-d H:i:s', time() - $days * DAY_IN_SECONDS ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	}
