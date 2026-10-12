@@ -2,6 +2,14 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.23.0] — 2026-10-12 · Fase 8.3: actualizar y borrar plugins
+
+### Añadido
+- `spiral-mcp/update-plugin` (con `confirm`): actualiza a la última versión de wordpress.org tras comprobar la compatibilidad. Si el plugin estaba activo sigue activo, y si después la portada o wp-admin responden con error 500 vuelve a la versión anterior (copia temporal de WordPress). Spiral-MCP-Control, MCP Adapter y los plugins que no vienen de wordpress.org no se actualizan desde aquí.
+- `spiral-mcp/delete-plugin` (con `confirm`): borra un plugin desactivado, ejecutando su desinstalación; dice si sus datos se han borrado. Irreversible.
+- Filtro `spiral_mcp_plugins_allowed_hosts` (orígenes de descarga permitidos; por defecto solo `downloads.wordpress.org`).
+- Plugins de prueba `spiral-test-update` (con su versión 2.0.0 rota y un mu-plugin que la anuncia) y `spiral-test-uninstall`.
+
 ## [1.22.0] — 2026-10-12 · Fase 8.2: instalar, activar y desactivar plugins
 
 ### Añadido

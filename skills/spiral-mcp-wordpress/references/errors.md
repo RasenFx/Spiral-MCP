@@ -22,7 +22,10 @@
 | `spiral_mcp_online_disabled` | El administrador ha desactivado las descargas de la librería online (Ajustes > Spiral-MCP > Comportamiento) | Puedes enseñar el catálogo (`list-online-library`), pero no importar: díselo al usuario. |
 | `spiral_mcp_plugins_disabled` / `spiral_mcp_plugins_capability` (403) | Falta un cerrojo de la gestión de plugins: el ajuste del administrador o la capacidad `spiral_mcp_plugins` | Explica al usuario cuál falta (lo dice el mensaje); no lo intentes por otra vía. |
 | `spiral_mcp_plugin_fatal` / `spiral_mcp_plugin_broke_site` | El plugin da un error fatal o rompe la web al activarse | No ha quedado activo y el sitio funciona. Díselo al usuario y busca otra opción. |
-| `spiral_mcp_plugin_protected` | Se intentó desactivar Spiral-MCP-Control o MCP Adapter | No se puede desde aquí: sin ellos perderías el acceso. |
+| `spiral_mcp_plugin_protected` | Se intentó desactivar, actualizar o borrar Spiral-MCP-Control o MCP Adapter | No se puede desde aquí: sin ellos perderías el acceso. |
+| `spiral_mcp_plugin_update_rolled_back` | La nueva versión daba error 500 en la portada o wp-admin | Ya se ha vuelto a la versión anterior. Díselo al usuario; no lo reintentes. |
+| `spiral_mcp_plugin_no_update` / `spiral_mcp_plugin_source` | No hay actualización, o viene de fuera de wordpress.org (plugin de pago) | Si es de pago, que lo actualice el usuario desde wp-admin. |
+| `spiral_mcp_plugin_active` (en `delete-plugin`) | Solo se borran plugins desactivados | Desactívalo antes con `deactivate-plugin` (con permiso del usuario). |
 | `spiral_mcp_snapshot_later` | Después de ese snapshot hubo otros cambios en el mismo objeto, y restaurarlo los desharía | Restaura solo la parte que toca (`"parts"`, en la configuración del tema) o revierte el valor con su herramienta. `"include_later": true` solo si el usuario quiere volver al estado completo. |
 | Enlace roto con `target_status` en `inspect-page` | El destino existe pero no está publicado (borrador, programado…) | Publica el destino cuando el usuario lo apruebe, o cambia el enlace. La ruta está bien. |
 | `warnings` de `get-menu` / `create-menu` sobre elementos en borrador | El menú enlaza a contenido sin publicar | Igual que arriba: el elemento se ve en el menú, pero da 404 hasta publicar. |

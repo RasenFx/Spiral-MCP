@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugins de wordpress.org: listar los instalados, buscar en el directorio,
- * instalar (sin activar), activar y desactivar (Fases 8.1 y 8.2). Gestionarlos
+ * instalar (sin activar), activar, desactivar, actualizar y borrar (Fase 8). Gestionarlos
  * exige dos cerrojos: la capacidad spiral_mcp_plugins y el ajuste
  * "plugins_management" (Ajustes > Spiral-MCP > Comportamiento), además de que
  * el sitio permita modificar archivos (DISALLOW_FILE_MODS).
@@ -71,6 +71,20 @@ function spiral_mcp_plugin_compat_issues( $requires_wp, $requires_php ) {
 	return $issues;
 }
 
+/** ¿Viene el paquete (ZIP) de un origen permitido? Por defecto, solo downloads.wordpress.org. */
+function spiral_mcp_plugin_package_allowed( $url ) {
+	$hosts = (array) apply_filters( 'spiral_mcp_plugins_allowed_hosts', array( 'downloads.wordpress.org' ) );
+	return in_array( wp_parse_url( (string) $url, PHP_URL_HOST ), $hosts, true );
+}
+
+/** WP_Error si WordPress no puede escribir directamente en wp-content/plugins. */
+function spiral_mcp_plugins_check_filesystem() {
+	if ( ! WP_Filesystem() || 'direct' !== get_filesystem_method() ) {
+		return new WP_Error( 'spiral_mcp_plugin_filesystem', 'WordPress no puede escribir directamente en wp-content/plugins (pide credenciales FTP). Hazlo desde wp-admin.' );
+	}
+	return true;
+}
+
 /** Carga las partes de wp-admin que hacen falta para gestionar plugins. */
 function spiral_mcp_plugins_load_admin() {
 	foreach ( array( 'plugin.php', 'file.php', 'misc.php', 'plugin-install.php', 'class-wp-upgrader.php' ) as $file ) {
@@ -126,6 +140,16 @@ function spiral_mcp_plugins_health() {
 		}
 	}
 	return array( 'ok' => $ok, 'checks' => $checks );
+}
+
+/** Marca un plugin como activo sin cargarlo ni ejecutar su activación (como hace WordPress tras actualizar en segundo plano). */
+function spiral_mcp_plugins_set_active( $file ) {
+	$active = (array) get_option( 'active_plugins', array() );
+	if ( ! in_array( $file, $active, true ) ) {
+		$active[] = $file;
+		sort( $active );
+		update_option( 'active_plugins', $active );
+	}
 }
 
 /** Tras activar o desactivar: purga la caché si la purga automática está activa. */
@@ -410,7 +434,7 @@ add_action( 'wp_abilities_api_init', function () {
 	/* 3. Instalar --------------------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/install-plugin', array(
 		'label'               => 'Instalar un plugin de wordpress.org',
-		'description'         => 'Instala un plugin del directorio oficial de wordpress.org por su "slug" (ver spiral-mcp/search-plugins), sin activarlo: activarlo es otro paso (spiral-mcp/activate-plugin). Hazlo solo si el usuario lo ha pedido o lo ha aprobado tras enseñarle las opciones. Comprueba antes que sea compatible con la versión de WordPress y PHP del sitio. Solo wordpress.org: no acepta ZIP ni URLs. Requiere los dos cerrojos de la gestión de plugins (capacidad spiral_mcp_plugins y el ajuste del administrador; list-plugins dice si están abiertos). Para deshacerlo, bórralo (fase siguiente) o pide al usuario que lo haga.',
+		'description'         => 'Instala un plugin del directorio oficial de wordpress.org por su "slug" (ver spiral-mcp/search-plugins), sin activarlo: activarlo es otro paso (spiral-mcp/activate-plugin). Hazlo solo si el usuario lo ha pedido o lo ha aprobado tras enseñarle las opciones. Comprueba antes que sea compatible con la versión de WordPress y PHP del sitio. Solo wordpress.org: no acepta ZIP ni URLs. Requiere los dos cerrojos de la gestión de plugins (capacidad spiral_mcp_plugins y el ajuste del administrador; list-plugins dice si están abiertos). Para deshacerlo, bórralo con spiral-mcp/delete-plugin.',
 		'category'            => 'spiral-mcp-plugins',
 		// Pasa también con "settings" para que, sin spiral_mcp_plugins, la respuesta diga qué cerrojo falta
 		// (spiral_mcp_plugins_check_locks() exige la capacidad igualmente).
@@ -448,11 +472,12 @@ add_action( 'wp_abilities_api_init', function () {
 				return new WP_Error( 'spiral_mcp_plugin_incompatible', sprintf( '"%s" no es compatible con este sitio: %s. No se ha instalado.', $slug, implode( '; ', $issues ) ) );
 			}
 			$link = (string) ( $info->download_link ?? '' );
-			if ( 'downloads.wordpress.org' !== wp_parse_url( $link, PHP_URL_HOST ) ) {
+			if ( ! spiral_mcp_plugin_package_allowed( $link ) ) {
 				return new WP_Error( 'spiral_mcp_plugin_source', 'La descarga no viene de downloads.wordpress.org: no se instala.' );
 			}
-			if ( ! WP_Filesystem() || 'direct' !== get_filesystem_method() ) {
-				return new WP_Error( 'spiral_mcp_plugin_filesystem', 'WordPress no puede escribir directamente en wp-content/plugins (pide credenciales FTP). Instálalo desde wp-admin.' );
+			$fs = spiral_mcp_plugins_check_filesystem();
+			if ( is_wp_error( $fs ) ) {
+				return $fs;
 			}
 			$upgrader = new Plugin_Upgrader( new Automatic_Upgrader_Skin() );
 			$result   = $upgrader->install( $link );
@@ -578,5 +603,189 @@ add_action( 'wp_abilities_api_init', function () {
 			return $out;
 		},
 		'meta'                => spiral_mcp_meta( false, false, true ),
+	) );
+
+	/* 6. Actualizar ------------------------------------------------------- */
+	spiral_mcp_register_ability( 'spiral-mcp/update-plugin', array(
+		'label'               => 'Actualizar un plugin',
+		'description'         => 'Actualiza un plugin a la última versión de wordpress.org (list-plugins con status "update" dice cuáles tienen actualización y a qué versión). Exige "confirm": true: díselo antes al usuario, con la versión actual y la nueva. Comprueba que la nueva versión sea compatible con WordPress y PHP. Si el plugin estaba activo, sigue activo y después se comprueban la portada y wp-admin: si responden con error 500, se vuelve a poner la versión anterior (copia temporal de WordPress) y lo dice. Purga la caché. No se puede deshacer con restore-snapshot (es código, no ajustes). Spiral-MCP-Control y MCP Adapter no se actualizan desde aquí, ni los plugins de pago que no vienen de wordpress.org. Requiere los dos cerrojos de la gestión de plugins.',
+		'category'            => 'spiral-mcp-plugins',
+		// Pasa también con "settings" para que, sin spiral_mcp_plugins, la respuesta diga qué cerrojo falta
+		// (spiral_mcp_plugins_check_locks() exige la capacidad igualmente).
+		'group'               => array( 'plugins', 'settings' ),
+		'log'                 => array( 'type' => 'plugin', 'id' => 'plugin' ),
+		'input_schema'        => array(
+			'type'       => 'object',
+			'required'   => array( 'plugin', 'confirm' ),
+			'properties' => array(
+				'plugin'  => $plugin_prop,
+				'confirm' => array( 'type' => 'boolean', 'description' => 'true para actualizar.' ),
+			),
+		),
+		'permission_callback' => $can_manage,
+		'execute_callback'    => function ( $input ) {
+			$locks = spiral_mcp_plugins_check_locks();
+			if ( is_wp_error( $locks ) ) {
+				return $locks;
+			}
+			$file = spiral_mcp_plugin_resolve( $input['plugin'] ?? '' );
+			if ( is_wp_error( $file ) ) {
+				return $file;
+			}
+			if ( in_array( $file, spiral_mcp_plugins_protected(), true ) ) {
+				return new WP_Error( 'spiral_mcp_plugin_protected', sprintf( '"%s" está protegido: actualízalo desde wp-admin (si la actualización fallara, perderías el acceso).', $file ) );
+			}
+			$confirm = spiral_mcp_require_confirm( $input, 'actualizar el plugin' );
+			if ( is_wp_error( $confirm ) ) {
+				return $confirm;
+			}
+			$updates = get_site_transient( 'update_plugins' );
+			if ( ! isset( $updates->response[ $file ] ) ) {
+				// Puede que la información esté desfasada: se pregunta otra vez a wordpress.org.
+				delete_site_transient( 'update_plugins' );
+				wp_update_plugins();
+				$updates = get_site_transient( 'update_plugins' );
+			}
+			if ( ! isset( $updates->response[ $file ] ) ) {
+				return new WP_Error( 'spiral_mcp_plugin_no_update', sprintf( '"%s" no tiene actualizaciones (o no viene de wordpress.org).', $file ) );
+			}
+			$update = $updates->response[ $file ];
+			if ( empty( $update->package ) || ! spiral_mcp_plugin_package_allowed( $update->package ) ) {
+				return new WP_Error( 'spiral_mcp_plugin_source', 'La actualización no se descarga de downloads.wordpress.org (plugin de pago o de otro origen): que la haga el usuario desde wp-admin.' );
+			}
+			$issues = spiral_mcp_plugin_compat_issues( $update->requires ?? '', $update->requires_php ?? '' );
+			if ( $issues ) {
+				return new WP_Error( 'spiral_mcp_plugin_incompatible', sprintf( 'La versión %s de "%s" no es compatible con este sitio: %s. No se ha actualizado.', $update->new_version, $file, implode( '; ', $issues ) ) );
+			}
+			$fs = spiral_mcp_plugins_check_filesystem();
+			if ( is_wp_error( $fs ) ) {
+				return $fs;
+			}
+			$data   = get_plugin_data( WP_PLUGIN_DIR . '/' . $file, false, false );
+			$from   = (string) $data['Version'];
+			$active = is_plugin_active( $file );
+
+			// Plugin_Upgrader lo desactiva sin avisar y deja la versión anterior en
+			// wp-content/upgrade-temp-backup hasta el final de la petición (WordPress 6.3+).
+			$upgrader = new Plugin_Upgrader( new Automatic_Upgrader_Skin() );
+			$result   = $upgrader->upgrade( $file );
+			if ( is_wp_error( $result ) || ! $result ) {
+				if ( $active && ! is_plugin_active( $file ) && file_exists( WP_PLUGIN_DIR . '/' . $file ) ) {
+					spiral_mcp_plugins_set_active( $file );
+				}
+				$msg = is_wp_error( $result ) ? $result->get_error_message() : implode( ' ', (array) $upgrader->skin->get_upgrade_messages() );
+				return new WP_Error( 'spiral_mcp_plugin_update_failed', 'No se pudo actualizar (WordPress deja la versión anterior si falla la copia): ' . html_entity_decode( wp_strip_all_tags( $msg ), ENT_QUOTES, 'UTF-8' ) );
+			}
+			$new_file = $upgrader->plugin_info() ? $upgrader->plugin_info() : $file;
+			$new_data = get_plugin_data( WP_PLUGIN_DIR . '/' . $new_file, false, false );
+			$out      = array(
+				'updated' => true,
+				'file'    => $new_file,
+				'name'    => wp_strip_all_tags( (string) $new_data['Name'] ),
+				'from'    => $from,
+				'to'      => (string) $new_data['Version'],
+				'active'  => $active,
+			);
+			if ( $active ) {
+				// Se vuelve a marcar como activo sin cargarlo aquí (en esta petición sigue cargado el código
+				// viejo); la nueva versión se prueba con peticiones nuevas al propio sitio.
+				spiral_mcp_plugins_set_active( $new_file );
+				$health = spiral_mcp_plugins_health();
+				if ( ! $health['ok'] ) {
+					$backup = array( 'slug' => dirname( $file ), 'src' => WP_PLUGIN_DIR, 'dir' => 'plugins' );
+					$restored = '.' !== $backup['slug'] ? $upgrader->restore_temp_backup( array( $backup ) ) : false;
+					if ( true === $restored ) {
+						wp_clean_plugins_cache( false );
+						spiral_mcp_plugins_set_active( $file );
+						$again = spiral_mcp_plugins_health();
+					} else {
+						deactivate_plugins( $new_file, true );
+						$again = spiral_mcp_plugins_health();
+					}
+					spiral_mcp_plugins_after_change();
+					return new WP_Error(
+						'spiral_mcp_plugin_update_rolled_back',
+						( true === $restored
+							? sprintf( 'Con la versión %s el sitio respondía con error 500: se ha vuelto a la %s y sigue activo.', $out['to'], $from )
+							: sprintf( 'Con la versión %s el sitio respondía con error 500 y no se pudo recuperar la anterior: el plugin se ha desactivado.', $out['to'] ) )
+						. ( $again['ok'] ? ' El sitio vuelve a funcionar.' : ' OJO: el sitio sigue dando error; revísalo ya.' ),
+						array( 'before_rollback' => $health['checks'], 'after_rollback' => $again['checks'] )
+					);
+				}
+				$out['health'] = $health;
+			}
+			spiral_mcp_plugins_after_change();
+			return $out;
+		},
+		'meta'                => spiral_mcp_meta( false, true, false ),
+	) );
+
+	/* 7. Borrar ----------------------------------------------------------- */
+	spiral_mcp_register_ability( 'spiral-mcp/delete-plugin', array(
+		'label'               => 'Borrar un plugin',
+		'description'         => 'Borra un plugin desactivado: sus archivos y, si el plugin tiene rutina de desinstalación, también sus ajustes y datos (tablas, opciones…). IRREVERSIBLE: no hay snapshot; se puede volver a instalar con install-plugin, pero los datos borrados no vuelven. Exige "confirm": true: avisa antes al usuario. Desactívalo antes con spiral-mcp/deactivate-plugin. Spiral-MCP-Control y MCP Adapter no se pueden borrar. Requiere los dos cerrojos de la gestión de plugins.',
+		'category'            => 'spiral-mcp-plugins',
+		// Pasa también con "settings" para que, sin spiral_mcp_plugins, la respuesta diga qué cerrojo falta
+		// (spiral_mcp_plugins_check_locks() exige la capacidad igualmente).
+		'group'               => array( 'plugins', 'settings' ),
+		'log'                 => array( 'type' => 'plugin', 'id' => 'plugin' ),
+		'input_schema'        => array(
+			'type'       => 'object',
+			'required'   => array( 'plugin', 'confirm' ),
+			'properties' => array(
+				'plugin'  => $plugin_prop,
+				'confirm' => array( 'type' => 'boolean', 'description' => 'true para borrar.' ),
+			),
+		),
+		'permission_callback' => $can_manage,
+		'execute_callback'    => function ( $input ) {
+			$locks = spiral_mcp_plugins_check_locks();
+			if ( is_wp_error( $locks ) ) {
+				return $locks;
+			}
+			$file = spiral_mcp_plugin_resolve( $input['plugin'] ?? '' );
+			if ( is_wp_error( $file ) ) {
+				return $file;
+			}
+			if ( in_array( $file, spiral_mcp_plugins_protected(), true ) ) {
+				return new WP_Error( 'spiral_mcp_plugin_protected', sprintf( '"%s" está protegido: sin él perderías el acceso.', $file ) );
+			}
+			if ( is_plugin_active( $file ) ) {
+				return new WP_Error( 'spiral_mcp_plugin_active', sprintf( '"%s" está activo: desactívalo antes con spiral-mcp/deactivate-plugin.', $file ) );
+			}
+			$confirm = spiral_mcp_require_confirm( $input, 'borrar el plugin (irreversible)' );
+			if ( is_wp_error( $confirm ) ) {
+				return $confirm;
+			}
+			$fs = spiral_mcp_plugins_check_filesystem();
+			if ( is_wp_error( $fs ) ) {
+				return $fs;
+			}
+			$data         = get_plugin_data( WP_PLUGIN_DIR . '/' . $file, false, false );
+			$uninstalls   = is_uninstallable_plugin( $file );
+			$level        = ob_get_level();
+			try {
+				// Ejecuta la desinstalación del plugin (uninstall.php o su hook), que carga su código.
+				$res = delete_plugins( array( $file ) );
+			} catch ( Throwable $e ) {
+				while ( ob_get_level() > $level ) {
+					ob_end_clean();
+				}
+				return new WP_Error( 'spiral_mcp_plugin_fatal', sprintf( 'La desinstalación del plugin da un error fatal y no se ha borrado del todo: %s. Revisa wp-content/plugins desde wp-admin.', $e->getMessage() ) );
+			}
+			if ( is_wp_error( $res ) || ! $res ) {
+				return new WP_Error( 'spiral_mcp_plugin_delete_failed', 'No se pudo borrar: ' . ( is_wp_error( $res ) ? $res->get_error_message() : 'WordPress no lo ha permitido.' ) );
+			}
+			wp_clean_plugins_cache( true );
+			return array(
+				'deleted'        => true,
+				'file'           => $file,
+				'name'           => wp_strip_all_tags( (string) $data['Name'] ),
+				'version'        => (string) $data['Version'],
+				'data_removed'   => $uninstalls,
+				'note'           => $uninstalls ? 'El plugin tenía rutina de desinstalación: sus ajustes y datos también se han borrado.' : 'Puede que hayan quedado ajustes suyos en la base de datos (el plugin no tiene rutina de desinstalación).',
+			);
+		},
+		'meta'                => spiral_mcp_meta( false, true, false ),
 	) );
 } );

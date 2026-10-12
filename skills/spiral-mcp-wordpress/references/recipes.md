@@ -229,7 +229,8 @@ Solo si el usuario lo pide. Instalar código es el cambio de más riesgo: ve pas
 3. `install-plugin {"slug": "..."}`: queda instalado pero **desactivado**.
 4. Confirma con el usuario y `activate-plugin {"plugin": "..."}`. Si devuelve `spiral_mcp_plugin_fatal` o `spiral_mcp_plugin_broke_site`, el plugin no ha quedado activo y el sitio está bien: cuéntaselo y propón otra opción.
 5. Revisa la web (`inspect-page {"path": "/"}` o una captura): un plugin puede cambiar el diseño o añadir cosas. Dile al usuario dónde se configura (normalmente en wp-admin) y el `snapshot_id` para deshacerlo.
-6. Para quitarlo: `deactivate-plugin` (conserva sus datos). Spiral-MCP-Control y MCP Adapter no se pueden desactivar desde aquí.
+6. Para quitarlo: `deactivate-plugin` (conserva sus datos). Para borrarlo del todo, `delete-plugin` con `"confirm": true` tras avisar al usuario de que sus datos pueden borrarse y no vuelven. Spiral-MCP-Control y MCP Adapter no se pueden desactivar, actualizar ni borrar desde aquí.
+7. Actualizaciones: `list-plugins {"status": "update"}` dice cuáles tienen y a qué versión. Díselas al usuario y actualiza de una en una con `update-plugin` y `"confirm": true`; si devuelve `spiral_mcp_plugin_update_rolled_back`, sigue con la versión anterior y el sitio funciona: cuéntaselo.
 
 ## Deshacer un cambio
 
