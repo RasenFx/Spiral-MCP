@@ -10,7 +10,7 @@ El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes d
 - YOOtheme Pro activo (o un tema hijo de YOOtheme) para todo lo relacionado con el builder y los estilos.
 - PHP 7.4 como mínimo: no usar sintaxis de PHP 8 (match, nullsafe `?->`, argumentos con nombre, tipos de unión, `readonly`, enums).
 
-## Estructura actual (v1.12.0)
+## Estructura actual (v1.13.0)
 ```
 spiral-mcp-control.php   cabecera, constantes, comprobación de requisitos, require_once y hooks de activación
 uninstall.php            borra el rol y las capacidades (las tablas solo con el filtro spiral_mcp_uninstall_drop_tables)
@@ -24,7 +24,7 @@ includes/menus.php       abilities de menús y elementos de menú (+ snapshot ki
 includes/theme.php       footer de YOOtheme (builder) y widgets (+ snapshot kinds "theme_config" y "widgets")
 includes/media.php       subir, listar, editar y borrar medios, imagen destacada y usos (+ snapshot kinds "media_meta" y "post_meta")
 includes/elements.php    catálogo de elementos de YOOtheme (list-elements, get-element-schema) y validación de layouts
-includes/layout.php      JSON Pointer, get-layout-outline, get-layout-node, patch-layout y duplicate-content
+includes/layout.php      JSON Pointer, get-layout-outline, get-layout-texts, get-layout-node, patch-layout y duplicate-content
 includes/theme-config.php get-theme-config y update-theme-config (lista blanca de secciones)
 includes/templates.php   plantillas y biblioteca de YOOtheme vía su Storage (+ snapshot kind "yootheme_storage")
 includes/online-library.php librería online de YOOtheme (api.yootheme.com): catálogo, vista previa e importación
@@ -49,7 +49,7 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - Estilos: `get-custom-css`, `update-custom-css`, `get-theme-style`, `list-style-variables`, `update-theme-style`, `get-style-status`, `mark-style-compiled`.
 - Menús: `list-menus`, `get-menu`, `create-menu`, `update-menu`, `delete-menu`, `add-menu-item`, `update-menu-item`, `delete-menu-item`.
 - Tema: `get-theme-layout`, `update-theme-layout` (áreas `footer`, `menu_item:<ID>`, `widget:<ID>`, `template:<id>`), `list-widgets`, `create-widget`, `update-widget`, `delete-widget`; `list-theme-backups` y `restore-theme-backup` son alias obsoletos (se quitan en la próxima versión).
-- Layouts: `list-elements`, `get-element-schema`, `get-layout-outline`, `get-layout-node`, `patch-layout`, `duplicate-content`, `insert-from-library`.
+- Layouts: `list-elements`, `get-element-schema`, `get-layout-outline`, `get-layout-texts`, `get-layout-node`, `patch-layout`, `duplicate-content`, `insert-from-library`.
 - YOOtheme: `get-theme-config`, `update-theme-config`, `list-templates`, `get-template`, `create-template`, `update-template`, `delete-template`, `list-library`, `get-library-item`, `save-to-library`, `clear-cache`; librería online: `list-online-library`, `get-online-library-item`, `import-from-online-library`.
 - Medios: `upload-media`, `list-media`, `get-media`, `update-media`, `delete-media`, `set-featured-image`, `find-media-usage`.
 - Auditoría y snapshots: `list-activity`, `list-snapshots`, `restore-snapshot`.

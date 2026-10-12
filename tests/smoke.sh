@@ -110,7 +110,7 @@ for name in list-content get-content create-content update-content get-yootheme-
 	list-menus get-menu create-menu update-menu delete-menu add-menu-item update-menu-item delete-menu-item \
 	get-theme-layout update-theme-layout list-theme-backups restore-theme-backup list-widgets update-widget create-widget delete-widget \
 	list-activity list-snapshots restore-snapshot upload-media list-media get-media update-media delete-media \
-	set-featured-image find-media-usage list-elements get-element-schema get-layout-outline get-layout-node \
+	set-featured-image find-media-usage list-elements get-element-schema get-layout-outline get-layout-texts get-layout-node \
 	patch-layout duplicate-content get-theme-config update-theme-config list-templates get-template \
 	create-template update-template delete-template list-library get-library-item save-to-library \
 	insert-from-library list-online-library get-online-library-item import-from-online-library clear-cache list-post-types trash-content restore-content delete-content \
@@ -322,6 +322,8 @@ eq 'update-yootheme-layout rechaza un row fuera de section' code spiral_mcp_inva
 
 call GET spiral-mcp/get-layout-outline "{\"id\":$PAGE_ID}"
 check 'get-layout-outline' 200 nodes outline.0
+call GET spiral-mcp/get-layout-texts "{\"id\":$PAGE_ID,\"kinds\":[\"text\",\"link\"]}"
+check 'get-layout-texts' 200 total items.0.path items.0.value
 HEAD='/children/0/children/0/children/0/children/0'
 call GET spiral-mcp/get-layout-node "{\"id\":$PAGE_ID,\"path\":\"$HEAD\"}"
 eq 'get-layout-node: headline' node.type headline

@@ -168,7 +168,11 @@ La librería de YOOtheme tiene cientos de diseños hechos por su equipo (página
    - Un elemento suelto en una columna: `{"id": "...", "kind": "element", "target": "insert", "post_id": 12, "path": "/children/0/children/0/children/0/children/-"}`.
    - En la biblioteca del sitio, para reutilizarlo: `"target": "library"`.
    Las imágenes se descargan a la biblioteca de medios (sin duplicar).
-4. **Adapta:** los diseños son contenido de muestra (lorem ipsum, autores y fotos de ejemplo). Cambia textos, enlaces e imágenes con `patch-layout`. En plantillas, conecta título, fecha, imagen y contenido con fuentes dinámicas (`posts.singlePost`, `posts.archivePost`; ver las recetas de plantillas) antes de activarla con `update-template {"id": ..., "status": "enabled"}`: si no, todas las entradas mostrarían el mismo artículo de ejemplo.
+4. **Adapta:** los diseños son contenido de muestra (lorem ipsum, autores, direcciones y fotos de ejemplo).
+   - `get-layout-texts {"id": 12, "kinds": ["text", "link", "image"]}` (o `"area": "template:<id>"`) lista **todos** los textos, enlaces e imágenes con su ruta: también los que no salen en el esquema, como etiquetas y mensajes de formularios (`props/provider/message` de un newsletter), textos de botones, metas o el alt. Cámbialos en un solo `patch-layout` con un `replace` por entrada; en los que tienen `"html": true` conserva las etiquetas y los enlaces (`tel:`, `mailto:`).
+   - Lo que no es texto también es de muestra: coordenadas de un `map_item` (`location`), proveedor del newsletter (Mailchimp sin lista), enlaces `#`. Avisa al usuario en lugar de dejarlo a medias.
+   - Vuelve a llamar a `get-layout-texts` al final: no debe quedar nada en el idioma o con los datos de la web de ejemplo.
+   - En plantillas, conecta título, fecha, imagen y contenido con fuentes dinámicas (`posts.singlePost`, `posts.archivePost`; ver las recetas de plantillas) antes de activarla con `update-template {"id": ..., "status": "enabled"}`: si no, todas las entradas mostrarían el mismo artículo de ejemplo.
 5. Revisa con `inspect-page` (o la URL de `get-preview-url` en un navegador) y enseña el resultado al usuario.
 
 ## Cambiar la marca (colores y tipografía)

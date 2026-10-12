@@ -211,6 +211,59 @@ function spiral_mcp_layout_outline( array $node, $path = '', $depth = 0, array &
 	return $lines;
 }
 
+/**
+ * Recoge los textos visibles, enlaces e imágenes de un árbol según el catálogo de elementos:
+ * campos text/textarea/editor (textos), link (enlaces) e image (imágenes), también los anidados
+ * ("provider.message" = props.provider.message). Omite los campos internos (id, class, css,
+ * atributos, medidas). Cada entrada lleva la ruta JSON Pointer lista para patch-layout.
+ */
+function spiral_mcp_layout_texts( array $node, $path, array $types, array $kinds, array &$out, $max = 2000 ) {
+	if ( count( $out ) >= $max ) {
+		return;
+	}
+	$type   = (string) ( $node['type'] ?? '' );
+	$fields = (array) ( $types[ $type ]['fields'] ?? array() );
+	$props  = (array) ( $node['props'] ?? array() );
+	$mapped = (array) ( $node['source']['props'] ?? array() );
+	foreach ( $fields as $name => $field ) {
+		$ftype = (string) ( $field['type'] ?? 'text' );
+		$kind  = in_array( $ftype, array( 'text', 'textarea', 'editor' ), true ) ? 'text' : ( 'link' === $ftype ? 'link' : ( 'image' === $ftype ? 'image' : null ) );
+		if ( null === $kind || ! in_array( $kind, $kinds, true ) ) {
+			continue;
+		}
+		if ( in_array( $name, array( 'name', 'id', 'class', 'attributes', 'css' ), true ) || preg_match( '/(width|height|delay|offset|ratio|size|_breakpoint|focal_point)$/', $name ) ) {
+			continue;
+		}
+		$value = $props;
+		foreach ( explode( '.', (string) $name ) as $key ) {
+			$value = is_array( $value ) && array_key_exists( $key, $value ) ? $value[ $key ] : null;
+		}
+		$dynamic = isset( $mapped[ $name ] );
+		if ( ( ! is_string( $value ) || '' === trim( $value ) || ( 'text' === $kind && is_numeric( trim( $value ) ) ) ) && ! $dynamic ) {
+			continue;
+		}
+		$entry = array(
+			'path'    => $path . '/props/' . str_replace( '.', '/', (string) $name ),
+			'element' => $type,
+			'prop'    => (string) $name,
+			'kind'    => $kind,
+			'value'   => is_string( $value ) ? $value : '',
+		);
+		if ( 'text' === $kind && is_string( $value ) && preg_match( '#<[a-z/!]#i', $value ) ) {
+			$entry['html'] = true;
+		}
+		if ( $dynamic ) {
+			$entry['dynamic'] = true; // Lo rellena una fuente dinámica: cambiarlo aquí no se verá.
+		}
+		$out[] = $entry;
+	}
+	foreach ( (array) ( $node['children'] ?? array() ) as $i => $child ) {
+		if ( is_array( $child ) ) {
+			spiral_mcp_layout_texts( $child, $path . '/children/' . $i, $types, $kinds, $out, $max );
+		}
+	}
+}
+
 /* -------------------------------------------------------------------------
  * Helpers: destino (página o área del tema)
  * ---------------------------------------------------------------------- */
@@ -335,6 +388,51 @@ add_action( 'wp_abilities_api_init', function () {
 			return $loaded['target'] + array(
 				'nodes'   => count( $lines ),
 				'outline' => $lines,
+			);
+		},
+		'meta'                => spiral_mcp_meta( true, false, true ),
+	) );
+
+	/* 1b. Textos ---------------------------------------------------------- */
+	spiral_mcp_register_ability( 'spiral-mcp/get-layout-texts', array(
+		'label'               => 'Textos del layout',
+		'description'         => 'Lista todos los textos visibles de un layout de YOOtheme (de una página con "id" o de un área con "area"), y si se pide también sus enlaces e imágenes, cada uno con su ruta JSON Pointer completa lista para un "replace" de spiral-mcp/patch-layout. Incluye los textos que no salen en spiral-mcp/get-layout-outline: títulos y metas de items, textos de botones, etiquetas y mensajes de formularios, títulos de sección, alt de imágenes y ajustes anidados (p. ej. props/provider/message de un newsletter). Úsala para traducir o adaptar un diseño importado (spiral-mcp/import-from-online-library) sin dejarte nada. "html": true = el valor es HTML: conserva sus etiquetas y enlaces al cambiarlo. "dynamic": true = lo rellena una fuente dinámica, cambiarlo no se verá. "path" limita la búsqueda a un nodo.',
+		'category'            => 'spiral-mcp-layout',
+		'group'               => array( 'content', 'design' ),
+		'input_schema'        => array(
+			'type'       => 'object',
+			'properties' => $target_props + array(
+				'path'  => array( 'type' => 'string', 'description' => 'Ruta JSON Pointer de un nodo para limitar la búsqueda (por defecto, todo el layout).' ),
+				'kinds' => array(
+					'type'        => 'array',
+					'items'       => array( 'type' => 'string', 'enum' => array( 'text', 'link', 'image' ) ),
+					'default'     => array( 'text' ),
+					'description' => 'Qué devolver: text (por defecto), link, image.',
+				),
+			),
+		),
+		'permission_callback' => 'spiral_mcp_layout_target_can',
+		'execute_callback'    => function ( $input = array() ) {
+			$input  = (array) $input;
+			$loaded = spiral_mcp_layout_target_load( $input );
+			if ( is_wp_error( $loaded ) ) {
+				return $loaded;
+			}
+			$types = spiral_mcp_element_types();
+			if ( null === $types ) {
+				return new WP_Error( 'spiral_mcp_no_yootheme', 'YOOtheme Pro no está activo en este sitio.' );
+			}
+			$path = rtrim( (string) ( $input['path'] ?? '' ), '/' );
+			$node = '' === $path ? $loaded['layout'] : spiral_mcp_pointer_get( $loaded['layout'], $path );
+			if ( is_wp_error( $node ) || ! is_array( $node ) ) {
+				return is_wp_error( $node ) ? $node : new WP_Error( 'spiral_mcp_bad_path', 'La ruta no apunta a un nodo del layout (ver spiral-mcp/get-layout-outline).' );
+			}
+			$kinds = array_values( array_intersect( array( 'text', 'link', 'image' ), (array) ( $input['kinds'] ?? array( 'text' ) ) ) );
+			$items = array();
+			spiral_mcp_layout_texts( $node, $path, $types, $kinds ? $kinds : array( 'text' ), $items );
+			return $loaded['target'] + array(
+				'total' => count( $items ),
+				'items' => $items,
 			);
 		},
 		'meta'                => spiral_mcp_meta( true, false, true ),

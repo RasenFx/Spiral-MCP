@@ -2,6 +2,12 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.13.0] — 2026-10-11
+
+### Añadido
+- `spiral-mcp/get-layout-texts`: lista todos los textos visibles de un layout (y, si se pide, enlaces e imágenes) con su ruta JSON Pointer lista para `patch-layout`, según el catálogo de elementos: incluye títulos y metas de items, textos de botones, etiquetas y mensajes de formularios, títulos de sección, alt y ajustes anidados (p. ej. `props/provider/message` de un newsletter). Marca los valores HTML y los que rellena una fuente dinámica.
+- Skill: adaptar o traducir un diseño importado con `get-layout-texts` (receta de la librería online y flujo de edición).
+
 ## [1.12.0] — 2026-10-11
 
 ### Añadido

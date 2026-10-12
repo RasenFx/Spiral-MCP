@@ -33,7 +33,7 @@ Si necesitas los parámetros de una herramienta concreta, consulta `references/a
 
 1. Localiza el contenido: `list-content` (`search`, `post_type`, `parent`, `status`).
 2. Lee el árbol: `get-layout-outline {"id": 12}`. Cada línea es un nodo con su ruta JSON Pointer, su tipo y un extracto del texto.
-3. Mira el nodo exacto: `get-layout-node {"id": 12, "path": "/children/1/children/0/children/0/children/2"}`. Si no conoces sus props: `get-element-schema {"type": "button_item"}`.
+3. Mira el nodo exacto: `get-layout-node {"id": 12, "path": "/children/1/children/0/children/0/children/2"}`. Para cambiar muchos textos a la vez (traducir, adaptar un diseño importado), `get-layout-texts` da todos los textos visibles con su ruta, incluidos los que el esquema no muestra (botones, formularios, metas). Si no conoces sus props: `get-element-schema {"type": "button_item"}`.
 4. Cambia con `patch-layout` (operaciones `test`, `replace`, `add`, `remove`, `move`, `copy`). Se aplican en orden y de forma atómica:
    ```json
    {"id": 12, "operations": [
