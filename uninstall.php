@@ -22,6 +22,8 @@ foreach ( wp_roles()->role_objects as $spiral_mcp_role ) {
 wp_clear_scheduled_hook( 'spiral_mcp_daily_cleanup' );
 delete_option( 'spiral_mcp_db_version' );
 delete_option( 'spiral_mcp_style_dirty' );
+delete_option( 'spiral_mcp_disabled_abilities' );
+delete_option( 'spiral_mcp_agent_caps' );
 
 if ( apply_filters( 'spiral_mcp_uninstall_drop_tables', false ) ) {
 	global $wpdb;

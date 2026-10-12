@@ -45,6 +45,8 @@ Las abilities llevan el prefijo `spiral-mcp/`. La referencia completa de paráme
 | `spiral_mcp_code` | JS personalizado (sección `scripts` de YOOtheme) | sí |
 | `spiral_mcp_cache` | **cambiar** los ajustes de caché | **no** (concédela con el filtro `spiral_mcp_agent_caps`) |
 
+Las capacidades del rol del agente se pueden cambiar en **Ajustes > Spiral-MCP > Permisos del agente**, y la elección se mantiene al actualizar el plugin. En la pestaña **Abilities** de esa página se activa o desactiva cada herramienta o una categoría entera (con atajos "Solo lectura" y "Desactivar las destructivas"). Una ability desactivada no se publica en el MCP: el agente ni la ve.
+
 Además, cada ability comprueba la capacidad nativa de WordPress del objeto (`edit_post` de ese post, `edit_theme_options`…). El rol del agente nunca tiene `install_plugins`, `edit_plugins`, `manage_options`, `promote_users` ni `delete_users`. Las acciones destructivas exigen `"confirm": true`.
 
 ## Cachés compatibles

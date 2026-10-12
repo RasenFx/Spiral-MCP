@@ -2,6 +2,15 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.18.0] — 2026-10-12 · Fase 7.1: página de ajustes
+
+### Añadido
+- **Ajustes > Spiral-MCP** (solo administradores):
+  - Pestaña *Abilities*: activar o desactivar cada ability o una categoría entera, con atajos "Activar todas", "Solo lectura" y "Desactivar las destructivas". Una ability desactivada no se registra: el MCP Adapter no la publica y el agente no la ve. `list-activity`, `list-snapshots` y `restore-snapshot` están siempre activas.
+  - Pestaña *Permisos del agente*: qué capacidades `spiral_mcp_*` tiene el rol del agente (p. ej. quitar `spiral_mcp_code` o dar `spiral_mcp_cache`). La elección se mantiene al actualizar el plugin.
+  - Los cambios quedan en el registro de auditoría (`admin/abilities`, `admin/agent_caps`).
+- Enlace "Ajustes" en la lista de plugins. La desinstalación borra las opciones nuevas.
+
 ## [1.17.0] — 2026-10-12 · Fase 6.4: ajustes de más herramientas de caché
 
 ### Documentación y pruebas (Fase 6.5, sin cambios en el plugin)

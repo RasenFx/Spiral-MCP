@@ -10,7 +10,7 @@ El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes d
 - YOOtheme Pro activo (o un tema hijo de YOOtheme) para todo lo relacionado con el builder y los estilos.
 - PHP 7.4 como mínimo: no usar sintaxis de PHP 8 (match, nullsafe `?->`, argumentos con nombre, tipos de unión, `readonly`, enums).
 
-## Estructura actual (v1.17.0)
+## Estructura actual (v1.18.0)
 ```
 spiral-mcp-control.php   cabecera, constantes, comprobación de requisitos, require_once y hooks de activación
 uninstall.php            borra el rol y las capacidades (las tablas solo con el filtro spiral_mcp_uninstall_drop_tables)
@@ -34,6 +34,7 @@ includes/taxonomies.php  taxonomías y términos (+ snapshot kind "term")
 includes/seo.php         SEO por contenido: Yoast o salida propia (+ snapshot kind "seo")
 includes/settings.php    ajustes del sitio: identidad y portada (+ snapshot kind "option")
 includes/preview.php     URLs de vista previa sin sesión (token firmado) e inspect-page
+includes/admin.php       página Ajustes > Spiral-MCP (solo admin): activar/desactivar abilities y permisos del rol del agente
 includes/styles.php      CSS adicional (+ snapshot kind "custom_css") y estilo de YOOtheme: catálogo de variables, cambios y estado de compilación
 tests/smoke.sh           prueba de humo por REST (ver "Entorno de desarrollo")
 tests/fixtures/          layouts de YOOtheme de ejemplo
@@ -59,7 +60,7 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 ## Convenciones (obligatorias)
 - **Nombres**: abilities `spiral-mcp/<verbo>-<objeto>` en kebab-case; funciones PHP `spiral_mcp_*`; constantes `SPIRAL_MCP_*`; códigos de `WP_Error` `spiral_mcp_*`; filtros y acciones `spiral_mcp_*`; categorías `spiral-mcp-<módulo>`.
 - **Un módulo por archivo** en `includes/`, cada uno con su categoría y sus abilities, registrado desde el archivo principal con `require_once`.
-- **Patrón de registro**: copiar el de `includes/menus.php`. Registrar siempre con `spiral_mcp_register_ability()`, nunca con `wp_register_ability()` directamente. Argumentos extra del wrapper: `'group'` (`content`, `design`, `media`, `settings`, `code`, `cache`, o un array si basta con uno: exige la capacidad `spiral_mcp_<grupo>`; `cache` no la tiene el rol del agente por defecto, ver `spiral_mcp_agent_excluded_caps()`) y `'log' => [ 'type' => …, 'id' => clave de la entrada o callable( $input, $result ) ]` (objeto para la auditoría). `'meta' => spiral_mcp_meta( $readonly, $destructive, $idempotent )`. `input_schema` con `required`. El wrapper registra en el log toda ability con `readonly = false`.
+- **Patrón de registro**: copiar el de `includes/menus.php`. Registrar siempre con `spiral_mcp_register_ability()`, nunca con `wp_register_ability()` directamente. Argumentos extra del wrapper: `'group'` (`content`, `design`, `media`, `settings`, `code`, `cache`, o un array si basta con uno: exige la capacidad `spiral_mcp_<grupo>`; `cache` no la tiene el rol del agente por defecto, ver `spiral_mcp_agent_excluded_caps()`) y `'log' => [ 'type' => …, 'id' => clave de la entrada o callable( $input, $result ) ]` (objeto para la auditoría). `'meta' => spiral_mcp_meta( $readonly, $destructive, $idempotent )`. `input_schema` con `required`. El wrapper registra en el log toda ability con `readonly = false`, anota cada ability en `spiral_mcp_ability_catalog()` y **no registra** las desactivadas en Ajustes > Spiral-MCP (opción `spiral_mcp_disabled_abilities`; `spiral_mcp_protected_abilities()` no se pueden desactivar). Las capacidades del rol del agente las decide `spiral_mcp_agent_caps()` (por defecto + opción `spiral_mcp_agent_caps` + filtro), y `spiral_mcp_install_caps()` añade y retira las propias según eso.
 - **Snapshots**: cada módulo registra sus tipos con el filtro `spiral_mcp_snapshot_kinds` (`group`, `cap`, `capture`, `restore`; opcionales `parts` y `partial` para restaurar por partes, como `theme_config`) y llama a `spiral_mcp_snapshot_capture( $kind, $ref, $note )` antes de escribir. Si devuelve `WP_Error`, no escribir. Devolver `snapshot_id` en la respuesta.
 - **Descripciones en español, escritas para un agente**: qué hace, qué leer antes ("primero lee con X"), qué devuelve y qué es irreversible. Las descripciones son la documentación que verá el agente.
 - **Permisos**: el wrapper exige la capacidad `spiral_mcp_*` del grupo; además, `permission_callback` comprueba la nativa del objeto (`edit_post` con ese ID, `edit_theme_options`…). Nunca `__return_true`.

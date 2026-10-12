@@ -77,7 +77,7 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 
 ## Crear el menú principal
 
-1. `list-menus`: menús existentes y ubicaciones (`locations`). `list-content {"post_type": "any"}` para los destinos; si una página no existe, ver el principio 7 del skill.
+1. `list-menus`: menús existentes y ubicaciones (`locations`). `list-content {"post_type": "any"}` para los destinos; si una página no existe, ver el principio 8 del skill.
 2. `create-menu {"name": "Menú principal", "items": [{"type": "custom", "title": "Inicio", "url": "/"}, {"type": "page", "object_id": 12}], "locations": ["navbar", "dialog-mobile"]}`.
    - En YOOtheme el menú de la cabecera de escritorio va en la ubicación `navbar` (en todas las disposiciones de `header.layout`). En móvil, `dialog-mobile` es el menú que abre el botón de hamburguesa (`navbar-mobile` si la cabecera móvil muestra una barra de navegación; mira `get-theme-config {"section": "mobile"}`).
    - Las demás ubicaciones (`header`, `toolbar-left`, `toolbar-right`, `dialog`, `header-mobile`) son posiciones extra.

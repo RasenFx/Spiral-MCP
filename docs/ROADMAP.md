@@ -4,7 +4,7 @@
 
 **Criterio de éxito global:** desde un cliente MCP, el agente puede (1) crear una página completa con imágenes propias subidas por él, (2) cambiar el header, el footer y la paleta de marca, (3) previsualizar el resultado antes de publicar y (4) deshacer cualquier cambio. Todo con registro de auditoría.
 
-**Orden de las fases:** 0 → 2 → 3 → 1 → 4 → 5 → 6. Medios y YOOtheme son lo que más bloquea el trabajo de diseño hoy.
+**Orden de las fases:** 0 → 2 → 3 → 1 → 4 → 5 → 6 → 7. Medios y YOOtheme son lo que más bloquea el trabajo de diseño hoy.
 
 Leyenda: `[ ]` pendiente · `[x]` hecho · **Spike** = investigar en el entorno local antes de implementar, y anotar el resultado en este documento.
 
@@ -243,6 +243,30 @@ Cada adaptador declara `writable` (claves que acepta) y `restore-snapshot` solo 
 **Fase 6 terminada.** Nota: restaurar los ajustes de WP Super Cache deja los mismos valores, pero sus funciones reescriben algunas líneas de `wp-cache-config.php` con otro formato (`'600'` en vez de `600`, arrays con índices); es equivalente.
 
 **Terminado cuando:** en un sitio con cualquiera de las herramientas compatibles, el agente sabe qué caché hay, la purga (toda o una página), lanza la precarga si existe y, con permiso, cambia los ajustes básicos y puede deshacerlo.
+
+---
+
+## Fase 7 — Ajustes del plugin
+
+Página *Ajustes > Spiral-MCP* (solo administradores, `manage_options`) para decidir qué puede hacer el agente sin tocar código. El agente no tiene ninguna ability para cambiarla.
+
+**Decisiones:** desactivar una ability = **no registrarla** (el MCP Adapter no la publica y el agente ni la ve). Se puede activar o desactivar una a una y por grupos, con atajos ("solo lectura", "sin destructivas"). Las abilities nuevas de versiones futuras llegan **activadas** (la opción guarda las desactivadas). Siempre activas, para que el agente pueda deshacer: `list-activity`, `list-snapshots` y `restore-snapshot`. Cada cambio en la página queda en el registro de auditoría.
+
+### 7.1 Abilities y permisos del agente
+- [x] El wrapper lleva un registro de todas las abilities (también las desactivadas) con su categoría, tipo (lectura / escritura / destructiva) y descripción, y no registra las desactivadas (opción `spiral_mcp_disabled_abilities`).
+- [x] Pestaña **Abilities**: interruptor por ability y por categoría; atajos "activar todas", "solo lectura" y "desactivar destructivas".
+- [x] Pestaña **Permisos del agente**: qué capacidades `spiral_mcp_*` tiene el rol del agente (opción `spiral_mcp_agent_caps`, que respetan también las actualizaciones del plugin). Las nativas peligrosas (`install_plugins`, `manage_options`…) nunca se pueden dar.
+- [x] Auditoría de los cambios, enlace "Ajustes" en la lista de plugins, limpieza de las opciones al desinstalar.
+
+**Resultado 7.1** (`includes/admin.php`, solo en `is_admin()`; guarda por `admin-post.php` con nonce y `manage_options`): comprobado con una sesión de administrador contra el sitio local. "Solo lectura" deja al agente 39 de 84 herramientas (las de lectura más `restore-snapshot`) y `update-content` responde `rest_ability_not_found`; desactivar solo `delete-media` la quita de la lista; las protegidas no se pueden desactivar aunque se omitan en el formulario. Quitar `spiral_mcp_code` y dar `spiral_mcp_cache` cambia el rol al momento (el agente ya puede cambiar ajustes de caché y no puede tocar `scripts`) y se mantiene tras la sincronización de una actualización. Sin sesión: HTTP 400; con nonce falso: 403. Cada guardado queda en el registro como `admin/abilities` o `admin/agent_caps` (`object_type` `settings`).
+
+### 7.2 Comportamiento
+- [ ] Ajustes que hoy son filtros: purga automática tras cada escritura, días de retención del registro, librería online de YOOtheme sí/no, borrar las tablas al desinstalar.
+
+### 7.3 Actividad
+- [ ] Pestaña con los últimos cambios del agente y su snapshot.
+
+**Terminado cuando:** un administrador desactiva una ability o un grupo desde la página y el agente deja de verla en su lista de herramientas; cambia los permisos del rol y se mantienen tras actualizar el plugin.
 
 ---
 

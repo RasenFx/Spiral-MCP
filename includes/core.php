@@ -61,6 +61,28 @@ function spiral_mcp_table( $name ) {
  * Fuerza el prefijo spiral-mcp/, rellena 'meta' con spiral_mcp_meta( false )
  * y, si la ability escribe (readonly = false), registra cada ejecución.
  */
+/** Abilities que no se pueden desactivar: sin ellas el agente no podría ver ni deshacer cambios. */
+function spiral_mcp_protected_abilities() {
+	return array( 'spiral-mcp/list-activity', 'spiral-mcp/list-snapshots', 'spiral-mcp/restore-snapshot' );
+}
+
+/** Abilities desactivadas en la página de ajustes (opción spiral_mcp_disabled_abilities). */
+function spiral_mcp_disabled_abilities() {
+	return array_values( array_diff( array_map( 'strval', (array) get_option( 'spiral_mcp_disabled_abilities', array() ) ), spiral_mcp_protected_abilities() ) );
+}
+
+/**
+ * Catálogo de las abilities del plugin, registradas o no: nombre => [ label, description,
+ * category, groups, kind (read|write|destructive), enabled ]. Con $name y $info, lo añade.
+ */
+function spiral_mcp_ability_catalog( $name = null, $info = null ) {
+	static $catalog = array();
+	if ( null !== $name && is_array( $info ) ) {
+		$catalog[ $name ] = $info;
+	}
+	return $catalog;
+}
+
 function spiral_mcp_register_ability( $name, array $args ) {
 	if ( 0 !== strpos( $name, 'spiral-mcp/' ) ) {
 		$name = 'spiral-mcp/' . $name;
@@ -70,6 +92,22 @@ function spiral_mcp_register_ability( $name, array $args ) {
 	unset( $args['group'], $args['log'] );
 
 	$args['meta'] = array_replace_recursive( spiral_mcp_meta( false ), (array) ( $args['meta'] ?? array() ) );
+
+	// Registro de todas las abilities (también las desactivadas) para la página de ajustes.
+	$annotations = (array) ( $args['meta']['annotations'] ?? array() );
+	$enabled     = ! in_array( $name, spiral_mcp_disabled_abilities(), true );
+	spiral_mcp_ability_catalog( $name, array(
+		'label'       => (string) ( $args['label'] ?? $name ),
+		'description' => (string) ( $args['description'] ?? '' ),
+		'category'    => (string) ( $args['category'] ?? '' ),
+		'groups'      => $groups,
+		'kind'        => ! empty( $annotations['readonly'] ) ? 'read' : ( ! empty( $annotations['destructive'] ) ? 'destructive' : 'write' ),
+		'enabled'     => $enabled,
+	) );
+	// Desactivada en Ajustes > Spiral-MCP: no se registra, así el MCP Adapter no la publica.
+	if ( ! $enabled ) {
+		return null;
+	}
 
 	// Sin esto, llamar sin "input" a una ability sin campos obligatorios falla la validación (null no es un objeto).
 	$schema = $args['input_schema'] ?? array();
