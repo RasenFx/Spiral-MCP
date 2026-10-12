@@ -116,7 +116,7 @@ for name in list-content get-content create-content update-content get-yootheme-
 	set-featured-image find-media-usage list-elements get-element-schema get-layout-outline get-layout-texts get-layout-node \
 	patch-layout duplicate-content get-theme-config update-theme-config list-templates get-template \
 	create-template update-template delete-template list-library get-library-item save-to-library \
-	insert-from-library list-online-library get-online-library-item import-from-online-library clear-cache get-cache-status purge-cache preload-cache get-cache-settings update-cache-settings list-post-types trash-content restore-content delete-content \
+	insert-from-library list-online-library get-online-library-item import-from-online-library clear-cache get-cache-status purge-cache preload-cache get-cache-settings update-cache-settings list-plugins search-plugins list-post-types trash-content restore-content delete-content \
 	list-revisions restore-revision list-taxonomies list-terms create-term update-term delete-term \
 	get-seo update-seo get-site-settings update-site-settings get-custom-css update-custom-css \
 	get-theme-style list-style-variables update-theme-style get-style-status mark-style-compiled \
@@ -425,6 +425,18 @@ call POST spiral-mcp/purge-cache '{"scope":"url","url":"https://example.com/"}'
 [ "$STATUS" -ge 400 ] && ok 'purge-cache rechaza URLs absolutas' || ko 'purge-cache con URL absoluta'
 call POST spiral-mcp/purge-cache '{"scope":"all","object_cache":false}'
 check 'purge-cache (all)' 200 results
+# Plugins: lectura; la gestión tiene dos cerrojos, cerrados por defecto.
+call GET spiral-mcp/list-plugins
+check 'list-plugins' 200 plugins management.allowed
+printf '%s' "$BODY" | php -r '
+	$d = json_decode( stream_get_contents( STDIN ), true );
+	foreach ( $d["plugins"] as $p ) { if ( $p["protected"] && 0 === stripos( $p["slug"], "spiral-mcp" ) ) { exit( 0 ); } }
+	exit( 1 );
+' && ok 'list-plugins: Spiral-MCP-Control protegido' || ko 'list-plugins debería marcar Spiral-MCP-Control como protegido'
+if [ "${SMOKE_PLUGINS:-0}" != 1 ]; then
+	eq 'list-plugins: gestión cerrada por defecto' management.allowed false
+fi
+
 # Cambiar ajustes de caché exige spiral_mcp_cache, que el rol del agente no tiene por defecto.
 if [ "${SMOKE_CACHE_WRITE:-0}" != 1 ]; then
 	call POST spiral-mcp/update-cache-settings '{"settings":{"lifetime":3600}}'
@@ -530,6 +542,10 @@ if [ "${SMOKE_ONLINE:-0}" = 1 ]; then
 	call GET spiral-mcp/list-online-library '{"kind":"element","type":"accordion","per_page":1}'
 	check 'list-online-library (elementos)' 200 items.0.id
 	ONLINE_ID=$(jget items.0.id)
+	call GET spiral-mcp/search-plugins '{"search":"contact form","per_page":3}'
+	check 'search-plugins (wordpress.org)' 200 items.0.slug items.0.compatible
+	call GET spiral-mcp/search-plugins '{"slug":"classic-editor"}'
+	check 'search-plugins (ficha)' 200 items.0.version
 	call GET spiral-mcp/get-online-library-item "{\"id\":\"$ONLINE_ID\",\"kind\":\"element\"}"
 	check 'get-online-library-item' 200 root outline
 	call POST spiral-mcp/import-from-online-library "{\"id\":\"$ONLINE_ID\",\"kind\":\"element\",\"target\":\"library\",\"name\":\"Smoke online\"}"

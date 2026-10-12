@@ -10,7 +10,7 @@
 
 defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
 
-$spiral_mcp_caps = array( 'spiral_mcp_content', 'spiral_mcp_design', 'spiral_mcp_media', 'spiral_mcp_settings', 'spiral_mcp_code', 'spiral_mcp_cache' );
+$spiral_mcp_caps = array( 'spiral_mcp_content', 'spiral_mcp_design', 'spiral_mcp_media', 'spiral_mcp_settings', 'spiral_mcp_code', 'spiral_mcp_cache', 'spiral_mcp_plugins' );
 
 remove_role( 'spiral_mcp_agent' );
 foreach ( wp_roles()->role_objects as $spiral_mcp_role ) {

@@ -2,6 +2,19 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.21.0] — 2026-10-12 · Fase 8.1: plugins (lectura y cerrojos)
+
+### Añadido
+- `spiral-mcp/list-plugins`: plugins instalados (versión, activo, actualización disponible, actualizaciones automáticas, requisitos, protegido), mu-plugins y drop-ins, y `management` con el estado de los cerrojos de la gestión de plugins.
+- `spiral-mcp/search-plugins`: búsqueda y fichas del directorio de wordpress.org (valoración, instalaciones, última actualización, compatibilidad con el sitio, si ya está instalado).
+- Cerrojos para la gestión de plugins (fases 8.2 y 8.3): capacidad `spiral_mcp_plugins` (el rol del agente no la tiene por defecto) y ajuste "Permitir que el agente gestione plugins" en *Comportamiento* (desactivado por defecto); se respeta `DISALLOW_FILE_MODS`. Spiral-MCP-Control y MCP Adapter están protegidos.
+
+### Cambiado
+- Más capacidades nativas que el rol del agente no recibe nunca: `activate_plugins`, `update_plugins`, `delete_plugins`, las de temas, `update_core`, `edit_files`, `edit_users`, `create_users` y `unfiltered_upload`. La sincronización del rol las retira si alguien las añadió.
+
+### Corregido
+- La página de ajustes mostraba con las etiquetas `<code>` escapadas algunas listas de nombres.
+
 ## [1.20.0] — 2026-10-12 · Fase 7.3: actividad
 
 ### Añadido

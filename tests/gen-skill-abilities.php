@@ -38,8 +38,17 @@ $titles = array(
 	'spiral-mcp-preview'   => 'Verificación',
 	'spiral-mcp-settings'  => 'Ajustes del sitio',
 	'spiral-mcp-snapshots' => 'Snapshots',
+	'spiral-mcp-plugins'   => 'Plugins',
 	'spiral-mcp-activity'  => 'Auditoría',
 );
+// Categorías nuevas que aún no tengan título aquí: se incluyen igual (con su slug) para no perder abilities.
+foreach ( array_keys( $by_cat ) as $cat ) {
+	if ( ! isset( $titles[ $cat ] ) ) {
+		$titles[ $cat ] = $cat;
+		fwrite( STDERR, "Aviso: la categoría $cat no tiene título en tests/gen-skill-abilities.php
+" );
+	}
+}
 
 $fmt_type = function ( $p ) {
 	$t = $p['type'] ?? 'any';

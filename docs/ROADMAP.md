@@ -4,7 +4,7 @@
 
 **Criterio de éxito global:** desde un cliente MCP, el agente puede (1) crear una página completa con imágenes propias subidas por él, (2) cambiar el header, el footer y la paleta de marca, (3) previsualizar el resultado antes de publicar y (4) deshacer cualquier cambio. Todo con registro de auditoría.
 
-**Orden de las fases:** 0 → 2 → 3 → 1 → 4 → 5 → 6 → 7. Medios y YOOtheme son lo que más bloquea el trabajo de diseño hoy.
+**Orden de las fases:** 0 → 2 → 3 → 1 → 4 → 5 → 6 → 7 → 8. Medios y YOOtheme son lo que más bloquea el trabajo de diseño hoy.
 
 Leyenda: `[ ]` pendiente · `[x]` hecho · **Spike** = investigar en el entorno local antes de implementar, y anotar el resultado en este documento.
 
@@ -276,8 +276,49 @@ Página *Ajustes > Spiral-MCP* (solo administradores, `manage_options`) para dec
 
 ---
 
+## Fase 8 — Plugins
+
+Que el agente pueda buscar, instalar, activar, desactivar, actualizar y borrar plugins del directorio oficial de wordpress.org. Es el permiso de más riesgo del plugin: instalar código es tener el control del sitio. Por eso va detrás de **dos cerrojos** y con comprobaciones después de cada paso.
+
+**Decisiones (confirmadas):**
+- **Dos cerrojos:** la capacidad nueva `spiral_mcp_plugins` (grupo `plugins`, el rol del agente **no** la tiene por defecto; se da en *Permisos del agente*) **y** un interruptor del sitio en *Comportamiento* ("Permitir que el agente gestione plugins", apagado por defecto). Si falta cualquiera de los dos, las abilities de escritura responden con un error que explica cuál falta. Si `DISALLOW_FILE_MODS` está activo, nada de esto funciona y se dice.
+- **Sin dar permisos nativos al agente:** las abilities usan las APIs de WordPress (`Plugin_Upgrader`, `activate_plugin()`…) con su propia comprobación. El rol nunca recibe `install_plugins`, `activate_plugins`, `update_plugins`, `delete_plugins` ni los de temas: se añaden a la lista de nativas que nunca se conceden (hoy faltan `activate_plugins`, `update_plugins`, `delete_plugins`, `install_themes`, `switch_themes`, `edit_themes` y `update_core`).
+- **Solo wordpress.org, por slug**, y cualquier plugin del directorio (sin lista de permitidos). Nunca un ZIP de una URL ni subido.
+- **Plugins intocables:** Spiral-MCP-Control y MCP Adapter no se pueden desactivar, actualizar ni borrar desde aquí (el agente se cortaría el acceso).
+- **Instalar no activa:** se instala desactivado; activar es otro paso explícito.
+- **Comprobación tras activar o actualizar:** WordPress ya activa en un "sandbox" (si el plugin da un error fatal al cargar, no se activa). Además, el plugin pide la portada y wp-admin al propio servidor; si responden con error 500, desactiva el plugin solo y lo dice.
+- **Deshacer:** activar y desactivar son reversibles (snapshot `plugins_state` con la lista de plugins activos). Instalar se deshace borrando. Actualizar y borrar no se pueden deshacer del todo: son destructivas y piden `"confirm": true`.
+- **Temas:** fuera de esta fase (solo lectura). Los sitios son YOOtheme; cambiar de tema rompe el diseño.
+- **Multisitio:** fuera (sin activación en red).
+
+### 8.1 Lectura y cerrojos
+- [x] Capacidad `spiral_mcp_plugins`, interruptor en *Comportamiento* y respeto de `DISALLOW_FILE_MODS`.
+- [x] Ampliar la lista de nativas que nunca se conceden al agente.
+- [x] `spiral-mcp/list-plugins`: instalados (activo, versión, actualización disponible, autoactualización, si es intocable), más mu-plugins y drop-ins (`advanced-cache.php`, `object-cache.php`) en solo lectura.
+- [x] `spiral-mcp/search-plugins`: búsqueda en wordpress.org (nombre, slug, valoración, instalaciones activas, última actualización, compatible hasta, requiere PHP).
+
+**Resultado 8.1** (`includes/plugins.php`): `spiral_mcp_plugins_check_locks()` devuelve qué cerrojo falta (archivos, ajuste o capacidad); `list-plugins` lo resume en `management` (`allowed` y `reason`). Comprobado con la sesión de administrador: con todo cerrado, "la gestión está desactivada"; solo con el ajuste, "falta la capacidad"; con los dos, `allowed: true`. Lista de nativas que nunca se conceden (`spiral_mcp_never_granted_caps()`): ahora incluye `activate_plugins`, `update_plugins`, `delete_plugins`, los de temas, `update_core`, `edit_files`, `edit_users`, `create_users` y `unfiltered_upload`, y la sincronización las retira del rol si alguien las añadió. `search-plugins` probado contra wordpress.org (búsqueda, ficha por slug, slug inexistente). Arreglado de paso: las listas de nombres de la página de ajustes salían con las etiquetas `<code>` escapadas.
+
+### 8.2 Instalar, activar, desactivar
+- [ ] `spiral-mcp/install-plugin` (`slug`; instala sin activar; comprueba compatibilidad de WordPress y PHP antes).
+- [ ] `spiral-mcp/activate-plugin` y `deactivate-plugin`, con snapshot `plugins_state` y comprobación de salud tras activar (desactivación automática si el sitio da 500).
+- [ ] Purga de caché tras activar o desactivar.
+
+### 8.3 Actualizar y borrar
+- [ ] `spiral-mcp/update-plugin` (con `confirm`; misma comprobación de salud; WordPress 6.3+ revierte solo si la actualización da un error fatal).
+- [ ] `spiral-mcp/delete-plugin` (con `confirm`; solo desactivados; nunca los intocables).
+
+### 8.4 Pruebas y documentación
+- [ ] Pruebas en local: instalar y activar un plugin pequeño de wordpress.org; un plugin de prueba que da error fatal (en `tests/fixtures/`) para comprobar la desactivación automática; los dos cerrojos; los intocables.
+- [ ] Skill: receta "instalar un plugin" (solo si el usuario lo pide: buscar → enseñarle opciones → instalar → que confirme → activar → revisar con `inspect-page`).
+- [ ] README y tabla de permisos.
+
+**Terminado cuando:** con los dos cerrojos abiertos, el agente instala y activa un plugin de wordpress.org que el usuario pidió, comprueba que el sitio sigue bien, y lo puede desactivar y borrar; con cualquiera de los dos cerrados, no puede hacer nada de eso.
+
+---
+
 ## Fuera de alcance en esta etapa
-- Instalar, activar o actualizar plugins y temas (se trata aparte).
+- Instalar, activar o actualizar temas. Los plugins se tratan en la Fase 8.
 - WooCommerce (fase posterior del sitio).
 - Usuarios y roles más allá del rol `spiral_mcp_agent`.
 - Temas distintos de YOOtheme: las abilities de contenido, menús, medios y SEO deben funcionar con cualquier tema; las de diseño pueden exigir YOOtheme y devolver un error claro si no está activo.

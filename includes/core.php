@@ -73,6 +73,7 @@ function spiral_mcp_settings_defaults() {
 		'snapshot_retention_days'  => 90,    // 0 = no borrar nunca.
 		'online_download'          => true,  // Descargar diseños de la librería online con la clave de API.
 		'drop_tables_on_uninstall' => false, // Borrar auditoría y snapshots al desinstalar.
+		'plugins_management'       => false, // Segundo cerrojo de la gestión de plugins (el primero es spiral_mcp_plugins).
 	);
 }
 

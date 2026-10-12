@@ -9,6 +9,13 @@
 
 defined( 'ABSPATH' ) || exit;
 
+/** Lista de nombres como <code>a</code>, <code>b</code> (cada nombre escapado). */
+function spiral_mcp_admin_code_list( array $names ) {
+	return implode( ', ', array_map( function ( $n ) {
+		return '<code>' . esc_html( $n ) . '</code>';
+	}, $names ) );
+}
+
 /** URL de la página (con pestaña opcional). */
 function spiral_mcp_admin_url( $tab = 'abilities', array $args = array() ) {
 	return add_query_arg( array_merge( array( 'page' => 'spiral-mcp', 'tab' => $tab ), $args ), admin_url( 'options-general.php' ) );
@@ -144,6 +151,7 @@ add_action( 'admin_post_spiral_mcp_save_behavior', function () {
 		'snapshot_retention_days'  => $days( 'snapshot_retention_days' ),
 		'online_download'          => ! empty( $_POST['online_download'] ),
 		'drop_tables_on_uninstall' => ! empty( $_POST['drop_tables_on_uninstall'] ),
+		'plugins_management'       => ! empty( $_POST['plugins_management'] ),
 	);
 	update_option( 'spiral_mcp_settings', $new, true );
 	$changed = array();
@@ -271,9 +279,9 @@ function spiral_mcp_admin_render_abilities() {
 		.spiral-mcp-admin code { font-size:12px; }
 	</style>
 	<p>Decide qué herramientas ve el agente. Una ability desactivada no se publica en el MCP: el agente no la ve ni puede usarla. <strong><?php echo (int) ( count( $catalog ) - $off ); ?></strong> de <?php echo (int) count( $catalog ); ?> activas.
-	<?php echo $protected ? ' <code>' . esc_html( implode( '</code>, <code>', array_map( function ( $n ) {
+	<?php echo $protected ? ' ' . spiral_mcp_admin_code_list( array_map( function ( $n ) { // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escapado en la función.
 		return preg_replace( '#^spiral-mcp/#', '', $n );
-	}, $protected ) ) ) . '</code> están siempre activas: sin ellas el agente no podría ver ni deshacer sus cambios.' : ''; ?></p>
+	}, $protected ) ) . ' están siempre activas: sin ellas el agente no podría ver ni deshacer sus cambios.' : ''; ?></p>
 	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 		<input type="hidden" name="action" value="spiral_mcp_save_abilities">
 		<?php wp_nonce_field( 'spiral_mcp_save_abilities' ); ?>
@@ -323,7 +331,7 @@ function spiral_mcp_admin_render_permissions() {
 	$default = array_diff( spiral_mcp_caps(), spiral_mcp_agent_excluded_caps() );
 	?>
 	<p>Capacidades propias del rol <strong>Agente Spiral-MCP</strong> (<code>spiral_mcp_agent</code>). Cada ability exige la capacidad de su grupo y, además, el permiso nativo de WordPress sobre el objeto. Estos cambios se mantienen al actualizar el plugin.</p>
-	<p>El rol del agente nunca recibe <code>install_plugins</code>, <code>edit_plugins</code>, <code>manage_options</code>, <code>promote_users</code> ni <code>delete_users</code>.</p>
+	<p>El rol del agente nunca recibe estas capacidades nativas de WordPress, aunque un filtro las añada: <?php echo spiral_mcp_admin_code_list( spiral_mcp_never_granted_caps() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escapado en la función. ?>.</p>
 	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 		<input type="hidden" name="action" value="spiral_mcp_save_caps">
 		<?php wp_nonce_field( 'spiral_mcp_save_caps' ); ?>
@@ -384,13 +392,18 @@ function spiral_mcp_admin_render_behavior() {
 				<p class="description">El catálogo se puede consultar siempre (es público). La clave nunca se muestra al agente.</p></td>
 			</tr>
 			<tr>
+				<th scope="row">Plugins</th>
+				<td><label><input type="checkbox" name="plugins_management" value="1" <?php checked( $v( 'plugins_management' ) ); ?>> Permitir que el agente gestione plugins de wordpress.org</label>
+				<p class="description">Es el segundo cerrojo: además, el rol del agente necesita la capacidad <code>spiral_mcp_plugins</code> (pestaña Permisos del agente). Con esto activo, el agente podrá instalar, activar, desactivar, actualizar y borrar plugins; Spiral-MCP-Control y MCP Adapter están protegidos. <?php echo wp_is_file_mod_allowed( 'spiral_mcp_plugins' ) ? '' : '<strong>Este sitio no permite modificar archivos (DISALLOW_FILE_MODS): no funcionará.</strong>'; ?></p></td>
+			</tr>
+			<tr>
 				<th scope="row">Al desinstalar</th>
 				<td><label><input type="checkbox" name="drop_tables_on_uninstall" value="1" <?php checked( $v( 'drop_tables_on_uninstall' ) ); ?>> Borrar también el registro de actividad y los snapshots</label>
 				<p class="description">Si no se marca, las tablas se conservan por si se vuelve a instalar el plugin.</p></td>
 			</tr>
 		</table>
 		<?php if ( $filters ) : ?>
-			<p><strong>Atención:</strong> hay código que modifica estos ajustes con filtros (<code><?php echo esc_html( implode( '</code>, <code>', $filters ) ); ?></code>); tienen la última palabra sobre lo que se guarde aquí.</p>
+			<p><strong>Atención:</strong> hay código que modifica estos ajustes con filtros (<?php echo spiral_mcp_admin_code_list( $filters ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escapado en la función. ?>); tienen la última palabra sobre lo que se guarde aquí.</p>
 		<?php endif; ?>
 		<?php submit_button( 'Guardar' ); ?>
 	</form>

@@ -12,12 +12,39 @@ defined( 'ABSPATH' ) || exit;
  * ajustes de las herramientas de caché) no se da al rol del agente por defecto.
  */
 function spiral_mcp_groups() {
-	return array( 'content', 'design', 'media', 'settings', 'code', 'cache' );
+	return array( 'content', 'design', 'media', 'settings', 'code', 'cache', 'plugins' );
 }
 
 /** Capacidades propias que el rol del agente no recibe salvo que se añadan con spiral_mcp_agent_caps. */
 function spiral_mcp_agent_excluded_caps() {
-	return array( 'spiral_mcp_cache' );
+	return array( 'spiral_mcp_cache', 'spiral_mcp_plugins' );
+}
+
+/**
+ * Capacidades nativas que el rol del agente nunca recibe, aunque un filtro las añada. Las abilities
+ * de plugins no las necesitan: usan las APIs de WordPress con su propia comprobación.
+ */
+function spiral_mcp_never_granted_caps() {
+	return array(
+		'manage_options',
+		'promote_users',
+		'delete_users',
+		'edit_users',
+		'create_users',
+		'install_plugins',
+		'activate_plugins',
+		'update_plugins',
+		'delete_plugins',
+		'edit_plugins',
+		'install_themes',
+		'switch_themes',
+		'update_themes',
+		'delete_themes',
+		'edit_themes',
+		'update_core',
+		'edit_files',
+		'unfiltered_upload',
+	);
 }
 
 /** Para qué sirve cada capacidad propia (página de ajustes). */
@@ -29,6 +56,7 @@ function spiral_mcp_cap_descriptions() {
 		'spiral_mcp_settings' => 'Ajustes del sitio: identidad, portada y zona horaria.',
 		'spiral_mcp_code'     => 'Código: JavaScript personalizado (sección "scripts" de YOOtheme). Es el permiso de más riesgo.',
 		'spiral_mcp_cache'    => 'Cambiar los ajustes de la herramienta de caché (activarla, caducidad, exclusiones…).',
+		'spiral_mcp_plugins'  => 'Gestionar plugins de wordpress.org (instalar, activar, desactivar, actualizar, borrar). Además hay que activar "Permitir que el agente gestione plugins" en Comportamiento. Es el permiso de más riesgo: instalar código es tener el control del sitio.',
 	);
 }
 
@@ -107,7 +135,7 @@ function spiral_mcp_agent_caps() {
 	$caps = (array) apply_filters( 'spiral_mcp_agent_caps', $caps );
 
 	// Nunca se conceden, aunque un filtro los añada.
-	return array_values( array_diff( $caps, array( 'install_plugins', 'edit_plugins', 'manage_options', 'promote_users', 'delete_users' ) ) );
+	return array_values( array_diff( $caps, spiral_mcp_never_granted_caps() ) );
 }
 
 /** Crea o sincroniza el rol del agente y da todas las capacidades a los administradores. */
@@ -122,8 +150,9 @@ function spiral_mcp_install_caps() {
 				$role->add_cap( $cap );
 			}
 		}
-		// Las capacidades propias que ya no tocan (quitadas en los ajustes o excluidas) se retiran.
-		foreach ( spiral_mcp_caps() as $cap ) {
+		// Las capacidades propias que ya no tocan (quitadas en los ajustes o excluidas) se retiran,
+		// y también las nativas prohibidas si alguien las añadió al rol por otra vía.
+		foreach ( array_merge( spiral_mcp_caps(), spiral_mcp_never_granted_caps() ) as $cap ) {
 			if ( ! in_array( $cap, $caps, true ) && ! empty( $role->capabilities[ $cap ] ) ) {
 				$role->remove_cap( $cap );
 			}

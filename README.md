@@ -31,6 +31,7 @@ Las abilities llevan el prefijo `spiral-mcp/`. La referencia completa de paráme
 | Estilos | CSS adicional; estilo, variables LESS y estado de compilación de YOOtheme |
 | Verificación | URL de vista previa sin sesión, inspección de una página (encabezados, enlaces rotos, alt, SEO efectivo) |
 | Ajustes | identidad del sitio, portada, zona horaria |
+| Plugins | listar los instalados y buscar en wordpress.org (instalar, activar, actualizar y borrar: en desarrollo, con doble cerrojo) |
 | Cachés | estado, purga, precarga y ajustes de la herramienta de caché del sitio (ver abajo) |
 | Auditoría | registro de actividad, snapshots y restauración (también parcial) |
 
@@ -43,11 +44,12 @@ Las abilities llevan el prefijo `spiral-mcp/`. La referencia completa de paráme
 | `spiral_mcp_media` | medios | sí |
 | `spiral_mcp_settings` | ajustes del sitio | sí |
 | `spiral_mcp_code` | JS personalizado (sección `scripts` de YOOtheme) | sí |
-| `spiral_mcp_cache` | **cambiar** los ajustes de caché | **no** (concédela con el filtro `spiral_mcp_agent_caps`) |
+| `spiral_mcp_cache` | **cambiar** los ajustes de caché | **no** |
+| `spiral_mcp_plugins` | gestionar plugins de wordpress.org (además hay que activar "Permitir que el agente gestione plugins" en *Comportamiento*) | **no** |
 
 Las capacidades del rol del agente se pueden cambiar en **Ajustes > Spiral-MCP > Permisos del agente**, y la elección se mantiene al actualizar el plugin. En la pestaña **Abilities** de esa página se activa o desactiva cada herramienta o una categoría entera (con atajos "Solo lectura" y "Desactivar las destructivas"). Una ability desactivada no se publica en el MCP: el agente ni la ve. La pestaña **Comportamiento** decide si se purga la caché tras cada cambio, cuántos días se conservan el registro y los snapshots, si el agente puede descargar diseños de la librería online de YOOtheme y si al desinstalar se borran las tablas. La pestaña **Actividad** muestra los cambios del agente y permite restaurar cada uno desde wp-admin.
 
-Además, cada ability comprueba la capacidad nativa de WordPress del objeto (`edit_post` de ese post, `edit_theme_options`…). El rol del agente nunca tiene `install_plugins`, `edit_plugins`, `manage_options`, `promote_users` ni `delete_users`. Las acciones destructivas exigen `"confirm": true`.
+Además, cada ability comprueba la capacidad nativa de WordPress del objeto (`edit_post` de ese post, `edit_theme_options`…). El rol del agente nunca recibe las capacidades nativas de administración (`manage_options`, las de plugins, temas, usuarios y actualizaciones del núcleo, `edit_files`…), ni siquiera con un filtro: las abilities de plugins usan las APIs de WordPress con su propia comprobación. Las acciones destructivas exigen `"confirm": true`.
 
 ## Cachés compatibles
 
