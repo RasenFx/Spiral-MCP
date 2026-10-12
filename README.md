@@ -32,6 +32,7 @@ Las abilities llevan el prefijo `spiral-mcp/`. La referencia completa de paráme
 | Verificación | URL de vista previa sin sesión, inspección de una página (encabezados, enlaces rotos, alt, SEO efectivo) |
 | Ajustes | identidad del sitio, portada, zona horaria |
 | Plugins | listar los instalados, buscar en wordpress.org, instalar (sin activar), activar con comprobación de salud, desactivar, actualizar (vuelve a la versión anterior si rompe el sitio) y borrar; con doble cerrojo, cerrado por defecto |
+| Formularios | con Contact Form 7 activo: listar (y dónde se usan), leer, crear, editar y borrar; cambiar a quién llega el correo exige confirmación |
 | Cachés | estado, purga, precarga y ajustes de la herramienta de caché del sitio (ver abajo) |
 | Auditoría | registro de actividad, snapshots y restauración (también parcial) |
 
@@ -39,7 +40,7 @@ Las abilities llevan el prefijo `spiral-mcp/`. La referencia completa de paráme
 
 | Capacidad | Para qué | Rol del agente |
 |---|---|---|
-| `spiral_mcp_content` | contenido, taxonomías, SEO | sí |
+| `spiral_mcp_content` | contenido, taxonomías, SEO, formularios | sí |
 | `spiral_mcp_design` | builder, tema, menús, widgets, estilos | sí |
 | `spiral_mcp_media` | medios | sí |
 | `spiral_mcp_settings` | ajustes del sitio | sí |

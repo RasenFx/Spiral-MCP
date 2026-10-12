@@ -1,6 +1,6 @@
 # Referencia de abilities spiral-mcp/*
 
-Generada a partir de los esquemas registrados por el plugin (v1.23.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
+Generada a partir de los esquemas registrados por el plugin (v1.24.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
 
 Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; destructiva = requiere `"confirm": true`.
 
@@ -16,6 +16,7 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 - [Ajustes del sitio](#ajustes-del-sitio)
 - [Snapshots](#snapshots)
 - [Plugins](#plugins)
+- [Formularios (Contact Form 7)](#formularios-contact-form-7)
 - [Auditoría](#auditoria)
 
 ## Contenido, taxonomías y SEO
@@ -157,6 +158,16 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 | `deactivate-plugin` | escritura | **plugin** `string` |
 | `update-plugin` | destructiva | **plugin** `string`, **confirm** `boolean` |
 | `delete-plugin` | destructiva | **plugin** `string`, **confirm** `boolean` |
+
+## Formularios (Contact Form 7)
+
+| Ability | Tipo | Parámetros |
+|---|---|---|
+| `list-forms` | lectura | search `string` |
+| `get-form` | lectura | **id** `string / integer` |
+| `create-form` | escritura | **title** `string`, template `string`, mail `object`, mail_2 `object`, messages `object`, additional_settings `string`, confirm `boolean`, copy_from `string / integer`, locale `string` |
+| `update-form` | escritura | **id** `string / integer`, title `string`, template `string`, mail `object`, mail_2 `object`, messages `object`, additional_settings `string`, confirm `boolean` |
+| `delete-form` | destructiva | **id** `string / integer`, **confirm** `boolean` |
 
 ## Auditoría
 

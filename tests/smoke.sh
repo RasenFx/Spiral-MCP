@@ -101,6 +101,8 @@ echo "== Spiral-MCP smoke contra $WP_URL como $WP_USER"
 # --- Usuario y rol -------------------------------------------------------
 rest GET '/wp/v2/users/me&context=edit'
 check 'autenticación con Application Password' 200 roles || exit 1
+# Capacidades efectivas del usuario (el administrador puede haber cambiado las del rol en Ajustes > Spiral-MCP).
+HAS_CACHE_CAP=$(jget capabilities.spiral_mcp_cache || echo false)
 case "$(jget roles)" in
 	*spiral_mcp_agent*) ok 'el usuario tiene el rol spiral_mcp_agent' ;;
 	*) ko 'el usuario debe tener el rol spiral_mcp_agent' ;;
@@ -453,8 +455,36 @@ else
 	[ "$STATUS" -ge 400 ] && ok 'delete-plugin exige confirm' || ko 'delete-plugin sin confirm no debería borrar'
 fi
 
+# Formularios de Contact Form 7 (solo si está activo: si no, las abilities no se registran).
+call GET spiral-mcp/list-forms
+if [ "$STATUS" = 200 ]; then
+	check 'list-forms' 200 forms plugin
+	call POST spiral-mcp/create-form '{"title":"Smoke formulario","template":"[text* nombre] [email* correo] [submit \"Enviar\"]","mail":{"additional_headers":"Reply-To: [correo]"}}'
+	if check 'create-form' 200 id shortcode snapshot_id; then
+		FORM_ID=$(jget id)
+		call POST spiral-mcp/update-form "{\"id\":$FORM_ID,\"mail\":{\"recipient\":\"alguien@ejemplo.com\"}}"
+		printf '%s' "$BODY" | grep -q spiral_mcp_form_mail_confirm && ok 'update-form: cambiar el destinatario exige confirm' || ko 'update-form debería pedir confirm al cambiar el destinatario'
+		call POST spiral-mcp/update-form "{\"id\":$FORM_ID,\"mail\":{\"additional_headers\":\"Reply-To: [correo]\\nBcc: alguien@ejemplo.com\"}}"
+		printf '%s' "$BODY" | grep -q spiral_mcp_form_mail_confirm && ok 'update-form: añadir Bcc exige confirm' || ko 'update-form debería pedir confirm al añadir Bcc'
+		call POST spiral-mcp/update-form "{\"id\":$FORM_ID,\"messages\":{\"mail_sent_ok\":\"Gracias\"}}"
+		check 'update-form (mensajes)' 200 snapshot_id
+		call GET spiral-mcp/get-form "{\"id\":$FORM_ID}"
+		eq 'get-form: mensaje cambiado' messages.mail_sent_ok Gracias
+		eq 'get-form: destinatario intacto' mail.recipient '[_site_admin_email]'
+		eq 'get-form: campos' 'fields.#' 3
+		call POST spiral-mcp/delete-form "{\"id\":$FORM_ID,\"confirm\":false}"
+		[ "$STATUS" -ge 400 ] && ok 'delete-form exige confirm' || ko 'delete-form sin confirm no debería borrar'
+		call POST spiral-mcp/delete-form "{\"id\":$FORM_ID,\"confirm\":true}"
+		check 'delete-form' 200 deleted snapshot_id
+	fi
+else
+	ok 'formularios: Contact Form 7 no está activo (se omiten)'
+fi
+
 # Cambiar ajustes de caché exige spiral_mcp_cache, que el rol del agente no tiene por defecto.
-if [ "${SMOKE_CACHE_WRITE:-0}" != 1 ]; then
+if [ "$HAS_CACHE_CAP" = true ] && [ "${SMOKE_CACHE_WRITE:-0}" != 1 ]; then
+	ok 'update-cache-settings: el rol tiene spiral_mcp_cache (concedido en Ajustes); no se prueba el 403'
+elif [ "${SMOKE_CACHE_WRITE:-0}" != 1 ]; then
 	call POST spiral-mcp/update-cache-settings '{"settings":{"lifetime":3600}}'
 	[ "$STATUS" = 403 ] && ok 'update-cache-settings: el agente no tiene permiso por defecto' || ko "update-cache-settings debería exigir spiral_mcp_cache (HTTP $STATUS)"
 fi

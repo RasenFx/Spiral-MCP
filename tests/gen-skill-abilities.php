@@ -39,6 +39,7 @@ $titles = array(
 	'spiral-mcp-settings'  => 'Ajustes del sitio',
 	'spiral-mcp-snapshots' => 'Snapshots',
 	'spiral-mcp-plugins'   => 'Plugins',
+	'spiral-mcp-forms'     => 'Formularios (Contact Form 7)',
 	'spiral-mcp-activity'  => 'Auditoría',
 );
 // Categorías nuevas que aún no tengan título aquí: se incluyen igual (con su slug) para no perder abilities.

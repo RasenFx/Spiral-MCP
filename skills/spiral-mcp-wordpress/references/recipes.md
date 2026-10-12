@@ -21,6 +21,7 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 - [Página hija con plantilla, categorías y SEO](#página-hija-con-plantilla-categorías-y-seo)
 - [Un cambio no se ve (cachés)](#un-cambio-no-se-ve-cachés)
 - [Acelerar el sitio](#acelerar-el-sitio)
+- [Añadir un formulario de contacto](#añadir-un-formulario-de-contacto)
 - [Instalar un plugin](#instalar-un-plugin)
 - [Deshacer un cambio](#deshacer-un-cambio)
 
@@ -219,6 +220,30 @@ Las escrituras ya purgan solas la caché de lo que cambian (un contenido: esa p�
 4. **Precarga** tras activarla o tras cambios grandes: `preload-cache {"action": "start"}` (si la herramienta la admite).
 5. **Imágenes de YOOtheme:** `get-theme-config {"section": "webp"}` (conversión a WebP; y `lazyload`, carga diferida, si aparece en la lista de secciones: no existe en todas las instalaciones); si están desactivadas, propón activarlas con `update-theme-config`. Sube imágenes a un tamaño razonable (no fotos de 6000 px para una tarjeta).
 6. **Comprueba** con `inspect-page {"path": "/"}` que todo sigue bien, y explica al usuario qué cambiaste y cómo deshacerlo (`snapshot_id`).
+
+## Añadir un formulario de contacto
+
+Necesita Contact Form 7 activo (si no, no existen las herramientas `*-form`; propón instalarlo con la receta siguiente, solo si el usuario quiere).
+
+1. `list-forms`: mira si ya hay uno que sirva y dónde se usa (`used_in`).
+2. `create-form` con `title`, `template` y lo que cambie del correo. Escribe la plantilla en el idioma del sitio y con las clases de UIkit para que tome el estilo de YOOtheme:
+   ```
+   <div class="uk-margin"><label class="uk-form-label">Nombre</label>
+   [text* tu-nombre autocomplete:name class:uk-input]</div>
+   <div class="uk-margin"><label class="uk-form-label">Email</label>
+   [email* tu-email autocomplete:email class:uk-input]</div>
+   <div class="uk-margin"><label class="uk-form-label">Mensaje</label>
+   [textarea* tu-mensaje class:uk-textarea x5]</div>
+   <div class="uk-margin">[acceptance privacidad class:uk-checkbox] Acepto la política de privacidad. [/acceptance]</div>
+   [submit class:uk-button class:uk-button-primary "Enviar"]
+   ```
+   Otros campos: `[tel tu-telefono class:uk-input]`, `[select tu-servicio class:uk-select "Diseño web" "SEO"]`, `[checkbox temas "A" "B"]`, `[radio tipo default:1 "Empresa" "Particular"]`, `[file adjunto limit:2mb filetypes:pdf|jpg]`. Un `*` tras el tipo lo hace obligatorio.
+3. El correo usa los nombres de los campos: `"mail": {"subject": "[_site_title] Mensaje de [tu-nombre]", "body": "De: [tu-nombre] ([tu-email])\n\n[tu-mensaje]", "additional_headers": "Reply-To: [tu-email]"}`. No pongas `<[tu-email]>`: CF7 lo borra (te avisa en `warnings`). Por defecto llega al email de administración del sitio.
+4. Los mensajes por defecto pueden estar en inglés (según el idioma de WordPress): tradúcelos con `"messages"` (`mail_sent_ok`, `mail_sent_ng`, `validation_error`, `spam`, `accept_terms`, `invalid_required`, `invalid_email`…; `get-form` los lista todos).
+5. Si el usuario quiere que llegue a otra dirección (o con copia), confírmalo con él y envía `"confirm": true`: sin eso la herramienta lo rechaza (`spiral_mcp_form_mail_confirm`).
+6. Inserta el `shortcode` en la página: `patch-layout` con un elemento `{"type": "text", "props": {"content": "<p>[contact-form-7 id=\"a58ff5f\" title=\"Contacto\"]</p>"}}` donde corresponda (o en el contenido, si la página no usa YOOtheme).
+7. Revisa con `get-preview-url` + una captura o `inspect-page`, y mira `config_errors` de la respuesta: CF7 avisa, p. ej., de un remitente de otro dominio, o de "Unsafe email config" si activas el correo de respuesta al visitante (`mail_2`) sin reCAPTCHA o Turnstile (díselo al usuario).
+8. Contact Form 7 no guarda los mensajes recibidos (`stores_submissions` en `list-forms`; hace falta el plugin Flamingo).
 
 ## Instalar un plugin
 

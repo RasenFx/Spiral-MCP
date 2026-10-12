@@ -10,7 +10,7 @@ El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes d
 - YOOtheme Pro activo (o un tema hijo de YOOtheme) para todo lo relacionado con el builder y los estilos.
 - PHP 7.4 como mínimo: no usar sintaxis de PHP 8 (match, nullsafe `?->`, argumentos con nombre, tipos de unión, `readonly`, enums).
 
-## Estructura actual (v1.23.0)
+## Estructura actual (v1.24.0)
 ```
 spiral-mcp-control.php   cabecera, constantes, comprobación de requisitos, require_once y hooks de activación
 uninstall.php            borra el rol y las capacidades (las tablas solo con el filtro spiral_mcp_uninstall_drop_tables)
@@ -35,6 +35,7 @@ includes/seo.php         SEO por contenido: Yoast o salida propia (+ snapshot ki
 includes/settings.php    ajustes del sitio: identidad y portada (+ snapshot kind "option")
 includes/preview.php     URLs de vista previa sin sesión (token firmado) e inspect-page
 includes/plugins.php     plugins: listar, buscar en wordpress.org, instalar, activar (protegida), desactivar, actualizar (con vuelta atrás) y borrar; cerrojos (spiral_mcp_plugins + ajuste plugins_management) y snapshot kind "plugins_state"
+includes/forms.php       formularios de Contact Form 7 (solo si está activo): listar, leer, crear, editar y borrar (+ snapshot kind "form")
 includes/admin.php       página Ajustes > Spiral-MCP (solo admin): abilities, permisos del rol del agente, comportamiento y actividad (con restaurar)
 includes/styles.php      CSS adicional (+ snapshot kind "custom_css") y estilo de YOOtheme: catálogo de variables, cambios y estado de compilación
 tests/smoke.sh           prueba de humo por REST (ver "Entorno de desarrollo")
@@ -57,6 +58,7 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - Medios: `upload-media`, `list-media`, `get-media`, `update-media`, `delete-media`, `set-featured-image`, `find-media-usage`.
 - Cachés: `get-cache-status`, `purge-cache`, `preload-cache`, `get-cache-settings`, `update-cache-settings` (exige `spiral_mcp_cache`); `clear-cache` es un alias obsoleto de `purge-cache`.
 - Plugins: `list-plugins`, `search-plugins`, `install-plugin`, `activate-plugin`, `deactivate-plugin`, `update-plugin`, `delete-plugin` (escritura con dos cerrojos).
+- Formularios (solo con Contact Form 7 activo): `list-forms`, `get-form`, `create-form`, `update-form`, `delete-form` (cambiar a quién llega el correo exige `confirm`).
 - Auditoría y snapshots: `list-activity`, `list-snapshots`, `restore-snapshot`.
 
 ## Convenciones (obligatorias)
@@ -91,6 +93,7 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - **Los estilos (LESS) se compilan en el navegador**, en el Personalizador. Cambiar `config.style`, `config.less` o `config.custom_less` en la BD no cambia el CSS servido hasta recompilar. Si `StylerConfig['update']` es true, abrir el Personalizador recompila y guarda el CSS solo; este plugin lo fuerza mientras exista la opción `spiral_mcp_style_dirty` (ver `includes/styles.php`). El CSS va a `themes/yootheme/css/theme.<blog>.css` y las fuentes de Google se descargan a `themes/yootheme/fonts/`.
 - **Cachés**: cada herramienta es un adaptador en `spiral_mcp_cache_providers()` (filtro del mismo nombre) con `detect`, `supports`, callables (`purge_all`, `purge_post`, `purge_url`, `preload`, `settings`, `write_settings`, `status`) y `writable` (claves que acepta `write_settings`; `restore-snapshot` solo reescribe esas). Las abilities de caché llevan `'log' => ['type' => 'cache']`: el wrapper no hace purga automática tras ellas (si no, una purga por URL acabaría purgando todo). WP Super Cache guarda sus ajustes en variables globales cargadas de `wp-content/wp-cache-config.php`; `wp_cache_post_change()` purga el post, su autor, la portada y la página de entradas. Para escribir ajustes se usa una subclase de `WP_Super_Cache_Rest_Update_Settings` (sus métodos hacen los efectos secundarios); ojo con sus fallos: pierde los ajustes cuya clave REST no coincide con la variable, y al guardar caducidad o precarga activa casillas que no se le pasan (`cache_gc_email_me`, `preload_on`, `preload_taxonomies`): pásaselas siempre con su valor actual.
 - **El CSS por elemento** (prop `css` de una sección o elemento) sí se procesa en el servidor al renderizar.
+- **Shortcodes**: YOOtheme los ejecuta dentro de un elemento `text` (comprobado con el de Contact Form 7). En el JSON del layout las comillas van escapadas (`id=\"a58ff5f\"`): quien busque shortcodes en `post_content` debe contar con ello.
 - **Librería online** (`https://api.yootheme.com/v1/library/layout` y `/element`): el catálogo es público; cada diseño se descarga en `<link>?key=<yootheme_apikey>`. El JSON trae `images` (`src` firmado que caduca en 1 h + `md5`): hay que descargarlas a `uploads` sin subcarpeta (deduplicando por md5, como `BuilderController::loadImage`) y cambiar las URLs. Las plantillas de la librería son contenido de muestra fijo: no traen fuentes dinámicas.
 - `config.yootheme_apikey` es un secreto: no devolverlo nunca en una respuesta (enmascararlo). Se usa solo en el servidor (`spiral_mcp_online_fetch()`); los errores pasan por `spiral_mcp_online_scrub()`.
 

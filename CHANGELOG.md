@@ -2,6 +2,21 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.24.0] — 2026-10-12 · Fase 9: formularios de Contact Form 7
+
+### Añadido
+- Módulo `includes/forms.php` (categoría `spiral-mcp-forms`), solo si Contact Form 7 está activo:
+  - `spiral-mcp/list-forms`: formularios, shortcode, destinatario y dónde se usan (también dentro de layouts de YOOtheme y en widgets).
+  - `spiral-mcp/get-form`: plantilla, campos, correo, correo 2, mensajes, ajustes adicionales, etiquetas de correo y problemas de configuración.
+  - `spiral-mcp/create-form` (plantilla por defecto o copia de otro) y `spiral-mcp/update-form` (el correo y los mensajes se cambian por claves), con snapshot kind `form`.
+  - `spiral-mcp/delete-form` (con `confirm`); restaurar el snapshot lo recrea con el mismo ID y shortcode.
+- Cambiar a quién llega el correo de un formulario (destinatario, Cc/Bcc, adjuntos) exige `"confirm": true`.
+- Avisos cuando CF7 recorta el cuerpo del correo al guardarlo o la plantilla usa etiquetas que no existen.
+- Skill: receta "Añadir un formulario de contacto".
+
+### Cambiado
+- `tests/smoke.sh`: pruebas de formularios (si CF7 está activo) y la comprobación del 403 de `update-cache-settings` se omite si el rol tiene `spiral_mcp_cache` concedido en Ajustes.
+
 ## [1.23.0] — 2026-10-12 · Fase 8.3: actualizar y borrar plugins
 
 ### Añadido

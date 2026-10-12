@@ -323,6 +323,26 @@ Que el agente pueda buscar, instalar, activar, desactivar, actualizar y borrar p
 
 ---
 
+## Fase 9 — Formularios (Contact Form 7)
+
+Que el agente cree y cambie los formularios del sitio sin entrar en wp-admin: campos, correo, mensajes, y que los inserte en las páginas de YOOtheme. Spiral-MCP-Control se instala también en sitios sin Contact Form 7: el módulo solo se registra si CF7 está activo.
+
+### 9.1 Abilities
+- [x] `spiral-mcp/list-forms`: formularios con su shortcode, a quién llega el correo y dónde se usan (contenidos, también dentro de layouts de YOOtheme, y widgets).
+- [x] `spiral-mcp/get-form`: plantilla, campos interpretados, correo, correo 2, mensajes, ajustes adicionales, etiquetas de correo y problemas de configuración que ve CF7.
+- [x] `spiral-mcp/create-form` (plantilla por defecto de CF7 o copia de otro) y `spiral-mcp/update-form` (correo y mensajes por claves), con snapshot kind `form`.
+- [x] `spiral-mcp/delete-form` (con `confirm`; avisa si se usa; restore-snapshot lo recrea con el mismo ID y hash).
+- [x] Seguridad: cambiar a quién llega el correo (destinatario, cabeceras To/Cc/Bcc, adjuntos; activar el correo 2 hacia una dirección fija) exige `confirm`. No cuenta un destinatario hecho solo de `[_site_admin_email]` o de campos de email que escribe el visitante (sí uno oculto).
+
+### 9.2 Pruebas y documentación
+- [x] Prueba de humo (solo si CF7 está activo), receta del skill y errores, README.
+
+**Resultado 9:** CF7 6.2.2 guarda cada formulario como post `wpcf7_contact_form` con metas `_form`, `_mail`, `_mail_2`, `_messages`, `_additional_settings`, `_locale` y `_hash`; se escribe con `wpcf7_save_contact_form()` (sanea como wp-admin) y se valida con `WPCF7_ConfigValidator`. Ojo: `wpcf7_sanitize_mail()` vacía las claves que no se le pasan (por eso se mezcla con lo actual) y, sin `unfiltered_html`, quita del cuerpo lo que parece HTML (`<[your-email]>`): la ability lo avisa. Permisos: los de CF7 (`wpcf7_edit_contact_forms` → `publish_pages`), grupo `content`. YOOtheme ejecuta los shortcodes de un elemento `text`, y con las clases de UIkit en las etiquetas (`class:uk-input`, `class:uk-button class:uk-button-primary`) el formulario toma el estilo del tema. Probado en local: formulario en español creado, editado, insertado en una página de YOOtheme (se ve con sus campos y lo detecta `used_in`), borrado (la página muestra el aviso) y restaurado con el mismo shortcode; destinatario externo, Bcc y campo oculto como destinatario piden `confirm`; Reply-To y la respuesta al visitante no. Sitio restaurado desde copia de la BD al terminar.
+
+**Terminado cuando:** el agente crea un formulario de contacto en español, lo pone en una página de YOOtheme con el estilo del tema y cambia sus textos; no puede desviar los mensajes a otra dirección sin que el usuario lo confirme.
+
+---
+
 ## Fuera de alcance en esta etapa
 - Instalar, activar o actualizar temas. Los plugins se tratan en la Fase 8.
 - WooCommerce (fase posterior del sitio).
