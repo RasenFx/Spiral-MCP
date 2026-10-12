@@ -7,9 +7,17 @@
 
 defined( 'ABSPATH' ) || exit;
 
-/** Grupos de permisos. Cada uno tiene su capacidad spiral_mcp_<grupo>. */
+/**
+ * Grupos de permisos. Cada uno tiene su capacidad spiral_mcp_<grupo>. "cache" (cambiar los
+ * ajustes de las herramientas de caché) no se da al rol del agente por defecto.
+ */
 function spiral_mcp_groups() {
-	return array( 'content', 'design', 'media', 'settings', 'code' );
+	return array( 'content', 'design', 'media', 'settings', 'code', 'cache' );
+}
+
+/** Capacidades propias que el rol del agente no recibe salvo que se añadan con spiral_mcp_agent_caps. */
+function spiral_mcp_agent_excluded_caps() {
+	return array( 'spiral_mcp_cache' );
 }
 
 /** Capacidades propias del plugin. */
@@ -64,7 +72,7 @@ function spiral_mcp_agent_caps() {
 		'edit_theme_options',
 		'manage_categories',
 	);
-	$caps = array_merge( $native, spiral_mcp_caps() );
+	$caps = array_merge( $native, array_diff( spiral_mcp_caps(), spiral_mcp_agent_excluded_caps() ) );
 	$caps = (array) apply_filters( 'spiral_mcp_agent_caps', $caps );
 
 	// Nunca se conceden, aunque un filtro los añada.

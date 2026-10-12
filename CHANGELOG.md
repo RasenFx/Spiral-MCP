@@ -2,6 +2,13 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.15.0] — 2026-10-11 · Fase 6.2: ajustes de caché
+
+### Añadido
+- `spiral-mcp/update-cache-settings`: cambia los ajustes de una herramienta de caché (vocabulario común + `provider_settings`), validando todo antes de escribir. Snapshot `cache_settings` antes; `restore-snapshot` lo deshace. Los modos que reescriben `.htaccess` (Expert de WP Super Cache) no se pueden activar.
+- Capacidad `spiral_mcp_cache` (grupo `cache`): la reciben los administradores; el rol del agente **no** por defecto (filtro `spiral_mcp_agent_caps` para concederla).
+- Adaptador de escritura de WP Super Cache, que reutiliza su propia lógica de guardado y sortea tres fallos de su API REST (ajustes perdidos, aviso por correo de la recogida de basura y casillas de precarga activadas sin pedirlo).
+
 ## [1.14.0] — 2026-10-11 · Fase 6.1: cachés independientes de la herramienta
 
 ### Añadido

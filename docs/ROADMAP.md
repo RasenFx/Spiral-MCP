@@ -195,9 +195,11 @@ El plugin se instala en sitios con distintas herramientas de caché (o ninguna, 
 **Resultado 6.1 (WP Super Cache 3.1.4, modo Simple):** purgar `/blog/` por URL borra solo esa página; purgar un post borra el post, la portada y la página de entradas (`wp_cache_post_change`); editar el SEO de una página purga esa página y la portada; un cambio de diseño global purga todo. La precarga arranca con WP-Cron, se consulta y se detiene. Las abilities de caché no disparan la purga automática (si no, una purga por URL acababa purgando todo).
 
 ### 6.2 Ajustes
-- [ ] Capacidad `spiral_mcp_cache` (administradores sí; rol del agente no, por defecto).
-- [ ] `spiral-mcp/update-cache-settings`: ajustes comunes y `provider_settings`, por herramienta. Snapshot `cache_settings` antes; `restore-snapshot` lo deshace.
-- [ ] Adaptador de escritura para WP Super Cache (`wp_cache_setting()`, activar/desactivar con sus funciones; sin modo Expert).
+- [x] Capacidad `spiral_mcp_cache` (administradores sí; rol del agente no, por defecto).
+- [x] `spiral-mcp/update-cache-settings`: ajustes comunes y `provider_settings`, por herramienta. Snapshot `cache_settings` antes; `restore-snapshot` lo deshace.
+- [x] Adaptador de escritura para WP Super Cache (`wp_cache_setting()`, activar/desactivar con sus funciones; sin modo Expert).
+
+**Resultado 6.2:** el adaptador reutiliza la clase de la API REST de WP Super Cache (`WP_Super_Cache_Rest_Update_Settings`, subclase `Spiral_MCP_WPSC_Updater`) para los ajustes con efectos secundarios (activar, modo, usuarios con sesión, compresión, URLs excluidas, caducidad, precarga), sin su comprobación `manage_options` ni la parte de depuración, y `wp_cache_setting()` para los simples. Bugs de WP Super Cache sorteados: su API pierde los ajustes cuya clave REST no coincide con el nombre de la variable (móvil, purgar al editar, regenerar, `no_cache_for_get`…); guardar la caducidad activa el aviso por correo de la recogida de basura y guardar la precarga activa `preload_on` y `preload_taxonomies` si no se les pasa su valor actual. Comprobado: el agente sin `spiral_mcp_cache` recibe 403; con el permiso, un cambio de 8 ajustes escribe solo esas líneas en `wp-cache-config.php` (que sigue siendo PHP válido) y restaurar el snapshot deja los mismos valores.
 
 ### 6.3 Más herramientas: purga y estado
 - [ ] WP Rocket, LiteSpeed Cache, W3 Total Cache, WP Fastest Cache, SiteGround Optimizer, Nginx Helper y cachés de hosting (Kinsta, WP Engine…).

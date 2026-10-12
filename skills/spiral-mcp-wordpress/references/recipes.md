@@ -207,6 +207,8 @@ Las escrituras ya purgan solas la caché de lo que cambian (un contenido: esa p�
 4. Tras cambios grandes (rediseño, muchas páginas), `preload-cache {"action": "start"}` regenera la caché en segundo plano, si la herramienta lo admite. No lo hagas tras cada edición: consume recursos.
 5. Si el usuario sigue sin verlo, puede ser su navegador: que recargue sin caché (Ctrl+F5) o pruebe en una ventana privada.
 
+**Cambiar ajustes de caché** (activarla, caducidad, no cachear a usuarios con sesión, versión móvil, URLs excluidas…): `get-cache-settings` y después `update-cache-settings {"settings": {"lifetime": 3600}}` (solo cambian las claves enviadas; las propias de la herramienta van en `provider_settings`). Exige el permiso de caché (`spiral_mcp_cache`), que el agente no tiene por defecto: si la respuesta es 403, explícale al usuario qué cambiarías y por qué, y que lo haga él o te dé el permiso. Activar o desactivar la caché afecta a todo el sitio: solo si el usuario lo pide. Se deshace con el `snapshot_id` de la respuesta.
+
 ## Deshacer un cambio
 
 - **Página o entrada (título, contenido, layout):** `restore-revision {"revision_id": <undo_revision_id>, "confirm": true}` (o búscala con `list-revisions {"id": 12}`). Antes guarda el estado actual, así que también se puede deshacer la restauración.

@@ -113,7 +113,7 @@ for name in list-content get-content create-content update-content get-yootheme-
 	set-featured-image find-media-usage list-elements get-element-schema get-layout-outline get-layout-texts get-layout-node \
 	patch-layout duplicate-content get-theme-config update-theme-config list-templates get-template \
 	create-template update-template delete-template list-library get-library-item save-to-library \
-	insert-from-library list-online-library get-online-library-item import-from-online-library clear-cache get-cache-status purge-cache preload-cache get-cache-settings list-post-types trash-content restore-content delete-content \
+	insert-from-library list-online-library get-online-library-item import-from-online-library clear-cache get-cache-status purge-cache preload-cache get-cache-settings update-cache-settings list-post-types trash-content restore-content delete-content \
 	list-revisions restore-revision list-taxonomies list-terms create-term update-term delete-term \
 	get-seo update-seo get-site-settings update-site-settings get-custom-css update-custom-css \
 	get-theme-style list-style-variables update-theme-style get-style-status mark-style-compiled \
@@ -422,6 +422,9 @@ call POST spiral-mcp/purge-cache '{"scope":"url","url":"https://example.com/"}'
 [ "$STATUS" -ge 400 ] && ok 'purge-cache rechaza URLs absolutas' || ko 'purge-cache con URL absoluta'
 call POST spiral-mcp/purge-cache '{"scope":"all","object_cache":false}'
 check 'purge-cache (all)' 200 results
+# Cambiar ajustes de caché exige spiral_mcp_cache, que el rol del agente no tiene por defecto.
+call POST spiral-mcp/update-cache-settings '{"settings":{"lifetime":3600}}'
+[ "$STATUS" = 403 ] && ok 'update-cache-settings: el agente no tiene permiso por defecto' || ko "update-cache-settings debería exigir spiral_mcp_cache (HTTP $STATUS)"
 if [ "${CACHE_PROVIDERS:-0}" -gt 0 ]; then
 	call POST spiral-mcp/preload-cache '{"action":"status"}'
 	if [ "$STATUS" = 200 ] || printf '%s' "$BODY" | grep -q 'spiral_mcp_cache_unsupported'; then ok 'preload-cache status'; else ko "preload-cache status (HTTP $STATUS)"; fi
