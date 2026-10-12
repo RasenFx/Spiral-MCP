@@ -2,6 +2,11 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.20.0] — 2026-10-12 · Fase 7.3: actividad
+
+### Añadido
+- Pestaña **Actividad** en Ajustes > Spiral-MCP: los cambios del agente (y de la página) con filtros por usuario, resultado y acción, la entrada de cada llamada, enlace al contenido afectado y un botón **Restaurar** para su snapshot. Si hubo cambios posteriores en el mismo objeto, avisa y ofrece restaurar igualmente. La restauración purga la caché y queda en el registro.
+
 ## [1.19.0] — 2026-10-12 · Fase 7.2: comportamiento
 
 ### Añadido

@@ -157,6 +157,49 @@ add_action( 'admin_post_spiral_mcp_save_behavior', function () {
 	exit;
 } );
 
+/** Aviso para la siguiente carga de la página. $extra: HTML ya escapado. */
+function spiral_mcp_admin_notice( $type, $message, $extra = '' ) {
+	set_transient( 'spiral_mcp_admin_notice_' . get_current_user_id(), array( 'type' => $type, 'message' => $message, 'extra' => $extra ), 5 * MINUTE_IN_SECONDS );
+}
+
+/** Formulario (botón) para restaurar un snapshot desde la pestaña Actividad. */
+function spiral_mcp_admin_restore_button( $snapshot_id, $label, $include_later = false, $class = 'button button-small' ) {
+	$confirm = $include_later
+		? 'Se restaurará el estado completo de este snapshot, deshaciendo también los cambios posteriores sobre el mismo objeto. ¿Seguir?'
+		: '¿Restaurar este snapshot? Antes se guarda una copia del estado actual, así que se puede deshacer.';
+	return '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline" onsubmit="return confirm(' . esc_attr( wp_json_encode( $confirm ) ) . ');">'
+		. '<input type="hidden" name="action" value="spiral_mcp_restore">'
+		. '<input type="hidden" name="snapshot_id" value="' . (int) $snapshot_id . '">'
+		. ( $include_later ? '<input type="hidden" name="include_later" value="1">' : '' )
+		. wp_nonce_field( 'spiral_mcp_restore_' . (int) $snapshot_id, '_wpnonce', true, false )
+		. '<button type="submit" class="' . esc_attr( $class ) . '">' . esc_html( $label ) . '</button></form>';
+}
+
+add_action( 'admin_post_spiral_mcp_restore', function () {
+	$id = isset( $_POST['snapshot_id'] ) ? absint( wp_unslash( $_POST['snapshot_id'] ) ) : 0;
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( 'No tienes permiso para cambiar esto.', 403 );
+	}
+	check_admin_referer( 'spiral_mcp_restore_' . $id );
+	$include_later = ! empty( $_POST['include_later'] );
+	$res           = spiral_mcp_snapshot_restore( $id, array( 'include_later' => $include_later ) );
+	if ( is_wp_error( $res ) ) {
+		$extra = '';
+		if ( 'spiral_mcp_snapshot_later' === $res->get_error_code() ) {
+			$extra = '<p>' . spiral_mcp_admin_restore_button( $id, 'Restaurar igualmente (deshace también los posteriores)', true, 'button' ) . '</p>';
+		}
+		spiral_mcp_admin_notice( 'error', $res->get_error_message(), $extra );
+	} else {
+		if ( spiral_mcp_setting( 'auto_purge' ) && function_exists( 'spiral_mcp_cache_purge' ) ) {
+			spiral_mcp_cache_purge( 'all' );
+		}
+		spiral_mcp_admin_notice( 'success', sprintf( 'Snapshot #%d restaurado. El estado anterior quedó guardado como snapshot #%d, por si quieres deshacer la restauración.', $id, (int) ( $res['snapshot_of_previous'] ?? 0 ) ) );
+	}
+	spiral_mcp_admin_log( 'restore-snapshot', array( 'id' => $id, 'include_later' => $include_later, 'result' => is_wp_error( $res ) ? $res->get_error_code() : 'ok' ) );
+	wp_safe_redirect( wp_get_referer() ? wp_get_referer() : spiral_mcp_admin_url( 'activity' ) );
+	exit;
+} );
+
 /* -------------------------------------------------------------------------
  * Pintar
  * ---------------------------------------------------------------------- */
@@ -169,12 +212,18 @@ function spiral_mcp_admin_render() {
 		'abilities'   => 'Abilities',
 		'permissions' => 'Permisos del agente',
 		'behavior'    => 'Comportamiento',
+		'activity'    => 'Actividad',
 	);
 	$tab  = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'abilities'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 	$tab  = isset( $tabs[ $tab ] ) ? $tab : 'abilities';
 	echo '<div class="wrap spiral-mcp-admin"><h1>Spiral-MCP</h1>';
 	if ( ! empty( $_GET['updated'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		echo '<div class="notice notice-success is-dismissible"><p>Cambios guardados. Los clientes MCP conectados verán la lista nueva de herramientas al volver a pedirla (en algunos hay que reconectar).</p></div>';
+	}
+	$notice = get_transient( 'spiral_mcp_admin_notice_' . get_current_user_id() );
+	if ( is_array( $notice ) ) {
+		delete_transient( 'spiral_mcp_admin_notice_' . get_current_user_id() );
+		printf( '<div class="notice notice-%s is-dismissible"><p>%s</p>%s</div>', esc_attr( $notice['type'] ), esc_html( $notice['message'] ), $notice['extra'] ?? '' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- extra se construye con funciones de escape.
 	}
 	echo '<nav class="nav-tab-wrapper">';
 	foreach ( $tabs as $id => $label ) {
@@ -185,6 +234,8 @@ function spiral_mcp_admin_render() {
 		spiral_mcp_admin_render_permissions();
 	} elseif ( 'behavior' === $tab ) {
 		spiral_mcp_admin_render_behavior();
+	} elseif ( 'activity' === $tab ) {
+		spiral_mcp_admin_render_activity();
 	} else {
 		spiral_mcp_admin_render_abilities();
 	}
@@ -344,4 +395,121 @@ function spiral_mcp_admin_render_behavior() {
 		<?php submit_button( 'Guardar' ); ?>
 	</form>
 	<?php
+}
+
+function spiral_mcp_admin_render_activity() {
+	global $wpdb;
+	$table = spiral_mcp_table( 'log' );
+	// phpcs:disable WordPress.Security.NonceVerification.Recommended -- filtros de lectura.
+	$f_user    = isset( $_GET['f_user'] ) ? absint( $_GET['f_user'] ) : 0;
+	$f_result  = isset( $_GET['f_result'] ) ? sanitize_key( wp_unslash( $_GET['f_result'] ) ) : '';
+	$f_ability = isset( $_GET['f_ability'] ) ? sanitize_text_field( wp_unslash( $_GET['f_ability'] ) ) : '';
+	$paged     = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
+	// phpcs:enable
+	$per    = 50;
+	$where  = array( '1=1' );
+	$values = array();
+	if ( $f_user ) {
+		$where[]  = 'user_id = %d';
+		$values[] = $f_user;
+	}
+	if ( 'ok' === $f_result ) {
+		$where[] = "result = 'ok'";
+	} elseif ( 'error' === $f_result ) {
+		$where[] = "result <> 'ok'";
+	}
+	if ( '' !== $f_ability ) {
+		$where[]  = 'ability = %s';
+		$values[] = $f_ability;
+	}
+	$sql_where = implode( ' AND ', $where );
+	// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+	$total     = (int) $wpdb->get_var( $values ? $wpdb->prepare( "SELECT COUNT(*) FROM $table WHERE $sql_where", $values ) : "SELECT COUNT(*) FROM $table WHERE $sql_where" );
+	$rows      = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM $table WHERE $sql_where ORDER BY id DESC LIMIT %d OFFSET %d", array_merge( $values, array( $per, ( $paged - 1 ) * $per ) ) ) );
+	$users     = $wpdb->get_col( "SELECT DISTINCT user_id FROM $table ORDER BY user_id" );
+	$abilities = $wpdb->get_col( "SELECT DISTINCT ability FROM $table ORDER BY ability" );
+	// phpcs:enable
+	$name = function ( $uid ) {
+		$u = $uid ? get_userdata( (int) $uid ) : null;
+		return $u ? $u->display_name . ' (' . $u->user_login . ')' : ( $uid ? '#' . $uid : 'Sistema' );
+	};
+	?>
+	<p>Cambios hechos por el agente (y por esta página), del más reciente al más antiguo. Los cambios de contenido se deshacen con las revisiones de WordPress; los demás, restaurando su snapshot.</p>
+	<form method="get" style="margin:1em 0">
+		<input type="hidden" name="page" value="spiral-mcp"><input type="hidden" name="tab" value="activity">
+		<select name="f_user"><option value="0">Todos los usuarios</option>
+			<?php foreach ( $users as $uid ) : ?>
+				<option value="<?php echo (int) $uid; ?>" <?php selected( $f_user, (int) $uid ); ?>><?php echo esc_html( $name( $uid ) ); ?></option>
+			<?php endforeach; ?>
+		</select>
+		<select name="f_result">
+			<option value="">Todos los resultados</option>
+			<option value="ok" <?php selected( $f_result, 'ok' ); ?>>Correctos</option>
+			<option value="error" <?php selected( $f_result, 'error' ); ?>>Con error</option>
+		</select>
+		<select name="f_ability"><option value="">Todas las acciones</option>
+			<?php foreach ( $abilities as $ab ) : ?>
+				<option value="<?php echo esc_attr( $ab ); ?>" <?php selected( $f_ability, $ab ); ?>><?php echo esc_html( preg_replace( '#^spiral-mcp/#', '', $ab ) ); ?></option>
+			<?php endforeach; ?>
+		</select>
+		<button class="button">Filtrar</button>
+		<span class="description"><?php echo (int) $total; ?> registros</span>
+	</form>
+	<?php if ( ! $rows ) : ?>
+		<p>No hay actividad registrada<?php echo $f_user || $f_result || $f_ability ? ' con estos filtros' : ''; ?>.</p>
+		<?php
+		return;
+	endif;
+	?>
+	<table class="widefat striped">
+		<thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Objeto</th><th>Resultado</th><th>Deshacer</th></tr></thead>
+		<tbody>
+		<?php foreach ( $rows as $row ) : ?>
+			<?php
+			$time   = strtotime( $row->created_at . ' UTC' );
+			$object = trim( $row->object_type . ( '' !== (string) $row->object_id ? ' ' . $row->object_id : '' ) );
+			$link   = '';
+			if ( in_array( $row->object_type, array( 'post', 'seo' ), true ) && ctype_digit( (string) $row->object_id ) && get_post( (int) $row->object_id ) ) {
+				$link = get_edit_post_link( (int) $row->object_id );
+			} elseif ( 'layout' === $row->object_type && preg_match( '/^post:(\d+)$/', (string) $row->object_id, $m ) && get_post( (int) $m[1] ) ) {
+				$link = get_edit_post_link( (int) $m[1] );
+			}
+			$input = json_decode( (string) $row->input_json, true );
+			?>
+			<tr>
+				<td title="<?php echo esc_attr( $row->created_at ); ?> UTC"><?php echo esc_html( wp_date( 'Y-m-d H:i', $time ) ); ?><br><span class="description"><?php echo esc_html( sprintf( 'hace %s', human_time_diff( $time ) ) ); ?></span></td>
+				<td><?php echo esc_html( $name( $row->user_id ) ); ?></td>
+				<td><code><?php echo esc_html( preg_replace( '#^spiral-mcp/#', '', $row->ability ) ); ?></code>
+					<?php if ( null !== $input && array() !== $input ) : ?>
+						<details><summary class="description">Entrada</summary><pre style="white-space:pre-wrap;max-width:60ch;max-height:20em;overflow:auto;font-size:11px"><?php echo esc_html( wp_json_encode( $input, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) ); ?></pre></details>
+					<?php endif; ?>
+				</td>
+				<td><?php echo $link ? '<a href="' . esc_url( $link ) . '">' . esc_html( $object ) . '</a>' : esc_html( $object ); ?></td>
+				<td><?php echo 'ok' === $row->result ? '<span style="color:#00a32a">ok</span>' : '<span style="color:#b32d2e">' . esc_html( $row->result ) . '</span>'; ?><br><span class="description"><?php echo (int) $row->duration_ms; ?> ms</span></td>
+				<td>
+					<?php if ( $row->snapshot_id && 'ok' === $row->result ) : ?>
+						<span class="description">snapshot #<?php echo (int) $row->snapshot_id; ?></span><br>
+						<?php echo spiral_mcp_admin_restore_button( (int) $row->snapshot_id, 'Restaurar' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- construido con funciones de escape. ?>
+					<?php elseif ( $link && 'ok' === $row->result ) : ?>
+						<span class="description">Revisiones del contenido</span>
+					<?php else : ?>
+						<span class="description">—</span>
+					<?php endif; ?>
+				</td>
+			</tr>
+		<?php endforeach; ?>
+		</tbody>
+	</table>
+	<?php
+	$pages = (int) ceil( $total / $per );
+	if ( $pages > 1 ) {
+		echo '<div class="tablenav"><div class="tablenav-pages">';
+		echo paginate_links( array( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			'base'    => add_query_arg( 'paged', '%#%' ),
+			'format'  => '',
+			'current' => $paged,
+			'total'   => $pages,
+		) );
+		echo '</div></div>';
+	}
 }

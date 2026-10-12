@@ -10,7 +10,7 @@ El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes d
 - YOOtheme Pro activo (o un tema hijo de YOOtheme) para todo lo relacionado con el builder y los estilos.
 - PHP 7.4 como mínimo: no usar sintaxis de PHP 8 (match, nullsafe `?->`, argumentos con nombre, tipos de unión, `readonly`, enums).
 
-## Estructura actual (v1.19.0)
+## Estructura actual (v1.20.0)
 ```
 spiral-mcp-control.php   cabecera, constantes, comprobación de requisitos, require_once y hooks de activación
 uninstall.php            borra el rol y las capacidades (las tablas solo con el filtro spiral_mcp_uninstall_drop_tables)
@@ -34,7 +34,7 @@ includes/taxonomies.php  taxonomías y términos (+ snapshot kind "term")
 includes/seo.php         SEO por contenido: Yoast o salida propia (+ snapshot kind "seo")
 includes/settings.php    ajustes del sitio: identidad y portada (+ snapshot kind "option")
 includes/preview.php     URLs de vista previa sin sesión (token firmado) e inspect-page
-includes/admin.php       página Ajustes > Spiral-MCP (solo admin): activar/desactivar abilities, permisos del rol del agente y comportamiento
+includes/admin.php       página Ajustes > Spiral-MCP (solo admin): abilities, permisos del rol del agente, comportamiento y actividad (con restaurar)
 includes/styles.php      CSS adicional (+ snapshot kind "custom_css") y estilo de YOOtheme: catálogo de variables, cambios y estado de compilación
 tests/smoke.sh           prueba de humo por REST (ver "Entorno de desarrollo")
 tests/fixtures/          layouts de YOOtheme de ejemplo

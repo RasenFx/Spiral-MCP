@@ -266,7 +266,11 @@ Página *Ajustes > Spiral-MCP* (solo administradores, `manage_options`) para dec
 **Resultado 7.2:** pestaña *Comportamiento* (opción `spiral_mcp_settings`, leída con `spiral_mcp_setting()`): purga automática, retención del registro y de los snapshots (0 = nunca), descargas de la librería online con la clave de API y borrar tablas al desinstalar. Los filtros de siempre reciben el valor guardado y tienen la última palabra (la página avisa si hay alguno). Comprobado: sin purga automática, editar el SEO de una página deja su caché de WP Super Cache intacta; con 30 días de retención la limpieza diaria borra un registro de hace 40 días y con 0 conserva un snapshot de hace 400; sin descargas, `import-from-online-library` responde `spiral_mcp_online_disabled` y `list-online-library` indica `download_enabled: false`.
 
 ### 7.3 Actividad
-- [ ] Pestaña con los últimos cambios del agente y su snapshot.
+- [x] Pestaña con los últimos cambios del agente y su snapshot.
+
+**Resultado 7.3:** pestaña *Actividad*: registro paginado (50 por página) con filtros por usuario, resultado y acción; cada fila muestra fecha local, usuario, acción con su entrada (desplegable), objeto (enlazado al editor si es un contenido), resultado y duración, y un botón **Restaurar** para su snapshot. Restaurar desde aquí respeta la protección de cambios posteriores: si los hay, el aviso los lista y ofrece "Restaurar igualmente"; después purga la caché (si la purga automática está activa) y queda en el registro como `admin/restore-snapshot`. Comprobado con dos cambios seguidos de la descripción del sitio: el primer intento se rechazó sin tocar nada y "Restaurar igualmente" la devolvió al valor original.
+
+**Fase 7 terminada.**
 
 **Terminado cuando:** un administrador desactiva una ability o un grupo desde la página y el agente deja de verla en su lista de herramientas; cambia los permisos del rol y se mantienen tras actualizar el plugin.
 
