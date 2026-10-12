@@ -10,7 +10,7 @@ El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes d
 - YOOtheme Pro activo (o un tema hijo de YOOtheme) para todo lo relacionado con el builder y los estilos.
 - PHP 7.4 como mínimo: no usar sintaxis de PHP 8 (match, nullsafe `?->`, argumentos con nombre, tipos de unión, `readonly`, enums).
 
-## Estructura actual (v1.15.0)
+## Estructura actual (v1.16.0)
 ```
 spiral-mcp-control.php   cabecera, constantes, comprobación de requisitos, require_once y hooks de activación
 uninstall.php            borra el rol y las capacidades (las tablas solo con el filtro spiral_mcp_uninstall_drop_tables)
@@ -28,7 +28,8 @@ includes/layout.php      JSON Pointer, get-layout-outline, get-layout-texts, get
 includes/theme-config.php get-theme-config y update-theme-config (lista blanca de secciones)
 includes/templates.php   plantillas y biblioteca de YOOtheme vía su Storage (+ snapshot kind "yootheme_storage")
 includes/online-library.php librería online de YOOtheme (api.yootheme.com): catálogo, vista previa e importación
-includes/cache.php       cachés con un adaptador por herramienta (WP Super Cache, WP Rocket, LiteSpeed, W3TC, objetos): estado, purga, precarga, ajustes y purga automática dirigida
+includes/cache.php       cachés con un adaptador por herramienta: lógica común, WP Super Cache (completo), caché de objetos, abilities y purga automática dirigida
+includes/cache-providers.php adaptadores de purga y estado: WP Fastest Cache, W3TC, LiteSpeed, SiteGround, Nginx Helper, WP Rocket, WP Engine, Pantheon, Kinsta
 includes/taxonomies.php  taxonomías y términos (+ snapshot kind "term")
 includes/seo.php         SEO por contenido: Yoast o salida propia (+ snapshot kind "seo")
 includes/settings.php    ajustes del sitio: identidad y portada (+ snapshot kind "option")

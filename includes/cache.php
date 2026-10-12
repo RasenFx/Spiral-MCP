@@ -31,76 +31,7 @@ defined( 'ABSPATH' ) || exit;
 
 /** Todos los adaptadores registrados: id => definición. */
 function spiral_mcp_cache_providers() {
-	$providers = array(
-		'wp-super-cache' => spiral_mcp_cache_wpsc_provider(),
-		'wp-rocket'      => array(
-			'label'      => 'WP Rocket',
-			'tested'     => false,
-			'detect'     => function () {
-				return function_exists( 'rocket_clean_domain' );
-			},
-			'supports'   => array( 'purge_all', 'purge_post', 'purge_url' ),
-			'purge_all'  => function () {
-				rocket_clean_domain();
-				return true;
-			},
-			'purge_post' => function ( $post_id ) {
-				return function_exists( 'rocket_clean_post' ) ? (bool) rocket_clean_post( $post_id ) : false;
-			},
-			'purge_url'  => function ( $url ) {
-				if ( ! function_exists( 'rocket_clean_files' ) ) {
-					return false;
-				}
-				rocket_clean_files( array( $url ) );
-				return true;
-			},
-		),
-		'litespeed'      => array(
-			'label'      => 'LiteSpeed Cache',
-			'tested'     => false,
-			'detect'     => function () {
-				return defined( 'LSCWP_V' ) || has_action( 'litespeed_purge_all' );
-			},
-			'supports'   => array( 'purge_all', 'purge_post', 'purge_url' ),
-			'purge_all'  => function () {
-				do_action( 'litespeed_purge_all' );
-				return true;
-			},
-			'purge_post' => function ( $post_id ) {
-				do_action( 'litespeed_purge_post', $post_id );
-				return true;
-			},
-			'purge_url'  => function ( $url ) {
-				do_action( 'litespeed_purge_url', $url );
-				return true;
-			},
-		),
-		'w3-total-cache' => array(
-			'label'      => 'W3 Total Cache',
-			'tested'     => false,
-			'detect'     => function () {
-				return function_exists( 'w3tc_flush_all' );
-			},
-			'supports'   => array( 'purge_all', 'purge_post', 'purge_url' ),
-			'purge_all'  => function () {
-				w3tc_flush_all();
-				return true;
-			},
-			'purge_post' => function ( $post_id ) {
-				if ( ! function_exists( 'w3tc_flush_post' ) ) {
-					return false;
-				}
-				w3tc_flush_post( $post_id );
-				return true;
-			},
-			'purge_url'  => function ( $url ) {
-				if ( ! function_exists( 'w3tc_flush_url' ) ) {
-					return false;
-				}
-				w3tc_flush_url( $url );
-				return true;
-			},
-		),
+	$providers = array( 'wp-super-cache' => spiral_mcp_cache_wpsc_provider() ) + spiral_mcp_cache_other_providers() + array(
 		'object-cache'   => array(
 			'label'     => 'Caché de objetos (Redis, Memcached…)',
 			'tested'    => true,
@@ -170,6 +101,10 @@ function spiral_mcp_cache_purge( $scope = 'all', $target = null, $object_cache =
 				$ok = call_user_func( $p['purge_post'], (int) $target );
 			} elseif ( 'url' === $scope && spiral_mcp_cache_can( $p, 'purge_url' ) ) {
 				$ok = call_user_func( $p['purge_url'], (string) $target );
+			} elseif ( 'url' === $scope && spiral_mcp_cache_can( $p, 'purge_post' ) && url_to_postid( (string) $target ) ) {
+				// Sin purga por URL, pero la URL es de un contenido: se purga ese contenido.
+				$done = 'post';
+				$ok   = call_user_func( $p['purge_post'], url_to_postid( (string) $target ) );
 			} elseif ( spiral_mcp_cache_can( $p, 'purge_all' ) ) {
 				$done = 'all';
 				$ok   = call_user_func( $p['purge_all'] );

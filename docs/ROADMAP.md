@@ -202,7 +202,23 @@ El plugin se instala en sitios con distintas herramientas de caché (o ninguna, 
 **Resultado 6.2:** el adaptador reutiliza la clase de la API REST de WP Super Cache (`WP_Super_Cache_Rest_Update_Settings`, subclase `Spiral_MCP_WPSC_Updater`) para los ajustes con efectos secundarios (activar, modo, usuarios con sesión, compresión, URLs excluidas, caducidad, precarga), sin su comprobación `manage_options` ni la parte de depuración, y `wp_cache_setting()` para los simples. Bugs de WP Super Cache sorteados: su API pierde los ajustes cuya clave REST no coincide con el nombre de la variable (móvil, purgar al editar, regenerar, `no_cache_for_get`…); guardar la caducidad activa el aviso por correo de la recogida de basura y guardar la precarga activa `preload_on` y `preload_taxonomies` si no se les pasa su valor actual. Comprobado: el agente sin `spiral_mcp_cache` recibe 403; con el permiso, un cambio de 8 ajustes escribe solo esas líneas en `wp-cache-config.php` (que sigue siendo PHP válido) y restaurar el snapshot deja los mismos valores.
 
 ### 6.3 Más herramientas: purga y estado
-- [ ] WP Rocket, LiteSpeed Cache, W3 Total Cache, WP Fastest Cache, SiteGround Optimizer, Nginx Helper y cachés de hosting (Kinsta, WP Engine…).
+- [x] WP Rocket, LiteSpeed Cache, W3 Total Cache, WP Fastest Cache, SiteGround Optimizer, Nginx Helper y cachés de hosting (Kinsta, WP Engine…).
+
+**Resultado 6.3** (adaptadores en `includes/cache-providers.php`; cada herramienta instalada en local de una en una, con WP Super Cache desactivado, y el sitio restaurado al final desde copia de archivos y BD):
+
+| Herramienta | Versión | Purga | Estado | Probado |
+|---|---|---|---|---|
+| WP Super Cache | 3.1.4 | todo / post / URL | sí (+ ajustes y precarga) | sí: archivos borrados |
+| WP Fastest Cache | 1.5.3 | todo / post (URL → su post) | activada, móvil, archivos | sí: archivos borrados |
+| W3 Total Cache | 2.10.7 | todo / post / URL | activada, motor, caducidad, archivos | sí: páginas regeneradas (marca "Served from") |
+| LiteSpeed Cache | 7.9.1 | todo / post / URL | activada; avisa si el servidor no es LiteSpeed | sí: cabeceras `X-LiteSpeed-Purge` correctas |
+| SiteGround Optimizer | 7.8.4 | todo / post / URL | activada | API comprobada; el efecto solo existe en SiteGround |
+| Nginx Helper | 2.4.1 | todo / post / URL | activada, método | API comprobada; el efecto solo existe con Nginx |
+| WP Rocket | — | todo / post / URL | versión | sin probar (de pago) |
+| WP Engine, Pantheon, Kinsta | — | según su API | — | sin probar (solo en su plataforma) |
+| Caché de objetos | — | todo (solo si se pide) | — | sí |
+
+Mejora salida de las pruebas: si una herramienta no purga por URL pero la URL es de un contenido, se purga ese contenido en lugar de todo. Notas: la activación de W3 Total Cache tarda más de 2 minutos (hace peticiones a sí mismo); su motor "Disk: Basic" guarda en `cache/page` con nombres en hash. Desactivar WP Super Cache desde código necesita `wp-admin/includes/file.php` (si no, se rompe a medias tras quitar `advanced-cache.php`).
 
 ### 6.4 Más herramientas: ajustes
 - [ ] WP Rocket (`wp_rocket_settings`), LiteSpeed Cache y WP Fastest Cache. W3 Total Cache solo lectura al principio.

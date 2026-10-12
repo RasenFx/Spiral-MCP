@@ -2,6 +2,15 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.16.0] — 2026-10-12 · Fase 6.3: más herramientas de caché
+
+### Añadido
+- Adaptadores de purga y estado (`includes/cache-providers.php`) para WP Fastest Cache, W3 Total Cache, LiteSpeed Cache, SiteGround Optimizer, Nginx Helper, WP Rocket y las cachés de WP Engine, Pantheon y Kinsta. Cada uno informa de su estado (activada, motor, caducidad, archivos…) y avisa cuando la caché no puede funcionar en ese servidor (LiteSpeed fuera de LiteSpeed, SiteGround fuera de su hosting, Nginx Helper sin Nginx).
+- Probados en local con la versión actual de cada plugin gratuito; `tested` en `get-cache-status` dice cuáles.
+
+### Cambiado
+- `purge-cache` con `"scope": "url"`: si una herramienta no sabe purgar por URL pero la URL es de un contenido, purga ese contenido en lugar de todo.
+
 ## [1.15.0] — 2026-10-11 · Fase 6.2: ajustes de caché
 
 ### Añadido

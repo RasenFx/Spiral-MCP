@@ -202,7 +202,7 @@ La librería de YOOtheme tiene cientos de diseños hechos por su equipo (página
 Las escrituras ya purgan solas la caché de lo que cambian (un contenido: esa página, la portada y sus listados; un cambio de diseño global: todo). Si aun así algo no se ve:
 
 1. ¿Es un estilo (colores, tipografía, LESS)? Entonces no es caché: falta recompilar (`get-style-status`).
-2. `get-cache-status`: qué herramientas de caché hay (WP Super Cache, WP Rocket, LiteSpeed, W3 Total Cache, caché de objetos…), qué admite cada una (`supports`) y si están activadas. Sin herramientas, no hay caché que purgar: el problema es otro (el navegador del usuario, una CDN externa).
+2. `get-cache-status`: qué herramientas de caché hay (WP Super Cache, WP Fastest Cache, W3 Total Cache, LiteSpeed, SiteGround, Nginx Helper, WP Rocket, cachés de hosting, caché de objetos…), qué admite cada una (`supports`) y si están activadas. Lee `problem` y `note`: algunas no pueden funcionar en ese servidor (LiteSpeed fuera de un servidor LiteSpeed, SiteGround fuera de su hosting, Nginx Helper sin Nginx). Sin herramientas, no hay caché que purgar: el problema es otro (el navegador del usuario, una CDN externa).
 3. Purga lo justo: `purge-cache {"scope": "url", "url": "/contacto/"}` o `{"scope": "post", "post_id": 12}`; si no basta, `{"scope": "all"}`. La respuesta dice qué purgó cada herramienta (`purged`: si una no sabe purgar una sola página, purga todo).
 4. Tras cambios grandes (rediseño, muchas páginas), `preload-cache {"action": "start"}` regenera la caché en segundo plano, si la herramienta lo admite. No lo hagas tras cada edición: consume recursos.
 5. Si el usuario sigue sin verlo, puede ser su navegador: que recargue sin caché (Ctrl+F5) o pruebe en una ventana privada.
