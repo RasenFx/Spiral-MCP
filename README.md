@@ -51,6 +51,25 @@ Las capacidades del rol del agente se pueden cambiar en **Ajustes > Spiral-MCP >
 
 Además, cada ability comprueba la capacidad nativa de WordPress del objeto (`edit_post` de ese post, `edit_theme_options`…). El rol del agente nunca recibe las capacidades nativas de administración (`manage_options`, las de plugins, temas, usuarios y actualizaciones del núcleo, `edit_files`…), ni siquiera con un filtro: las abilities de plugins usan las APIs de WordPress con su propia comprobación. Las acciones destructivas exigen `"confirm": true`.
 
+## Gestión de plugins
+
+El agente siempre puede **ver** los plugins instalados (`list-plugins`) y **buscar** en wordpress.org (`search-plugins`). Para **instalar, activar, desactivar, actualizar o borrar** hacen falta dos cerrojos, los dos cerrados al instalar Spiral-MCP-Control:
+
+1. En **Ajustes > Spiral-MCP > Comportamiento**, marcar "Permitir que el agente gestione plugins de wordpress.org".
+2. En **Ajustes > Spiral-MCP > Permisos del agente**, dar al rol la capacidad `spiral_mcp_plugins`.
+
+Con cualquiera de los dos cerrado, esas abilities responden 403 y dicen cuál falta (`list-plugins` lo indica en `management`). Si el sitio define `DISALLOW_FILE_MODS`, no funcionan nunca.
+
+| Ability | Qué hace | Salvaguardas |
+|---|---|---|
+| `install-plugin` | instala por slug de wordpress.org | solo descargas de `downloads.wordpress.org` (no acepta ZIP ni URLs); comprueba la versión de WordPress y PHP; queda **desactivado** |
+| `activate-plugin` | activa | un error fatal al cargarlo no lo deja activo; si después la portada o wp-admin dan error 500, se desactiva solo; snapshot de los plugins activos (`restore-snapshot` lo deshace) y purga de caché |
+| `deactivate-plugin` | desactiva (conserva los datos) | snapshot y comprobación del sitio |
+| `update-plugin` | actualiza a la última versión de wordpress.org | exige `"confirm": true`; comprueba la compatibilidad; si la nueva versión da error 500, vuelve sola a la anterior |
+| `delete-plugin` | borra un plugin desactivado y ejecuta su desinstalación | exige `"confirm": true`; **irreversible** (sus datos pueden borrarse) |
+
+Spiral-MCP-Control y MCP Adapter están protegidos: el agente no puede desactivarlos, actualizarlos ni borrarlos (sin ellos perdería el acceso). Los plugins de pago o de otros orígenes no se actualizan desde aquí. Todo queda en el registro de actividad. El skill del agente le pide instalar solo lo que el usuario pida, enseñarle antes las opciones y confirmar antes de activar o borrar.
+
 ## Cachés compatibles
 
 El agente usa siempre las mismas abilities (`get-cache-status`, `purge-cache`, `preload-cache`, `get-cache-settings`, `update-cache-settings`). Por dentro, un adaptador por herramienta traduce cada operación. Si el sitio tiene varias a la vez (un plugin más la caché del hosting), la purga llega a todas. Después de cada escritura el plugin purga solo lo que ha cambiado: si el cambio es de un contenido, ese contenido, la portada y sus listados; si es de diseño global, todo.
@@ -79,7 +98,8 @@ Para añadir otra herramienta sin tocar el plugin, registra un adaptador con el 
   WP_URL=https://mi-sitio.test WP_USER=agente WP_APP_PASSWORD='xxxx xxxx xxxx xxxx xxxx xxxx' bash tests/smoke.sh
   ```
 
-  Opcionales: `SMOKE_INSPECT=1` (inspección de páginas), `SMOKE_ONLINE=1` (librería online de YOOtheme), `SMOKE_CACHE_WRITE=1` (escritura de ajustes de caché; el usuario necesita `spiral_mcp_cache`).
+  Opcionales: `SMOKE_INSPECT=1` (inspección de páginas), `SMOKE_ONLINE=1` (librería online de YOOtheme), `SMOKE_CACHE_WRITE=1` (escritura de ajustes de caché; el usuario necesita `spiral_mcp_cache`), `SMOKE_PLUGINS=1` (con los dos cerrojos de plugins abiertos para ese usuario: comprueba los protegidos y `confirm`; sin él, comprueba que la gestión está cerrada).
+- Plugins de prueba para la gestión de plugins en [`tests/fixtures/plugins/`](tests/fixtures/plugins/): uno que da error fatal al cargarse, otro que rompe la web pública, uno incompatible, uno con desinstalación y uno cuya versión 2.0.0 rompe la portada (con un mu-plugin que anuncia esa actualización). Cópialos a `wp-content/plugins` de un sitio **local**.
 - Tras añadir o cambiar abilities: `php tests/gen-skill-abilities.php /ruta/al/wordpress` regenera la referencia del skill.
 - ZIP de instalación:
 
