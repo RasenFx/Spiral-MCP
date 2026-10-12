@@ -31,7 +31,7 @@ Las abilities llevan el prefijo `spiral-mcp/`. La referencia completa de paráme
 | Estilos | CSS adicional; estilo, variables LESS y estado de compilación de YOOtheme |
 | Verificación | URL de vista previa sin sesión, inspección de una página (encabezados, enlaces rotos, alt, SEO efectivo) |
 | Ajustes | identidad del sitio, portada, zona horaria |
-| Plugins | listar los instalados y buscar en wordpress.org (instalar, activar, actualizar y borrar: en desarrollo, con doble cerrojo) |
+| Plugins | listar los instalados, buscar en wordpress.org, instalar (sin activar), activar con comprobación de salud y desactivar; con doble cerrojo, cerrado por defecto (actualizar y borrar: en desarrollo) |
 | Cachés | estado, purga, precarga y ajustes de la herramienta de caché del sitio (ver abajo) |
 | Auditoría | registro de actividad, snapshots y restauración (también parcial) |
 

@@ -300,9 +300,11 @@ Que el agente pueda buscar, instalar, activar, desactivar, actualizar y borrar p
 **Resultado 8.1** (`includes/plugins.php`): `spiral_mcp_plugins_check_locks()` devuelve qué cerrojo falta (archivos, ajuste o capacidad); `list-plugins` lo resume en `management` (`allowed` y `reason`). Comprobado con la sesión de administrador: con todo cerrado, "la gestión está desactivada"; solo con el ajuste, "falta la capacidad"; con los dos, `allowed: true`. Lista de nativas que nunca se conceden (`spiral_mcp_never_granted_caps()`): ahora incluye `activate_plugins`, `update_plugins`, `delete_plugins`, los de temas, `update_core`, `edit_files`, `edit_users`, `create_users` y `unfiltered_upload`, y la sincronización las retira del rol si alguien las añadió. `search-plugins` probado contra wordpress.org (búsqueda, ficha por slug, slug inexistente). Arreglado de paso: las listas de nombres de la página de ajustes salían con las etiquetas `<code>` escapadas.
 
 ### 8.2 Instalar, activar, desactivar
-- [ ] `spiral-mcp/install-plugin` (`slug`; instala sin activar; comprueba compatibilidad de WordPress y PHP antes).
-- [ ] `spiral-mcp/activate-plugin` y `deactivate-plugin`, con snapshot `plugins_state` y comprobación de salud tras activar (desactivación automática si el sitio da 500).
-- [ ] Purga de caché tras activar o desactivar.
+- [x] `spiral-mcp/install-plugin` (`slug`; instala sin activar; comprueba compatibilidad de WordPress y PHP antes).
+- [x] `spiral-mcp/activate-plugin` y `deactivate-plugin`, con snapshot `plugins_state` y comprobación de salud tras activar (desactivación automática si el sitio da 500).
+- [x] Purga de caché tras activar o desactivar.
+
+**Resultado 8.2:** `install-plugin` usa `plugins_api()` + `Plugin_Upgrader` con `Automatic_Upgrader_Skin`, solo si la descarga viene de `downloads.wordpress.org` y el sistema de archivos es `direct`. `activate-plugin` envuelve `activate_plugin()` en `try/catch` (WordPress incluye el plugin y ejecuta su activación **antes** de guardarlo como activo, así que un error fatal no lo deja activo; hay que cerrar el búfer de salida que abre) y luego pide `/` y `/wp-admin/` al propio servidor: con un 500 o el aviso de error crítico, lo desactiva. Probado en local: Classic Editor instalado (desactivado), activado (portada 200, wp-admin 302), desactivado y vuelto a activar restaurando el snapshot; protegidos rechazados; tres plugins de prueba en `tests/fixtures/plugins/`: el que falla al cargar no se activa (el error dice la función y la línea), el que rompe la web pública se activó, la portada dio 500 y se desactivó solo (la portada volvió a 200), el que pide PHP 99 se rechaza. Con los cerrojos cerrados, las abilities responden 403 con el cerrojo que falta. Sitio restaurado desde copia de la BD al terminar.
 
 ### 8.3 Actualizar y borrar
 - [ ] `spiral-mcp/update-plugin` (con `confirm`; misma comprobación de salud; WordPress 6.3+ revierte solo si la actualización da un error fatal).

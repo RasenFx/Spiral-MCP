@@ -1,7 +1,7 @@
 <?php
 /**
- * Plugins de wordpress.org: listar los instalados y buscar en el directorio
- * (Fase 8.1). Gestionarlos (instalar, activar, desactivar, actualizar, borrar)
+ * Plugins de wordpress.org: listar los instalados, buscar en el directorio,
+ * instalar (sin activar), activar y desactivar (Fases 8.1 y 8.2). Gestionarlos
  * exige dos cerrojos: la capacidad spiral_mcp_plugins y el ajuste
  * "plugins_management" (Ajustes > Spiral-MCP > Comportamiento), además de que
  * el sitio permita modificar archivos (DISALLOW_FILE_MODS).
@@ -42,13 +42,13 @@ function spiral_mcp_plugins_locks() {
 function spiral_mcp_plugins_check_locks() {
 	$locks = spiral_mcp_plugins_locks();
 	if ( ! $locks['file_mods_allowed'] ) {
-		return new WP_Error( 'spiral_mcp_plugins_file_mods', 'Este sitio no permite modificar archivos (DISALLOW_FILE_MODS en wp-config.php): no se pueden gestionar plugins desde aquí ni desde wp-admin.' );
+		return new WP_Error( 'spiral_mcp_plugins_file_mods', 'Este sitio no permite modificar archivos (DISALLOW_FILE_MODS en wp-config.php): no se pueden gestionar plugins desde aquí ni desde wp-admin.', array( 'status' => 403 ) );
 	}
 	if ( ! $locks['setting'] ) {
-		return new WP_Error( 'spiral_mcp_plugins_disabled', 'La gestión de plugins por el agente está desactivada. Un administrador puede activarla en Ajustes > Spiral-MCP > Comportamiento ("Permitir que el agente gestione plugins").' );
+		return new WP_Error( 'spiral_mcp_plugins_disabled', 'La gestión de plugins por el agente está desactivada. Un administrador puede activarla en Ajustes > Spiral-MCP > Comportamiento ("Permitir que el agente gestione plugins").', array( 'status' => 403 ) );
 	}
 	if ( ! $locks['capability'] ) {
-		return new WP_Error( 'spiral_mcp_plugins_capability', 'Tu rol no tiene la capacidad spiral_mcp_plugins. Un administrador puede dártela en Ajustes > Spiral-MCP > Permisos del agente.' );
+		return new WP_Error( 'spiral_mcp_plugins_capability', 'Tu rol no tiene la capacidad spiral_mcp_plugins. Un administrador puede dártela en Ajustes > Spiral-MCP > Permisos del agente.', array( 'status' => 403 ) );
 	}
 	return true;
 }
@@ -70,6 +70,147 @@ function spiral_mcp_plugin_compat_issues( $requires_wp, $requires_php ) {
 	}
 	return $issues;
 }
+
+/** Carga las partes de wp-admin que hacen falta para gestionar plugins. */
+function spiral_mcp_plugins_load_admin() {
+	foreach ( array( 'plugin.php', 'file.php', 'misc.php', 'plugin-install.php', 'class-wp-upgrader.php' ) as $file ) {
+		require_once ABSPATH . 'wp-admin/includes/' . $file;
+	}
+}
+
+/**
+ * Archivo de un plugin instalado a partir de "plugin" (archivo, p. ej. contact-form-7/wp-contact-form-7.php,
+ * o slug, p. ej. contact-form-7). WP_Error si no está instalado.
+ */
+function spiral_mcp_plugin_resolve( $plugin ) {
+	spiral_mcp_plugins_load_admin();
+	$plugin  = trim( (string) $plugin );
+	$plugins = get_plugins();
+	if ( isset( $plugins[ $plugin ] ) ) {
+		return $plugin;
+	}
+	foreach ( array_keys( $plugins ) as $file ) {
+		if ( spiral_mcp_plugin_slug( $file ) === $plugin ) {
+			return $file;
+		}
+	}
+	return new WP_Error( 'spiral_mcp_plugin_not_found', sprintf( 'El plugin "%s" no está instalado. Mira spiral-mcp/list-plugins (o instálalo con spiral-mcp/install-plugin).', $plugin ) );
+}
+
+/**
+ * Comprueba que el sitio sigue respondiendo: pide la portada y wp-admin al propio servidor.
+ * Un 500 (o el aviso de error crítico de WordPress) es un fallo.
+ */
+function spiral_mcp_plugins_health() {
+	$checks = array();
+	$ok     = true;
+	foreach ( array( '/', '/wp-admin/' ) as $path ) {
+		$url = function_exists( 'spiral_mcp_inspect_url' ) ? spiral_mcp_inspect_url( home_url( $path ) ) : home_url( $path );
+		$res = wp_remote_get( add_query_arg( 'spiral_mcp_health', time(), $url ), array(
+			'timeout'     => 20,
+			'redirection' => 0,
+			'sslverify'   => apply_filters( 'https_local_ssl_verify', false ),
+			'headers'     => array( 'Cache-Control' => 'no-cache' ),
+			'user-agent'  => 'Spiral-MCP-Health/' . SPIRAL_MCP_VERSION,
+		) );
+		if ( is_wp_error( $res ) ) {
+			// Sin respuesta (el servidor no se alcanza a sí mismo): no se puede saber; no cuenta como fallo.
+			$checks[] = array( 'path' => $path, 'status' => null, 'error' => $res->get_error_message() );
+			continue;
+		}
+		$code     = (int) wp_remote_retrieve_response_code( $res );
+		$critical = false !== stripos( (string) wp_remote_retrieve_body( $res ), 'critical error' );
+		$checks[] = array( 'path' => $path, 'status' => $code );
+		if ( $code >= 500 || $critical ) {
+			$ok = false;
+		}
+	}
+	return array( 'ok' => $ok, 'checks' => $checks );
+}
+
+/** Tras activar o desactivar: purga la caché si la purga automática está activa. */
+function spiral_mcp_plugins_after_change() {
+	if ( spiral_mcp_setting( 'auto_purge' ) && function_exists( 'spiral_mcp_cache_purge' ) ) {
+		spiral_mcp_cache_purge( 'all' );
+	}
+}
+
+/**
+ * Activa un plugin protegiendo el resto del sitio: un error fatal al cargarlo o en su activación
+ * se captura (WordPress aún no lo ha marcado como activo) y, si después el sitio responde con
+ * error 500, se desactiva solo. Devuelve [ 'health' => … ] o WP_Error.
+ */
+function spiral_mcp_plugin_activate_safely( $file ) {
+	$level = ob_get_level();
+	try {
+		$res = activate_plugin( $file, '', false, false );
+	} catch ( Throwable $e ) {
+		while ( ob_get_level() > $level ) {
+			ob_end_clean();
+		}
+		deactivate_plugins( $file, true ); // Por si llegó a marcarse como activo.
+		return new WP_Error( 'spiral_mcp_plugin_fatal', sprintf( 'El plugin da un error fatal al cargarse o activarse y no se ha activado: %s (%s, línea %d).', $e->getMessage(), str_replace( wp_normalize_path( ABSPATH ), '', wp_normalize_path( $e->getFile() ) ), $e->getLine() ) );
+	}
+	if ( is_wp_error( $res ) ) {
+		return new WP_Error( 'spiral_mcp_plugin_activation', 'WordPress no ha activado el plugin: ' . $res->get_error_message() );
+	}
+	$health = spiral_mcp_plugins_health();
+	if ( ! $health['ok'] ) {
+		deactivate_plugins( $file, true );
+		$again = spiral_mcp_plugins_health();
+		return new WP_Error( 'spiral_mcp_plugin_broke_site', 'Al activarlo, el sitio empezó a responder con error 500, así que se ha desactivado otra vez.' . ( $again['ok'] ? ' El sitio vuelve a funcionar.' : ' OJO: el sitio sigue dando error; revísalo ya.' ), array( 'before_rollback' => $health['checks'], 'after_rollback' => $again['checks'] ) );
+	}
+	return array( 'health' => $health );
+}
+
+/* -------------------------------------------------------------------------
+ * Snapshots: plugins activos (ref "active_plugins")
+ * ---------------------------------------------------------------------- */
+
+add_filter( 'spiral_mcp_snapshot_kinds', function ( $kinds ) {
+	$kinds['plugins_state'] = array(
+		'group'   => 'plugins',
+		'cap'     => 'edit_theme_options',
+		'capture' => function () {
+			return array_values( (array) get_option( 'active_plugins', array() ) );
+		},
+		'restore' => function ( $ref, $data ) {
+			$locks = spiral_mcp_plugins_check_locks();
+			if ( is_wp_error( $locks ) ) {
+				return $locks;
+			}
+			spiral_mcp_plugins_load_admin();
+			$want      = (array) $data;
+			$current   = (array) get_option( 'active_plugins', array() );
+			$protected = spiral_mcp_plugins_protected();
+			$installed = get_plugins();
+			$done      = array( 'activated' => array(), 'deactivated' => array(), 'skipped' => array() );
+			foreach ( array_diff( $current, $want ) as $file ) {
+				if ( in_array( $file, $protected, true ) ) {
+					$done['skipped'][] = $file;
+					continue;
+				}
+				deactivate_plugins( $file, true );
+				$done['deactivated'][] = $file;
+			}
+			foreach ( array_diff( $want, $current ) as $file ) {
+				if ( ! isset( $installed[ $file ] ) ) {
+					$done['skipped'][] = $file; // Ya no está instalado.
+					continue;
+				}
+				$res = spiral_mcp_plugin_activate_safely( $file );
+				if ( is_wp_error( $res ) ) {
+					$done['skipped'][] = $file;
+					continue;
+				}
+				$done['activated'][] = $file;
+			}
+			spiral_mcp_plugins_after_change();
+			return $done;
+		},
+	);
+	return $kinds;
+} );
 
 /* -------------------------------------------------------------------------
  * Categoría y abilities
@@ -258,5 +399,184 @@ add_action( 'wp_abilities_api_init', function () {
 			return $out;
 		},
 		'meta'                => spiral_mcp_meta( true, false, true ),
+	) );
+
+	$can_manage = function () {
+		// Los cerrojos se comprueban al ejecutar, para devolver un mensaje que diga cuál falta.
+		return current_user_can( 'edit_theme_options' );
+	};
+	$plugin_prop = array( 'type' => 'string', 'description' => 'Archivo (p. ej. contact-form-7/wp-contact-form-7.php) o slug (contact-form-7), como en list-plugins.' );
+
+	/* 3. Instalar --------------------------------------------------------- */
+	spiral_mcp_register_ability( 'spiral-mcp/install-plugin', array(
+		'label'               => 'Instalar un plugin de wordpress.org',
+		'description'         => 'Instala un plugin del directorio oficial de wordpress.org por su "slug" (ver spiral-mcp/search-plugins), sin activarlo: activarlo es otro paso (spiral-mcp/activate-plugin). Hazlo solo si el usuario lo ha pedido o lo ha aprobado tras enseñarle las opciones. Comprueba antes que sea compatible con la versión de WordPress y PHP del sitio. Solo wordpress.org: no acepta ZIP ni URLs. Requiere los dos cerrojos de la gestión de plugins (capacidad spiral_mcp_plugins y el ajuste del administrador; list-plugins dice si están abiertos). Para deshacerlo, bórralo (fase siguiente) o pide al usuario que lo haga.',
+		'category'            => 'spiral-mcp-plugins',
+		// Pasa también con "settings" para que, sin spiral_mcp_plugins, la respuesta diga qué cerrojo falta
+		// (spiral_mcp_plugins_check_locks() exige la capacidad igualmente).
+		'group'               => array( 'plugins', 'settings' ),
+		'log'                 => array( 'type' => 'plugin', 'id' => 'slug' ),
+		'input_schema'        => array(
+			'type'       => 'object',
+			'required'   => array( 'slug' ),
+			'properties' => array(
+				'slug' => array( 'type' => 'string', 'description' => 'Slug en wordpress.org, p. ej. classic-editor.' ),
+			),
+		),
+		'permission_callback' => $can_manage,
+		'execute_callback'    => function ( $input ) {
+			$locks = spiral_mcp_plugins_check_locks();
+			if ( is_wp_error( $locks ) ) {
+				return $locks;
+			}
+			spiral_mcp_plugins_load_admin();
+			$slug = sanitize_key( (string) ( $input['slug'] ?? '' ) );
+			if ( '' === $slug ) {
+				return new WP_Error( 'spiral_mcp_bad_input', 'Indica "slug" (p. ej. classic-editor).' );
+			}
+			foreach ( array_keys( get_plugins() ) as $file ) {
+				if ( spiral_mcp_plugin_slug( $file ) === $slug ) {
+					return new WP_Error( 'spiral_mcp_plugin_installed', sprintf( 'El plugin "%s" ya está instalado (%s). Para activarlo, spiral-mcp/activate-plugin.', $slug, $file ) );
+				}
+			}
+			$info = plugins_api( 'plugin_information', array( 'slug' => $slug, 'fields' => array( 'sections' => false, 'requires' => true, 'requires_php' => true, 'versions' => false ) ) );
+			if ( is_wp_error( $info ) ) {
+				return new WP_Error( 'spiral_mcp_plugins_api', sprintf( 'No se encontró "%s" en wordpress.org: %s', $slug, $info->get_error_message() ) );
+			}
+			$issues = spiral_mcp_plugin_compat_issues( $info->requires ?? '', $info->requires_php ?? '' );
+			if ( $issues ) {
+				return new WP_Error( 'spiral_mcp_plugin_incompatible', sprintf( '"%s" no es compatible con este sitio: %s. No se ha instalado.', $slug, implode( '; ', $issues ) ) );
+			}
+			$link = (string) ( $info->download_link ?? '' );
+			if ( 'downloads.wordpress.org' !== wp_parse_url( $link, PHP_URL_HOST ) ) {
+				return new WP_Error( 'spiral_mcp_plugin_source', 'La descarga no viene de downloads.wordpress.org: no se instala.' );
+			}
+			if ( ! WP_Filesystem() || 'direct' !== get_filesystem_method() ) {
+				return new WP_Error( 'spiral_mcp_plugin_filesystem', 'WordPress no puede escribir directamente en wp-content/plugins (pide credenciales FTP). Instálalo desde wp-admin.' );
+			}
+			$upgrader = new Plugin_Upgrader( new Automatic_Upgrader_Skin() );
+			$result   = $upgrader->install( $link );
+			if ( is_wp_error( $result ) || ! $result ) {
+				$msg = is_wp_error( $result ) ? $result->get_error_message() : implode( ' ', (array) $upgrader->skin->get_upgrade_messages() );
+				return new WP_Error( 'spiral_mcp_plugin_install_failed', 'No se pudo instalar: ' . $msg );
+			}
+			wp_clean_plugins_cache( true );
+			$file = $upgrader->plugin_info();
+			$data = $file ? get_plugin_data( WP_PLUGIN_DIR . '/' . $file, false, false ) : array();
+			return array(
+				'installed' => true,
+				'active'    => false,
+				'file'      => (string) $file,
+				'slug'      => $slug,
+				'name'      => wp_strip_all_tags( (string) ( $data['Name'] ?? $info->name ?? $slug ) ),
+				'version'   => (string) ( $data['Version'] ?? $info->version ?? '' ),
+				'next'      => 'Está instalado pero desactivado. Para usarlo, spiral-mcp/activate-plugin (confírmalo antes con el usuario).',
+			);
+		},
+		'meta'                => spiral_mcp_meta( false ),
+	) );
+
+	/* 4. Activar ---------------------------------------------------------- */
+	spiral_mcp_register_ability( 'spiral-mcp/activate-plugin', array(
+		'label'               => 'Activar un plugin',
+		'description'         => 'Activa un plugin instalado. Si da un error fatal al cargarse no se activa; si después el sitio responde con error 500 (se comprueban la portada y wp-admin), se desactiva solo y lo dice. Antes guarda un snapshot de los plugins activos ("snapshot_id"; restore-snapshot lo deshace) y después purga la caché. Revisa la web con inspect-page o una captura: un plugin puede cambiar el diseño o añadir contenido. Requiere los dos cerrojos de la gestión de plugins.',
+		'category'            => 'spiral-mcp-plugins',
+		// Pasa también con "settings" para que, sin spiral_mcp_plugins, la respuesta diga qué cerrojo falta
+		// (spiral_mcp_plugins_check_locks() exige la capacidad igualmente).
+		'group'               => array( 'plugins', 'settings' ),
+		'log'                 => array( 'type' => 'plugin', 'id' => 'plugin' ),
+		'input_schema'        => array(
+			'type'       => 'object',
+			'required'   => array( 'plugin' ),
+			'properties' => array( 'plugin' => $plugin_prop ),
+		),
+		'permission_callback' => $can_manage,
+		'execute_callback'    => function ( $input ) {
+			$locks = spiral_mcp_plugins_check_locks();
+			if ( is_wp_error( $locks ) ) {
+				return $locks;
+			}
+			$file = spiral_mcp_plugin_resolve( $input['plugin'] ?? '' );
+			if ( is_wp_error( $file ) ) {
+				return $file;
+			}
+			if ( is_plugin_active( $file ) ) {
+				return new WP_Error( 'spiral_mcp_plugin_active', sprintf( '"%s" ya está activo.', $file ) );
+			}
+			$data   = get_plugin_data( WP_PLUGIN_DIR . '/' . $file, false, false );
+			$issues = spiral_mcp_plugin_compat_issues( $data['RequiresWP'] ?? '', $data['RequiresPHP'] ?? '' );
+			if ( $issues ) {
+				return new WP_Error( 'spiral_mcp_plugin_incompatible', sprintf( '"%s" no es compatible con este sitio: %s.', $file, implode( '; ', $issues ) ) );
+			}
+			$snapshot = spiral_mcp_snapshot_capture( 'plugins_state', 'active_plugins', 'activate-plugin:' . $file );
+			if ( is_wp_error( $snapshot ) ) {
+				return $snapshot;
+			}
+			$res = spiral_mcp_plugin_activate_safely( $file );
+			if ( is_wp_error( $res ) ) {
+				return $res;
+			}
+			spiral_mcp_plugins_after_change();
+			return array(
+				'active'      => true,
+				'file'        => $file,
+				'name'        => wp_strip_all_tags( (string) $data['Name'] ),
+				'version'     => (string) $data['Version'],
+				'health'      => $res['health'],
+				'snapshot_id' => $snapshot,
+			);
+		},
+		'meta'                => spiral_mcp_meta( false, false, true ),
+	) );
+
+	/* 5. Desactivar ------------------------------------------------------- */
+	spiral_mcp_register_ability( 'spiral-mcp/deactivate-plugin', array(
+		'label'               => 'Desactivar un plugin',
+		'description'         => 'Desactiva un plugin (no lo borra: sus ajustes y datos se conservan). Spiral-MCP-Control y MCP Adapter no se pueden desactivar desde aquí. Antes guarda un snapshot de los plugins activos ("snapshot_id"; restore-snapshot lo vuelve a activar) y después purga la caché y comprueba que el sitio responde. Avisa al usuario de lo que dejará de funcionar (formularios, tienda…). Requiere los dos cerrojos de la gestión de plugins.',
+		'category'            => 'spiral-mcp-plugins',
+		// Pasa también con "settings" para que, sin spiral_mcp_plugins, la respuesta diga qué cerrojo falta
+		// (spiral_mcp_plugins_check_locks() exige la capacidad igualmente).
+		'group'               => array( 'plugins', 'settings' ),
+		'log'                 => array( 'type' => 'plugin', 'id' => 'plugin' ),
+		'input_schema'        => array(
+			'type'       => 'object',
+			'required'   => array( 'plugin' ),
+			'properties' => array( 'plugin' => $plugin_prop ),
+		),
+		'permission_callback' => $can_manage,
+		'execute_callback'    => function ( $input ) {
+			$locks = spiral_mcp_plugins_check_locks();
+			if ( is_wp_error( $locks ) ) {
+				return $locks;
+			}
+			$file = spiral_mcp_plugin_resolve( $input['plugin'] ?? '' );
+			if ( is_wp_error( $file ) ) {
+				return $file;
+			}
+			if ( in_array( $file, spiral_mcp_plugins_protected(), true ) ) {
+				return new WP_Error( 'spiral_mcp_plugin_protected', sprintf( '"%s" está protegido: sin él perderías el acceso. Si hay que desactivarlo, que lo haga el usuario desde wp-admin.', $file ) );
+			}
+			if ( ! is_plugin_active( $file ) ) {
+				return new WP_Error( 'spiral_mcp_plugin_inactive', sprintf( '"%s" ya está desactivado.', $file ) );
+			}
+			$snapshot = spiral_mcp_snapshot_capture( 'plugins_state', 'active_plugins', 'deactivate-plugin:' . $file );
+			if ( is_wp_error( $snapshot ) ) {
+				return $snapshot;
+			}
+			deactivate_plugins( $file );
+			spiral_mcp_plugins_after_change();
+			$health = spiral_mcp_plugins_health();
+			$out    = array(
+				'active'      => false,
+				'file'        => $file,
+				'health'      => $health,
+				'snapshot_id' => $snapshot,
+			);
+			if ( ! $health['ok'] ) {
+				$out['warnings'] = array( 'Tras desactivarlo, el sitio responde con error: puede que otro plugin dependa de él. Restaura el snapshot para volver a activarlo.' );
+			}
+			return $out;
+		},
+		'meta'                => spiral_mcp_meta( false, false, true ),
 	) );
 } );

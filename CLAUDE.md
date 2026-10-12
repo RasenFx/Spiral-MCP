@@ -10,7 +10,7 @@ El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes d
 - YOOtheme Pro activo (o un tema hijo de YOOtheme) para todo lo relacionado con el builder y los estilos.
 - PHP 7.4 como mínimo: no usar sintaxis de PHP 8 (match, nullsafe `?->`, argumentos con nombre, tipos de unión, `readonly`, enums).
 
-## Estructura actual (v1.21.0)
+## Estructura actual (v1.22.0)
 ```
 spiral-mcp-control.php   cabecera, constantes, comprobación de requisitos, require_once y hooks de activación
 uninstall.php            borra el rol y las capacidades (las tablas solo con el filtro spiral_mcp_uninstall_drop_tables)
@@ -34,7 +34,7 @@ includes/taxonomies.php  taxonomías y términos (+ snapshot kind "term")
 includes/seo.php         SEO por contenido: Yoast o salida propia (+ snapshot kind "seo")
 includes/settings.php    ajustes del sitio: identidad y portada (+ snapshot kind "option")
 includes/preview.php     URLs de vista previa sin sesión (token firmado) e inspect-page
-includes/plugins.php     plugins: list-plugins, search-plugins (wordpress.org) y cerrojos de la gestión (spiral_mcp_plugins + ajuste plugins_management)
+includes/plugins.php     plugins: listar, buscar en wordpress.org, instalar, activar (protegida) y desactivar; cerrojos (spiral_mcp_plugins + ajuste plugins_management) y snapshot kind "plugins_state"
 includes/admin.php       página Ajustes > Spiral-MCP (solo admin): abilities, permisos del rol del agente, comportamiento y actividad (con restaurar)
 includes/styles.php      CSS adicional (+ snapshot kind "custom_css") y estilo de YOOtheme: catálogo de variables, cambios y estado de compilación
 tests/smoke.sh           prueba de humo por REST (ver "Entorno de desarrollo")
@@ -56,7 +56,7 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - YOOtheme: `get-theme-config`, `update-theme-config`, `list-templates`, `get-template`, `create-template`, `update-template`, `delete-template`, `list-library`, `get-library-item`, `save-to-library`; librería online: `list-online-library`, `get-online-library-item`, `import-from-online-library`.
 - Medios: `upload-media`, `list-media`, `get-media`, `update-media`, `delete-media`, `set-featured-image`, `find-media-usage`.
 - Cachés: `get-cache-status`, `purge-cache`, `preload-cache`, `get-cache-settings`, `update-cache-settings` (exige `spiral_mcp_cache`); `clear-cache` es un alias obsoleto de `purge-cache`.
-- Plugins: `list-plugins`, `search-plugins` (la gestión, en la Fase 8).
+- Plugins: `list-plugins`, `search-plugins`, `install-plugin`, `activate-plugin`, `deactivate-plugin` (escritura con dos cerrojos).
 - Auditoría y snapshots: `list-activity`, `list-snapshots`, `restore-snapshot`.
 
 ## Convenciones (obligatorias)

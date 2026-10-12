@@ -1,6 +1,6 @@
 # Referencia de abilities spiral-mcp/*
 
-Generada a partir de los esquemas registrados por el plugin (v1.21.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
+Generada a partir de los esquemas registrados por el plugin (v1.22.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
 
 Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; destructiva = requiere `"confirm": true`.
 
@@ -152,6 +152,9 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 |---|---|---|
 | `list-plugins` | lectura | status `"all" / "active" / "inactive" / "update"`, search `string` |
 | `search-plugins` | lectura | search `string`, slug `string`, per_page `integer`, page `integer` |
+| `install-plugin` | escritura | **slug** `string` |
+| `activate-plugin` | escritura | **plugin** `string` |
+| `deactivate-plugin` | escritura | **plugin** `string` |
 
 ## Auditoría
 

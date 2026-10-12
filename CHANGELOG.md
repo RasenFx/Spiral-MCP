@@ -2,6 +2,18 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.22.0] — 2026-10-12 · Fase 8.2: instalar, activar y desactivar plugins
+
+### Añadido
+- `spiral-mcp/install-plugin`: instala un plugin de wordpress.org por su slug, **sin activarlo**, tras comprobar que es compatible con la versión de WordPress y PHP del sitio. Solo descargas de `downloads.wordpress.org`.
+- `spiral-mcp/activate-plugin`: activación protegida. Si el plugin da un error fatal al cargarse no se activa; si después la portada o wp-admin responden con error 500, se desactiva solo. Snapshot `plugins_state` antes y purga de caché después.
+- `spiral-mcp/deactivate-plugin`: con snapshot (restaurarlo lo vuelve a activar) y comprobación del sitio; Spiral-MCP-Control y MCP Adapter están protegidos.
+- Plugins de prueba en `tests/fixtures/plugins/` (error al cargar, rompe la web pública, incompatible).
+- Skill: receta "Instalar un plugin".
+
+### Cambiado
+- Con un cerrojo de la gestión de plugins cerrado, las abilities responden 403 y dicen cuál falta.
+
 ## [1.21.0] — 2026-10-12 · Fase 8.1: plugins (lectura y cerrojos)
 
 ### Añadido

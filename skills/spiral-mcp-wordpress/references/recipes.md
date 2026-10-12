@@ -21,6 +21,7 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 - [Página hija con plantilla, categorías y SEO](#página-hija-con-plantilla-categorías-y-seo)
 - [Un cambio no se ve (cachés)](#un-cambio-no-se-ve-cachés)
 - [Acelerar el sitio](#acelerar-el-sitio)
+- [Instalar un plugin](#instalar-un-plugin)
 - [Deshacer un cambio](#deshacer-un-cambio)
 
 ## Crear una página nueva a partir de otra
@@ -218,6 +219,17 @@ Las escrituras ya purgan solas la caché de lo que cambian (un contenido: esa p�
 4. **Precarga** tras activarla o tras cambios grandes: `preload-cache {"action": "start"}` (si la herramienta la admite).
 5. **Imágenes de YOOtheme:** `get-theme-config {"section": "webp"}` (conversión a WebP; y `lazyload`, carga diferida, si aparece en la lista de secciones: no existe en todas las instalaciones); si están desactivadas, propón activarlas con `update-theme-config`. Sube imágenes a un tamaño razonable (no fotos de 6000 px para una tarjeta).
 6. **Comprueba** con `inspect-page {"path": "/"}` que todo sigue bien, y explica al usuario qué cambiaste y cómo deshacerlo (`snapshot_id`).
+
+## Instalar un plugin
+
+Solo si el usuario lo pide. Instalar código es el cambio de más riesgo: ve paso a paso y con su aprobación.
+
+1. `list-plugins`: mira si ya hay algo que haga eso y si puedes gestionar plugins (`management.allowed`). Si no, `management.reason` dice qué cerrojo falta (el ajuste del administrador o la capacidad `spiral_mcp_plugins`): explícaselo al usuario.
+2. `search-plugins {"search": "formulario de contacto"}`: enséñale dos o tres opciones con lo que importa: instalaciones activas, valoración, última actualización (descarta los que llevan más de un año sin actualizarse), `compatible`. Que elija él.
+3. `install-plugin {"slug": "..."}`: queda instalado pero **desactivado**.
+4. Confirma con el usuario y `activate-plugin {"plugin": "..."}`. Si devuelve `spiral_mcp_plugin_fatal` o `spiral_mcp_plugin_broke_site`, el plugin no ha quedado activo y el sitio está bien: cuéntaselo y propón otra opción.
+5. Revisa la web (`inspect-page {"path": "/"}` o una captura): un plugin puede cambiar el diseño o añadir cosas. Dile al usuario dónde se configura (normalmente en wp-admin) y el `snapshot_id` para deshacerlo.
+6. Para quitarlo: `deactivate-plugin` (conserva sus datos). Spiral-MCP-Control y MCP Adapter no se pueden desactivar desde aquí.
 
 ## Deshacer un cambio
 
