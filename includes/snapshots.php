@@ -153,6 +153,8 @@ function spiral_mcp_snapshot_restore( $id, array $opts = array() ) {
 	}
 	$res = call_user_func( $kind['restore'], $snap->ref, $data );
 	if ( is_wp_error( $res ) ) {
+		// No se restauró nada: la copia "antes de restaurar" sobra y bloquearía el siguiente intento.
+		$wpdb->delete( spiral_mcp_table( 'snapshots' ), array( 'id' => (int) $previous ), array( '%d' ) );
 		return $res;
 	}
 	return array_merge(

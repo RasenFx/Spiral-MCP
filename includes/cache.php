@@ -13,7 +13,9 @@
  *   'preload'  => callable( 'start'|'stop'|'status' ): array|WP_Error,
  *   'settings' => callable(): [ 'common' => […], 'provider_settings' => […] ],
  *   'write_settings' => callable( $common, $provider_settings ): [ 'changed' => […], 'warnings' => […] ]|WP_Error
- *                       (valida todo antes de escribir; capacidad "write_settings").
+ *                       (valida todo antes de escribir; capacidad "write_settings"),
+ *   'writable' => [ 'common' => [ claves ], 'provider' => [ claves ] ]: lo que write_settings acepta
+ *                 (al restaurar un snapshot solo se reescriben esas claves).
  * Ajustes comunes: enabled, lifetime (segundos), cache_logged_in, mobile, compression,
  * exclude_urls, clear_on_edit (null si la herramienta no lo tiene).
  *
@@ -221,6 +223,10 @@ function spiral_mcp_cache_wpsc_provider() {
 		'preload'    => 'spiral_mcp_cache_wpsc_preload',
 		'settings'   => 'spiral_mcp_cache_wpsc_settings',
 		'write_settings' => 'spiral_mcp_cache_wpsc_write',
+		'writable'       => array(
+			'common'   => array( 'enabled', 'lifetime', 'cache_logged_in', 'mobile', 'compression', 'exclude_urls', 'clear_on_edit' ),
+			'provider' => array( 'mode', 'dont_cache_logged_in', 'refresh_single_only', 'rebuild_files', 'no_cache_for_get', 'make_known_anon', 'preload_on', 'preload_interval_minutes', 'preload_posts' ),
+		),
 	);
 }
 
@@ -520,14 +526,19 @@ add_filter( 'spiral_mcp_snapshot_kinds', function ( $kinds ) {
 			if ( ! $p || ! spiral_mcp_cache_can( $p, 'write_settings' ) ) {
 				return new WP_Error( 'spiral_mcp_cache_unknown', sprintf( 'La herramienta de caché "%s" ya no está activa o no permite cambiar ajustes.', $ref ) );
 			}
-			$provider = (array) ( $data['provider_settings'] ?? array() );
-			// Solo lo que se puede escribir: lo de solo lectura y el modo Expert se dejan como estén.
-			unset( $provider['rejected_user_agents'] );
+			// Solo lo que la herramienta permite escribir (y sin valores null = "no lo tiene").
+			$writable = (array) ( $p['writable'] ?? array() );
+			$pick     = function ( $values, $keys ) {
+				return array_filter( array_intersect_key( (array) $values, array_flip( (array) $keys ) ), function ( $v ) {
+					return null !== $v;
+				} );
+			};
+			$common   = $pick( $data['common'] ?? array(), $writable['common'] ?? array() );
+			$provider = $pick( $data['provider_settings'] ?? array(), $writable['provider'] ?? array() );
 			if ( 'expert' === ( $provider['mode'] ?? '' ) ) {
-				unset( $provider['mode'] );
+				unset( $provider['mode'] ); // El modo Expert no se activa desde aquí: se deja como esté.
 			}
-			$res = call_user_func( $p['write_settings'], (array) ( $data['common'] ?? array() ), $provider );
-			return $res;
+			return call_user_func( $p['write_settings'], $common, $provider );
 		},
 	);
 	return $kinds;

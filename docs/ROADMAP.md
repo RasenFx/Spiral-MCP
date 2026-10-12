@@ -221,7 +221,19 @@ El plugin se instala en sitios con distintas herramientas de caché (o ninguna, 
 Mejora salida de las pruebas: si una herramienta no purga por URL pero la URL es de un contenido, se purga ese contenido en lugar de todo. Notas: la activación de W3 Total Cache tarda más de 2 minutos (hace peticiones a sí mismo); su motor "Disk: Basic" guarda en `cache/page` con nombres en hash. Desactivar WP Super Cache desde código necesita `wp-admin/includes/file.php` (si no, se rompe a medias tras quitar `advanced-cache.php`).
 
 ### 6.4 Más herramientas: ajustes
-- [ ] WP Rocket (`wp_rocket_settings`), LiteSpeed Cache y WP Fastest Cache. W3 Total Cache solo lectura al principio.
+- [x] WP Rocket (`wp_rocket_settings`), LiteSpeed Cache y WP Fastest Cache. W3 Total Cache solo lectura al principio.
+
+**Resultado 6.4:**
+
+| Herramienta | Leer | Escribir (comunes) | Propios | Cómo escribe | Probado |
+|---|---|---|---|---|---|
+| WP Super Cache | sí | los 7 | modo (no Expert), usuarios conocidos, regenerar, precarga… | su clase REST + `wp_cache_setting()` | sí |
+| LiteSpeed Cache | sí | enabled, lifetime, cache_logged_in, mobile, exclude_urls | caducidad de portada y feeds, REST, comentaristas, login | acción pública `litespeed_save_conf` (como su panel: actualiza su bloque de `.htaccess`) | sí: opciones, `.htaccess` y restaurar |
+| WP Fastest Cache | sí | enabled, cache_logged_in, exclude_urls (`/ruta/`, `/ruta*`, `*texto*`), clear_on_edit | no cachear en móvil, purgar al publicar | opciones `WpFastestCache` y `WpFastestCacheExclude` (sin tocar `.htaccess`; al desactivar, vacía la caché) | sí: la URL excluida deja de cachearse; restaurar |
+| WP Rocket | sí | lifetime, cache_logged_in, mobile, exclude_urls | caché móvil | `update_option( 'wp_rocket_settings' )` (dispara sus ganchos) | sin probar (de pago) |
+| W3 Total Cache | sí | — (solo lectura) | motor, portada, feeds | — | lectura, sí |
+
+Cada adaptador declara `writable` (claves que acepta) y `restore-snapshot` solo reescribe esas: así se restauran ajustes de herramientas que no permiten escribirlos todos. Arreglado de paso: si una restauración falla, ya no queda la copia "antes de restaurar" (bloqueaba el siguiente intento con `spiral_mcp_snapshot_later`).
 
 ### 6.5 Pruebas y documentación
 - [ ] `tests/smoke.sh`: pruebas según la herramienta detectada.

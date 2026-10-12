@@ -2,6 +2,16 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.17.0] — 2026-10-12 · Fase 6.4: ajustes de más herramientas de caché
+
+### Añadido
+- `get-cache-settings` / `update-cache-settings` para LiteSpeed Cache (por su acción pública `litespeed_save_conf`), WP Fastest Cache (sus opciones, sin tocar `.htaccess`) y WP Rocket (sin probar); W3 Total Cache, solo lectura.
+- Los adaptadores declaran `writable`: las claves que aceptan. Lo que una herramienta no admite se rechaza con el motivo (p. ej. la compresión de WP Fastest Cache va en `.htaccess`).
+
+### Corregido
+- Restaurar un snapshot de ajustes de caché de una herramienta que no permite escribir todos los ajustes fallaba: ahora solo se reescriben los que admite.
+- Si una restauración falla, se borra la copia "antes de restaurar", que bloqueaba el siguiente intento.
+
 ## [1.16.0] — 2026-10-12 · Fase 6.3: más herramientas de caché
 
 ### Añadido
