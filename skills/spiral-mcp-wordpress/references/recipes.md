@@ -20,6 +20,7 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 - [Programar una publicación](#programar-una-publicación)
 - [Página hija con plantilla, categorías y SEO](#página-hija-con-plantilla-categorías-y-seo)
 - [Un cambio no se ve (cachés)](#un-cambio-no-se-ve-cachés)
+- [Acelerar el sitio](#acelerar-el-sitio)
 - [Deshacer un cambio](#deshacer-un-cambio)
 
 ## Crear una página nueva a partir de otra
@@ -208,6 +209,15 @@ Las escrituras ya purgan solas la caché de lo que cambian (un contenido: esa p�
 5. Si el usuario sigue sin verlo, puede ser su navegador: que recargue sin caché (Ctrl+F5) o pruebe en una ventana privada.
 
 **Cambiar ajustes de caché** (activarla, caducidad, no cachear a usuarios con sesión, versión móvil, URLs excluidas…): `get-cache-settings` y después `update-cache-settings {"settings": {"lifetime": 3600}}` (solo cambian las claves enviadas; las propias de la herramienta van en `provider_settings`). Se pueden cambiar en WP Super Cache, LiteSpeed Cache y WP Fastest Cache (WP Rocket, sin probar); W3 Total Cache solo se lee. Cada herramienta tiene sus límites: un ajuste a `null` en `get-cache-settings` no existe en ella, y si pides algo que no admite (p. ej. la compresión de WP Fastest Cache, que va en `.htaccess`) la respuesta dice por qué. El formato de `exclude_urls` depende de la herramienta: en WP Super Cache son fragmentos de expresión regular; en WP Fastest Cache, `/ruta/` (exacta), `/ruta*` (empieza por) o `*texto*` (contiene). Exige el permiso de caché (`spiral_mcp_cache`), que el agente no tiene por defecto: si la respuesta es 403, explícale al usuario qué cambiarías y por qué, y que lo haga él o te dé el permiso. Activar o desactivar la caché afecta a todo el sitio: solo si el usuario lo pide. Se deshace con el `snapshot_id` de la respuesta.
+
+## Acelerar el sitio
+
+1. **Mira qué hay:** `get-cache-status {"include_stats": true}`. Sin herramienta de caché de páginas, la mejora más grande es instalar una; eso no se hace desde aquí: recomiéndaselo al usuario (WP Super Cache es gratuita y sencilla; si el hosting es LiteSpeed, LiteSpeed Cache; en SiteGround, su SiteGround Optimizer). Lee `problem` y `note`: una herramienta instalada puede no funcionar en ese servidor.
+2. **Caché de páginas activada:** `get-cache-settings`. Si `enabled` es false, propón activarla. Cambiarlo exige `spiral_mcp_cache`: con permiso, `update-cache-settings {"settings": {"enabled": true}}`; sin él, explícale al usuario qué tocar en el panel de su plugin.
+3. **Caducidad razonable:** en un sitio que cambia poco, horas o días (`lifetime`, en segundos); las escrituras de las abilities ya purgan lo que cambian, así que una caducidad larga no deja contenido viejo.
+4. **Precarga** tras activarla o tras cambios grandes: `preload-cache {"action": "start"}` (si la herramienta la admite).
+5. **Imágenes de YOOtheme:** `get-theme-config {"section": "webp"}` (conversión a WebP; y `lazyload`, carga diferida, si aparece en la lista de secciones: no existe en todas las instalaciones); si están desactivadas, propón activarlas con `update-theme-config`. Sube imágenes a un tamaño razonable (no fotos de 6000 px para una tarjeta).
+6. **Comprueba** con `inspect-page {"path": "/"}` que todo sigue bien, y explica al usuario qué cambiaste y cómo deshacerlo (`snapshot_id`).
 
 ## Deshacer un cambio
 

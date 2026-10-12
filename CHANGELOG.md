@@ -4,6 +4,11 @@ Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://
 
 ## [1.17.0] — 2026-10-12 · Fase 6.4: ajustes de más herramientas de caché
 
+### Documentación y pruebas (Fase 6.5, sin cambios en el plugin)
+- `README.md`: qué es, requisitos, instalación, permisos y tabla de herramientas de caché compatibles.
+- `tests/smoke.sh`: pruebas por herramienta de caché detectada y `SMOKE_CACHE_WRITE=1`.
+- Skill: receta "Acelerar el sitio".
+
 ### Añadido
 - `get-cache-settings` / `update-cache-settings` para LiteSpeed Cache (por su acción pública `litespeed_save_conf`), WP Fastest Cache (sus opciones, sin tocar `.htaccess`) y WP Rocket (sin probar); W3 Total Cache, solo lectura.
 - Los adaptadores declaran `writable`: las claves que aceptan. Lo que una herramienta no admite se rechaza con el motivo (p. ej. la compresión de WP Fastest Cache va en `.htaccess`).

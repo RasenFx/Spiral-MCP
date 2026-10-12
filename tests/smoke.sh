@@ -9,6 +9,9 @@
 # funciona también con los enlaces permanentes "simples". curl va con -k
 # (certificados autofirmados del entorno local): nunca lo apuntes a producción.
 #
+# SMOKE_CACHE_WRITE=1: prueba update-cache-settings en cada herramienta de caché que lo admita
+# (escribe un ajuste con su valor actual y lo restaura). El usuario necesita spiral_mcp_cache.
+#
 # SMOKE_MEDIA_URL: imagen https para probar upload-media desde URL. Por defecto,
 # un logo de s.w.org; vacía (SMOKE_MEDIA_URL=) omite la prueba.
 #
@@ -423,11 +426,43 @@ call POST spiral-mcp/purge-cache '{"scope":"url","url":"https://example.com/"}'
 call POST spiral-mcp/purge-cache '{"scope":"all","object_cache":false}'
 check 'purge-cache (all)' 200 results
 # Cambiar ajustes de caché exige spiral_mcp_cache, que el rol del agente no tiene por defecto.
-call POST spiral-mcp/update-cache-settings '{"settings":{"lifetime":3600}}'
-[ "$STATUS" = 403 ] && ok 'update-cache-settings: el agente no tiene permiso por defecto' || ko "update-cache-settings debería exigir spiral_mcp_cache (HTTP $STATUS)"
+if [ "${SMOKE_CACHE_WRITE:-0}" != 1 ]; then
+	call POST spiral-mcp/update-cache-settings '{"settings":{"lifetime":3600}}'
+	[ "$STATUS" = 403 ] && ok 'update-cache-settings: el agente no tiene permiso por defecto' || ko "update-cache-settings debería exigir spiral_mcp_cache (HTTP $STATUS)"
+fi
 if [ "${CACHE_PROVIDERS:-0}" -gt 0 ]; then
 	call POST spiral-mcp/preload-cache '{"action":"status"}'
 	if [ "$STATUS" = 200 ] || printf '%s' "$BODY" | grep -q 'spiral_mcp_cache_unsupported'; then ok 'preload-cache status'; else ko "preload-cache status (HTTP $STATUS)"; fi
+	# Por cada herramienta detectada: lo que dice admitir tiene que funcionar.
+	call GET spiral-mcp/get-cache-status
+	CACHE_LIST=$(printf '%s' "$BODY" | php -r '
+		$d = json_decode( stream_get_contents( STDIN ), true );
+		foreach ( $d["providers"] ?? array() as $p ) { echo $p["id"], " ", in_array( "read_settings", $p["supports"], true ) ? 1 : 0, " ", in_array( "write_settings", $p["supports"], true ) ? 1 : 0, "\n"; }
+	')
+	call GET spiral-mcp/get-cache-settings
+	CACHE_SETTINGS_BODY=$BODY
+	while read -r CACHE_ID CACHE_READ CACHE_WRITE; do
+		[ -z "$CACHE_ID" ] && continue
+		call POST spiral-mcp/purge-cache "{\"scope\":\"all\",\"provider\":\"$CACHE_ID\",\"object_cache\":false}"
+		check "purge-cache solo en $CACHE_ID" 200 results
+		if [ "$CACHE_READ" = 1 ]; then
+			printf '%s' "$CACHE_SETTINGS_BODY" | grep -q "\"provider\": *\"$CACHE_ID\"" && ok "get-cache-settings incluye $CACHE_ID" || ko "get-cache-settings no incluye $CACHE_ID"
+		fi
+		if [ "$CACHE_WRITE" = 1 ] && [ "${SMOKE_CACHE_WRITE:-0}" = 1 ]; then
+			# Escribe cache_logged_in con su valor actual (lo admiten todos los adaptadores que escriben) y deshace.
+			CURRENT=$(printf '%s' "$CACHE_SETTINGS_BODY" | php -r '
+				$d = json_decode( stream_get_contents( STDIN ), true );
+				foreach ( $d["providers"] as $p ) { if ( $p["provider"] === $argv[1] ) { echo json_encode( $p["common"]["cache_logged_in"] ); } }
+			' "$CACHE_ID")
+			call POST spiral-mcp/update-cache-settings "{\"provider\":\"$CACHE_ID\",\"settings\":{\"cache_logged_in\":$CURRENT}}"
+			check "update-cache-settings ($CACHE_ID, sin cambios)" 200 snapshot_id
+			eq "update-cache-settings ($CACHE_ID) no cambia nada" 'changed.#' 0
+			call POST spiral-mcp/restore-snapshot "{\"id\":$(jget snapshot_id),\"confirm\":true,\"include_later\":true}"
+			check "restore-snapshot (ajustes de $CACHE_ID)" 200
+		fi
+	done <<EOF_CACHE
+$CACHE_LIST
+EOF_CACHE
 else
 	echo 'AVISO no hay herramientas de caché activas: solo se prueba que las abilities responden'
 fi

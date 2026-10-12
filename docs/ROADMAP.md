@@ -236,9 +236,11 @@ Mejora salida de las pruebas: si una herramienta no purga por URL pero la URL es
 Cada adaptador declara `writable` (claves que acepta) y `restore-snapshot` solo reescribe esas: así se restauran ajustes de herramientas que no permiten escribirlos todos. Arreglado de paso: si una restauración falla, ya no queda la copia "antes de restaurar" (bloqueaba el siguiente intento con `spiral_mcp_snapshot_later`).
 
 ### 6.5 Pruebas y documentación
-- [ ] `tests/smoke.sh`: pruebas según la herramienta detectada.
-- [ ] Probar cada adaptador instalando la herramienta en local de una en una (W3TC, LiteSpeed, WP Fastest Cache, Nginx Helper son gratuitos). Los que no se puedan probar (WP Rocket, de pago; cachés de hosting) se marcan "sin probar" en la tabla de compatibilidad.
-- [ ] Skill: receta "un cambio no se ve" y "acelerar el sitio". Tabla de herramientas compatibles en el README.
+- [x] `tests/smoke.sh`: pruebas según la herramienta detectada (purga limitada a cada una, sus ajustes en `get-cache-settings`; con `SMOKE_CACHE_WRITE=1`, escritura sin cambios y restauración en las que admiten escribir).
+- [x] Probar cada adaptador instalando la herramienta en local de una en una (W3TC, LiteSpeed, WP Fastest Cache, Nginx Helper son gratuitos). Los que no se puedan probar (WP Rocket, de pago; cachés de hosting) se marcan "sin probar" en la tabla de compatibilidad.
+- [x] Skill: receta "un cambio no se ve" y "acelerar el sitio". Tabla de herramientas compatibles en el README.
+
+**Fase 6 terminada.** Nota: restaurar los ajustes de WP Super Cache deja los mismos valores, pero sus funciones reescriben algunas líneas de `wp-cache-config.php` con otro formato (`'600'` en vez de `600`, arrays con índices); es equivalente.
 
 **Terminado cuando:** en un sitio con cualquiera de las herramientas compatibles, el agente sabe qué caché hay, la purga (toda o una página), lanza la precarga si existe y, con permiso, cambia los ajustes básicos y puede deshacerlo.
 
