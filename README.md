@@ -30,7 +30,7 @@ Las abilities llevan el prefijo `spiral-mcp/`. La referencia completa de paráme
 | Medios | subir (URL o base64), listar, editar, borrar, imagen destacada, dónde se usa un medio |
 | Estilos | CSS adicional; estilo, variables LESS y estado de compilación de YOOtheme |
 | Verificación | URL de vista previa sin sesión, inspección de una página (encabezados, enlaces rotos, alt, SEO efectivo) |
-| Ajustes | identidad del sitio, portada, zona horaria |
+| Ajustes | identidad del sitio, portada, zona horaria; con Yoast SEO activo, sus ajustes generales (plantillas de título, Schema, redes sociales, migas de pan, mapas del sitio, verificación, rastreo) |
 | Plugins | listar los instalados, buscar en wordpress.org, instalar (sin activar), activar con comprobación de salud, desactivar, actualizar (vuelve a la versión anterior si rompe el sitio) y borrar; con doble cerrojo, cerrado por defecto |
 | Formularios | con Contact Form 7 activo: listar (y dónde se usan), leer, crear, editar y borrar; cambiar a quién llega el correo exige confirmación |
 | Cachés | estado, purga, precarga y ajustes de la herramienta de caché del sitio (ver abajo) |
@@ -43,7 +43,7 @@ Las abilities llevan el prefijo `spiral-mcp/`. La referencia completa de paráme
 | `spiral_mcp_content` | contenido, taxonomías, SEO, formularios | sí |
 | `spiral_mcp_design` | builder, tema, menús, widgets, estilos | sí |
 | `spiral_mcp_media` | medios | sí |
-| `spiral_mcp_settings` | ajustes del sitio | sí |
+| `spiral_mcp_settings` | ajustes del sitio y de Yoast SEO | sí |
 | `spiral_mcp_code` | JS personalizado (sección `scripts` de YOOtheme) | sí |
 | `spiral_mcp_cache` | **cambiar** los ajustes de caché | **no** |
 | `spiral_mcp_plugins` | gestionar plugins de wordpress.org (además hay que activar "Permitir que el agente gestione plugins" en *Comportamiento*) | **no** |

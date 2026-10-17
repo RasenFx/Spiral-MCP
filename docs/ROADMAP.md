@@ -343,6 +343,22 @@ Que el agente cree y cambie los formularios del sitio sin entrar en wp-admin: ca
 
 ---
 
+## Fase 10 — Ajustes generales de Yoast SEO
+
+Que el agente cambie lo que en wp-admin está en *Yoast SEO > Ajustes* (plantillas de título, Schema, redes, mapas del sitio, rastreo…), no solo el SEO de cada contenido. Solo se registra si Yoast está activo.
+
+- [x] `spiral-mcp/get-seo-settings`: secciones y, por sección, claves con su valor y ayudas (separadores, tipos de Schema, variables).
+- [x] `spiral-mcp/update-seo-settings`: claves de la lista blanca, tipo comprobado, validación de Yoast (`not_applied`), imágenes por ID, snapshot kind `seo_settings` y purga de toda la caché.
+- [x] Prueba de humo (si Yoast está activo), receta del skill, README.
+
+**Decisiones:** grupo `settings` + `edit_theme_options`, como los ajustes del sitio (el agente no tiene `manage_options`). Lista blanca por secciones con patrones sobre las claves existentes (filtro `spiral_mcp_yoast_sections`): fuera quedan el estado interno de Yoast (indexación, versión, tokens de SEMrush y Wincher, OAuth), el seguimiento de uso y el usuario que representa al sitio cuando es una persona (usuarios: fuera de alcance). El snapshot guarda solo las claves editables, así que restaurarlo nunca pisa el estado interno.
+
+**Resultado 10** (Yoast SEO 28.7): 11 secciones, 184 claves en local. Probado por REST con el rol del agente: separador `|` y plantilla de título de las páginas (la página del blog sale "Blog | MCP Control PRUEBA"), `noindex-tax-post_tag`, `remove_shortlinks` e imagen por defecto al compartir por ID (`og:image` con medidas); `twitter_card_type: "enorme"` queda en `not_applied` y se conserva `summary_large_image`; una clave interna (`semrush_tokens`) o un tipo equivocado se rechazan sin escribir; `stripcategorybase` hace que `/category/uncategorized/` redirija con 301 a `/uncategorized/`, y desactivar el mapa del sitio deja `/sitemap_index.xml` en 404. Restaurando los tres snapshots todo vuelve al estado original (reglas de reescritura incluidas). Descubierto: Yoast gratuito ignora las plantillas `social-*` por tipo de contenido (Premium); la descripción y `help` lo dicen.
+
+**Terminado cuando:** el agente cambia la plantilla de título de las páginas, la imagen por defecto al compartir y el mapa del sitio, lo comprueba en la web y lo deshace.
+
+---
+
 ## Fuera de alcance en esta etapa
 - Instalar, activar o actualizar temas. Los plugins se tratan en la Fase 8.
 - WooCommerce (fase posterior del sitio).

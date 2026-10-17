@@ -2,6 +2,18 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.25.0] — 2026-10-17 · Fase 10: ajustes generales de Yoast SEO
+
+### Añadido
+- Módulo `includes/seo-settings.php` (categoría `spiral-mcp-settings`, grupo `settings` + `edit_theme_options`), solo si Yoast SEO está activo:
+  - `spiral-mcp/get-seo-settings`: secciones (general y portada, representación del sitio, tipos de contenido, taxonomías, archivos, migas de pan, RSS, redes sociales, verificación, funciones, optimización del rastreo) y, por sección, sus claves con el valor actual y ayudas (separadores, tipos de Schema, variables de las plantillas).
+  - `spiral-mcp/update-seo-settings`: cambia claves de varias secciones a la vez. Solo las de la lista blanca (filtro `spiral_mcp_yoast_sections`; el estado interno de Yoast no se toca), con el tipo que tienen en Yoast. Escribe con `update_option()`, así que pasa por la validación de Yoast y sus watchers (reglas de reescritura al quitar `/category/`, indexables); lo que Yoast rechaza vuelve en `not_applied`. Las imágenes van por ID (`*_id`) y la URL se rellena sola. Snapshot kind `seo_settings` y purga de toda la caché.
+- `tests/smoke.sh`: pruebas de los ajustes de Yoast (si está activo).
+- Skill: receta "Ajustes generales de SEO (Yoast)".
+
+### Arreglado
+- `tests/smoke.sh`: sin `SMOKE_PLUGINS=1` y con los cerrojos de plugins abiertos en el sitio, las pruebas de "cerrojos cerrados" instalaban Classic Editor y borraban Hello Dolly de verdad. Ahora se omiten y lo dicen.
+
 ## [1.24.0] — 2026-10-12 · Fase 9: formularios de Contact Form 7
 
 ### Añadido

@@ -435,7 +435,10 @@ printf '%s' "$BODY" | php -r '
 	foreach ( $d["plugins"] as $p ) { if ( $p["protected"] && 0 === stripos( $p["slug"], "spiral-mcp" ) ) { exit( 0 ); } }
 	exit( 1 );
 ' && ok 'list-plugins: Spiral-MCP-Control protegido' || ko 'list-plugins debería marcar Spiral-MCP-Control como protegido'
-if [ "${SMOKE_PLUGINS:-0}" != 1 ]; then
+if [ "${SMOKE_PLUGINS:-0}" != 1 ] && [ "$(jget management.allowed)" = true ]; then
+	# Cerrojos abiertos en este sitio: las pruebas de "cerrados" instalarían y borrarían plugins de verdad.
+	ok 'list-plugins: cerrojos abiertos en este sitio; se omiten las pruebas de gestión (SMOKE_PLUGINS=1 para las de abiertos)'
+elif [ "${SMOKE_PLUGINS:-0}" != 1 ]; then
 	eq 'list-plugins: gestión cerrada por defecto' management.allowed false
 	call POST spiral-mcp/install-plugin '{"slug":"classic-editor"}'
 	[ "$STATUS" = 403 ] && ok 'install-plugin: cerrojos cerrados (403)' || ko "install-plugin debería responder 403 con los cerrojos cerrados (HTTP $STATUS)"
@@ -479,6 +482,25 @@ if [ "$STATUS" = 200 ]; then
 	fi
 else
 	ok 'formularios: Contact Form 7 no está activo (se omiten)'
+fi
+
+# Ajustes generales de Yoast SEO (solo si está activo: si no, las abilities no se registran).
+call GET spiral-mcp/get-seo-settings
+if [ "$STATUS" = 200 ]; then
+	check 'get-seo-settings' 200 provider sections
+	call GET spiral-mcp/get-seo-settings '{"section":"general"}'
+	if check 'get-seo-settings general' 200 settings.separator help.separator; then
+		SEP=$(jget settings.separator)
+		# Mismo valor que ya tiene: escribe sin cambiar nada.
+		call POST spiral-mcp/update-seo-settings "{\"settings\":{\"separator\":\"$SEP\"}}"
+		check 'update-seo-settings (sin cambios)' 200 snapshot_id && eq 'update-seo-settings: nada cambiado' 'changed.#' 0
+	fi
+	call POST spiral-mcp/update-seo-settings '{"settings":{"semrush_tokens":[]}}'
+	printf '%s' "$BODY" | grep -q spiral_mcp_bad_key && ok 'update-seo-settings: rechaza claves internas de Yoast' || ko 'update-seo-settings debería rechazar semrush_tokens'
+	call POST spiral-mcp/update-seo-settings '{"settings":{"noindex-page":"tal vez"}}'
+	printf '%s' "$BODY" | grep -q spiral_mcp_bad_value && ok 'update-seo-settings: comprueba el tipo' || ko 'update-seo-settings debería rechazar un texto en noindex-page'
+else
+	ok 'ajustes de Yoast: Yoast SEO no está activo (se omiten)'
 fi
 
 # Cambiar ajustes de caché exige spiral_mcp_cache, que el rol del agente no tiene por defecto.

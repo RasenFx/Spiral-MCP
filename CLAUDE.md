@@ -10,7 +10,7 @@ El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes d
 - YOOtheme Pro activo (o un tema hijo de YOOtheme) para todo lo relacionado con el builder y los estilos.
 - PHP 7.4 como mínimo: no usar sintaxis de PHP 8 (match, nullsafe `?->`, argumentos con nombre, tipos de unión, `readonly`, enums).
 
-## Estructura actual (v1.24.0)
+## Estructura actual (v1.25.0)
 ```
 spiral-mcp-control.php   cabecera, constantes, comprobación de requisitos, require_once y hooks de activación
 uninstall.php            borra el rol y las capacidades (las tablas solo con el filtro spiral_mcp_uninstall_drop_tables)
@@ -32,6 +32,7 @@ includes/cache.php       cachés con un adaptador por herramienta: lógica comú
 includes/cache-providers.php adaptadores de purga y estado: WP Fastest Cache, W3TC, LiteSpeed, SiteGround, Nginx Helper, WP Rocket, WP Engine, Pantheon, Kinsta
 includes/taxonomies.php  taxonomías y términos (+ snapshot kind "term")
 includes/seo.php         SEO por contenido: Yoast o salida propia (+ snapshot kind "seo")
+includes/seo-settings.php ajustes generales de Yoast SEO (solo si está activo), por secciones con lista blanca (+ snapshot kind "seo_settings")
 includes/settings.php    ajustes del sitio: identidad y portada (+ snapshot kind "option")
 includes/preview.php     URLs de vista previa sin sesión (token firmado) e inspect-page
 includes/plugins.php     plugins: listar, buscar en wordpress.org, instalar, activar (protegida), desactivar, actualizar (con vuelta atrás) y borrar; cerrojos (spiral_mcp_plugins + ajuste plugins_management) y snapshot kind "plugins_state"
@@ -48,7 +49,7 @@ dist/                    ZIP para instalar (no versionar)
 Abilities existentes (todas con prefijo `spiral-mcp/`):
 - Contenido: `list-post-types`, `list-content`, `get-content`, `create-content`, `update-content`, `trash-content`, `restore-content`, `delete-content`, `list-revisions`, `restore-revision`, `get-yootheme-layout`, `update-yootheme-layout`.
 - Taxonomías y SEO: `list-taxonomies`, `list-terms`, `create-term`, `update-term`, `delete-term`, `get-seo`, `update-seo`.
-- Ajustes: `get-site-settings`, `update-site-settings`.
+- Ajustes: `get-site-settings`, `update-site-settings`; con Yoast SEO activo, `get-seo-settings` y `update-seo-settings` (ajustes generales de Yoast).
 - Verificación: `get-preview-url`, `revoke-preview-url`, `inspect-page`.
 - Estilos: `get-custom-css`, `update-custom-css`, `get-theme-style`, `list-style-variables`, `update-theme-style`, `get-style-status`, `mark-style-compiled`.
 - Menús: `list-menus`, `get-menu`, `create-menu`, `update-menu`, `delete-menu`, `add-menu-item`, `update-menu-item`, `delete-menu-item`.
@@ -96,6 +97,12 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - **Shortcodes**: YOOtheme los ejecuta dentro de un elemento `text` (comprobado con el de Contact Form 7). En el JSON del layout las comillas van escapadas (`id=\"a58ff5f\"`): quien busque shortcodes en `post_content` debe contar con ello.
 - **Librería online** (`https://api.yootheme.com/v1/library/layout` y `/element`): el catálogo es público; cada diseño se descarga en `<link>?key=<yootheme_apikey>`. El JSON trae `images` (`src` firmado que caduca en 1 h + `md5`): hay que descargarlas a `uploads` sin subcarpeta (deduplicando por md5, como `BuilderController::loadImage`) y cambiar las URLs. Las plantillas de la librería son contenido de muestra fijo: no traen fuentes dinámicas.
 - `config.yootheme_apikey` es un secreto: no devolverlo nunca en una respuesta (enmascararlo). Se usa solo en el servidor (`spiral_mcp_online_fetch()`); los errores pasan por `spiral_mcp_online_scrub()`.
+
+## Lo que ya sabemos de Yoast SEO (28.7, comprobado en local)
+- Ajustes generales en tres opciones: `wpseo` (funciones, verificación, rastreo y mucho estado interno: tokens, indexación, versión), `wpseo_titles` (plantillas de título, tipos de contenido, taxonomías, archivos, Schema, migas, RSS) y `wpseo_social`. Las claves por tipo de contenido o taxonomía llevan su nombre (`title-page`, `noindex-tax-post_tag`).
+- Escribir con `update_option()` de la opción entera mezclada (como `WPSEO_Options::save_option()`): pasa por `sanitize_option_<opción>` → `WPSEO_Option::validate()`, que descarta en silencio lo que no valida (se conserva el valor anterior), y por los watchers `update_option_wpseo_titles` (p. ej. `stripcategorybase` regenera las reglas de reescritura y redirige `/category/x/` con 301). Después, `WPSEO_Options::clear_cache()`. No exige `manage_options`.
+- Yoast gratuito ignora las plantillas `social-title-*`, `social-description-*` y `social-image-*` por tipo de contenido y taxonomía (son de Premium); la imagen por defecto al compartir es `wpseo_social.og_default_image(_id)`.
+- Metas por contenido: `_yoast_wpseo_title`, `_yoast_wpseo_metadesc`… (ver `includes/seo.php`).
 
 ## Entorno de desarrollo
 - WordPress local de pruebas con YOOtheme Pro, MCP Adapter y este plugin enlazado (symlink o copia de la carpeta en `wp-content/plugins/spiral-mcp-control`).

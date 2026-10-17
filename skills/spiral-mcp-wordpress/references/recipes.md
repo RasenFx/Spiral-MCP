@@ -19,6 +19,7 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 - [Cambiar la marca (colores y tipografía)](#cambiar-la-marca-colores-y-tipografía)
 - [Programar una publicación](#programar-una-publicación)
 - [Página hija con plantilla, categorías y SEO](#página-hija-con-plantilla-categorías-y-seo)
+- [Ajustes generales de SEO (Yoast)](#ajustes-generales-de-seo-yoast)
 - [Un cambio no se ve (cachés)](#un-cambio-no-se-ve-cachés)
 - [Acelerar el sitio](#acelerar-el-sitio)
 - [Añadir un formulario de contacto](#añadir-un-formulario-de-contacto)
@@ -199,6 +200,17 @@ La librería de YOOtheme tiene cientos de diseños hechos por su equipo (página
 2. `create-content {"title": "Consultoría", "parent": <id madre>, "template": "<plantilla>", "featured_media": <id>, "status": "draft"}`.
 3. Términos: `create-term` si no existen, y luego `terms: {"category": ["noticias"]}` en `create-content` o `update-content` (solo en tipos que los admiten).
 4. `update-seo {"id": <id>, "title": "...", "description": "..."}`.
+
+## Ajustes generales de SEO (Yoast)
+
+Solo con Yoast SEO activo (si no, `get-seo-settings` no existe). Afecta a todo el sitio: el SEO de una página concreta es `update-seo`.
+
+1. `get-seo-settings` sin entrada: lista de secciones. Elige la que toca (`general` para separador y portada, `content_types` para las plantillas de título de páginas y entradas, `social` para perfiles e imagen por defecto al compartir, `features` para el mapa del sitio, `crawl` para limpiar el `<head>` o bloquear bots…).
+2. `get-seo-settings {"section": "content_types"}`: claves con su valor actual y `help` (variables como `%%title%% %%sep%% %%sitename%%`, valores de los desplegables).
+3. `update-seo-settings {"settings": {"title-page": "%%title%% %%sep%% %%sitename%%", "separator": "sc-pipe"}}`: solo lo que cambia, con el mismo tipo (true/false, número, texto). Imágenes por ID: `{"og_default_image_id": 933}` (0 la quita). Lo que Yoast rechaza vuelve en `not_applied`: corrígelo con los valores de `help`.
+4. Comprueba con `inspect-page {"path": "/"}` (título y description efectivos) y anota `snapshot_id` para deshacer.
+
+Ojo: `social-title-*`, `social-description-*` y `social-image-*` por tipo de contenido o taxonomía solo funcionan con Yoast Premium. `stripcategorybase`, `enable_xml_sitemap`, `deny_*` y los `noindex-*` cambian URLs, el mapa del sitio, `robots.txt` o la indexación de secciones enteras: hazlo solo si el usuario lo pide.
 
 ## Un cambio no se ve (cachés)
 
