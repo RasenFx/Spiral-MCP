@@ -8,16 +8,27 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Grupos de permisos. Cada uno tiene su capacidad spiral_mcp_<grupo>. "cache" (cambiar los
- * ajustes de las herramientas de caché) no se da al rol del agente por defecto.
+ * Grupos de permisos. Cada uno tiene su capacidad spiral_mcp_<grupo>. "cache", "plugins" y
+ * "orders" no se dan al rol del agente por defecto.
  */
 function spiral_mcp_groups() {
-	return array( 'content', 'design', 'media', 'settings', 'code', 'cache', 'plugins' );
+	return array( 'content', 'design', 'media', 'settings', 'code', 'cache', 'plugins', 'shop', 'orders' );
 }
 
 /** Capacidades propias que el rol del agente no recibe salvo que se añadan con spiral_mcp_agent_caps. */
 function spiral_mcp_agent_excluded_caps() {
-	return array( 'spiral_mcp_cache', 'spiral_mcp_plugins' );
+	return array( 'spiral_mcp_cache', 'spiral_mcp_plugins', 'spiral_mcp_orders' );
+}
+
+/**
+ * Capacidades nativas que el rol del agente solo recibe junto con una propia: cap propia => nativas.
+ * Las de términos de producto hacen que las abilities de taxonomías sirvan para las categorías,
+ * etiquetas y atributos de WooCommerce. Se retiran si se quita la propia.
+ */
+function spiral_mcp_conditional_caps() {
+	return array(
+		'spiral_mcp_shop' => array( 'manage_product_terms', 'edit_product_terms', 'delete_product_terms', 'assign_product_terms' ),
+	);
 }
 
 /**
@@ -44,6 +55,8 @@ function spiral_mcp_never_granted_caps() {
 		'update_core',
 		'edit_files',
 		'unfiltered_upload',
+		// WooCommerce: las abilities de la tienda usan su API con su propia comprobación.
+		'manage_woocommerce',
 	);
 }
 
@@ -57,6 +70,8 @@ function spiral_mcp_cap_descriptions() {
 		'spiral_mcp_code'     => 'Código: JavaScript personalizado (sección "scripts" de YOOtheme). Es el permiso de más riesgo.',
 		'spiral_mcp_cache'    => 'Cambiar los ajustes de la herramienta de caché (activarla, caducidad, exclusiones…).',
 		'spiral_mcp_plugins'  => 'Gestionar plugins de wordpress.org (instalar, activar, desactivar, actualizar, borrar). Además hay que activar "Permitir que el agente gestione plugins" en Comportamiento. Es el permiso de más riesgo: instalar código es tener el control del sitio.',
+		'spiral_mcp_shop'     => 'Tienda (WooCommerce): productos, variaciones, atributos, categorías de producto, cupones, ajustes de la tienda, envíos e impuestos. Las pasarelas de pago, solo en lectura.',
+		'spiral_mcp_orders'   => 'Pedidos y clientes de WooCommerce: leerlos, cambiar el estado de un pedido, notas y reembolsos. Incluye datos personales de los clientes.',
 	);
 }
 
@@ -131,6 +146,11 @@ function spiral_mcp_agent_caps() {
 	foreach ( spiral_mcp_agent_caps_override() as $cap => $on ) {
 		$own = $on ? array_unique( array_merge( $own, array( $cap ) ) ) : array_diff( $own, array( $cap ) );
 	}
+	foreach ( spiral_mcp_conditional_caps() as $cap => $extra ) {
+		if ( in_array( $cap, $own, true ) ) {
+			$native = array_merge( $native, $extra );
+		}
+	}
 	$caps = array_merge( $native, array_values( $own ) );
 	$caps = (array) apply_filters( 'spiral_mcp_agent_caps', $caps );
 
@@ -152,7 +172,8 @@ function spiral_mcp_install_caps() {
 		}
 		// Las capacidades propias que ya no tocan (quitadas en los ajustes o excluidas) se retiran,
 		// y también las nativas prohibidas si alguien las añadió al rol por otra vía.
-		foreach ( array_merge( spiral_mcp_caps(), spiral_mcp_never_granted_caps() ) as $cap ) {
+		$conditional = call_user_func_array( 'array_merge', array_values( spiral_mcp_conditional_caps() ) );
+		foreach ( array_merge( spiral_mcp_caps(), spiral_mcp_never_granted_caps(), $conditional ) as $cap ) {
 			if ( ! in_array( $cap, $caps, true ) && ! empty( $role->capabilities[ $cap ] ) ) {
 				$role->remove_cap( $cap );
 			}

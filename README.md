@@ -32,6 +32,8 @@ Las abilities llevan el prefijo `spiral-mcp/`. La referencia completa de paráme
 | Verificación | URL de vista previa sin sesión, inspección de una página (encabezados, enlaces rotos, alt, SEO efectivo) |
 | Ajustes | identidad del sitio, portada, zona horaria; con Yoast SEO activo, sus ajustes generales (plantillas de título, Schema, redes sociales, migas de pan, mapas del sitio, verificación, rastreo) |
 | Plugins | listar los instalados, buscar en wordpress.org, instalar (sin activar), activar con comprobación de salud, desactivar, actualizar (vuelve a la versión anterior si rompe el sitio) y borrar; con doble cerrojo, cerrado por defecto |
+| Tienda | con WooCommerce activo: productos simples y variables, variaciones, atributos, cupones, ajustes de la tienda (incluido el modo "próximamente"), zonas y métodos de envío, impuestos y pasarelas de pago (solo lectura) |
+| Pedidos | con WooCommerce activo y permiso aparte: pedidos (estado, notas, reembolsos) y clientes (lectura) |
 | Formularios | con Contact Form 7 activo: listar (y dónde se usan), leer, crear, editar y borrar; cambiar a quién llega el correo exige confirmación |
 | Cachés | estado, purga, precarga y ajustes de la herramienta de caché del sitio (ver abajo) |
 | Auditoría | registro de actividad, snapshots y restauración (también parcial) |
@@ -47,6 +49,8 @@ Las abilities llevan el prefijo `spiral-mcp/`. La referencia completa de paráme
 | `spiral_mcp_code` | JS personalizado (sección `scripts` de YOOtheme) | sí |
 | `spiral_mcp_cache` | **cambiar** los ajustes de caché | **no** |
 | `spiral_mcp_plugins` | gestionar plugins de wordpress.org (además hay que activar "Permitir que el agente gestione plugins" en *Comportamiento*) | **no** |
+| `spiral_mcp_shop` | tienda de WooCommerce: catálogo, cupones, ajustes, envíos e impuestos | sí |
+| `spiral_mcp_orders` | pedidos y clientes de WooCommerce (datos personales, reembolsos) | **no** |
 
 Las capacidades del rol del agente se pueden cambiar en **Ajustes > Spiral-MCP > Permisos del agente**, y la elección se mantiene al actualizar el plugin. En la pestaña **Abilities** de esa página se activa o desactiva cada herramienta o una categoría entera (con atajos "Solo lectura" y "Desactivar las destructivas"). Una ability desactivada no se publica en el MCP: el agente ni la ve. La pestaña **Comportamiento** decide si se purga la caché tras cada cambio, cuántos días se conservan el registro y los snapshots, si el agente puede descargar diseños de la librería online de YOOtheme y si al desinstalar se borran las tablas. La pestaña **Actividad** muestra los cambios del agente y permite restaurar cada uno desde wp-admin.
 

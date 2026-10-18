@@ -40,6 +40,8 @@ $titles = array(
 	'spiral-mcp-snapshots' => 'Snapshots',
 	'spiral-mcp-plugins'   => 'Plugins',
 	'spiral-mcp-forms'     => 'Formularios (Contact Form 7)',
+	'spiral-mcp-shop'      => 'Tienda (WooCommerce)',
+	'spiral-mcp-orders'    => 'Pedidos y clientes (WooCommerce)',
 	'spiral-mcp-activity'  => 'Auditoría',
 );
 // Categorías nuevas que aún no tengan título aquí: se incluyen igual (con su slug) para no perder abilities.

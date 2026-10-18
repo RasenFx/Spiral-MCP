@@ -359,9 +359,42 @@ Que el agente cambie lo que en wp-admin está en *Yoast SEO > Ajustes* (plantill
 
 ---
 
+## Fase 11 — WooCommerce
+
+Que el agente lleve la tienda: catálogo, cupones, ajustes, envíos e impuestos y, con permiso aparte, pedidos y clientes. Solo se registra si WooCommerce está activo.
+
+**Decisiones (confirmadas):**
+- **Alcance:** catálogo (productos simples y variables, variaciones, atributos, categorías y etiquetas con las abilities de taxonomías), cupones, ajustes de la tienda, envíos, impuestos, pedidos y clientes.
+- **Permisos:** `spiral_mcp_shop` (catálogo, cupones, ajustes; el agente la tiene) y `spiral_mcp_orders` (pedidos y clientes: datos personales y dinero; el agente **no** la tiene por defecto). Pasarelas de pago solo en lectura (sus ajustes llevan claves y cuentas).
+- **Cómo:** la API REST de WooCommerce por dentro, con su permiso concedido solo durante cada llamada (ver CLAUDE.md). El rol nunca recibe `manage_woocommerce`; con `spiral_mcp_shop` recibe los permisos de términos de producto.
+
+### 11.1 Catálogo y cupones
+- [x] `list-products`, `get-product`, `create-product`, `update-product`, `delete-product`, `update-variations`.
+- [x] `list-product-attributes`, `create-product-attribute`, `update-product-attribute`, `delete-product-attribute`.
+- [x] `list-coupons`, `get-coupon`, `create-coupon`, `update-coupon`, `delete-coupon`.
+
+### 11.2 Tienda
+- [x] `get-shop-settings` y `update-shop-settings` (lista blanca de grupos y campos; destinatarios de correo con `confirm`).
+- [x] Envíos: `list-shipping-zones`, `save-shipping-zone`, `delete-shipping-zone`, `save-shipping-method`, `delete-shipping-method`.
+- [x] Impuestos: `list-tax-rates`, `update-tax-rates`. Pasarelas: `list-payment-gateways` (lectura).
+
+### 11.3 Pedidos y clientes
+- [x] `list-orders`, `get-order`, `update-order`, `add-order-note`, `create-refund`, `list-customers`, `get-customer`.
+
+### 11.4 Pruebas y documentación
+- [x] Prueba de humo (si WooCommerce está activo), recetas del skill, README.
+
+**Resultado 11** (WooCommerce 11.2.1, instalado con `install-plugin` + `activate-plugin`; probado por REST con el rol del agente y el sitio restaurado desde copia de la BD al terminar): categoría de producto creada con `create-term` (gracias a `manage_product_terms`); producto simple con imagen de la biblioteca, publicado con oferta: YOOtheme muestra la ficha con "19,90 € / 14,90 €" tras cambiar moneda y formato y quitar el modo "próximamente". Atributo "Talla" con términos, producto variable con tres variaciones (una con imagen), cambio de precio de una, y restaurar: el snapshot de antes de crearlas las quita y el de después las vuelve a crear (con IDs nuevos). Borrar un producto lo manda a la papelera y restaurar lo deja publicado con sus categorías e imagen. Cupón creado, cambiado y borrado. Zona "España peninsular" con tarifa plana y envío gratis desde 50 €, cambio del mínimo y restauración (quita el método añadido después). IVA 21 % y 10 % creados y deshechos con el snapshot. Pedidos: 403 sin `spiral_mcp_orders`; con ella, listar, leer (líneas, notas), completar (envía el correo de WooCommerce), nota privada, reembolso por línea (importe calculado, unidad devuelta al stock, sin tocar la pasarela) y restaurar el estado. Rechazados: imágenes por URL, campos inventados, grupo de pagos, `woocommerce_custom_orders_table_enabled`, destinatario de correo, cancelar, nota al cliente y reembolso sin `confirm`, y `get-customer` de un administrador.
+
+**Encontrado y corregido durante las pruebas:** los términos de un atributo recién creado fallaban sin avisar (taxonomía sin registrar en esa petición); `site-visibility` llega vacío por la API (grupo propio con sus dos opciones); el grupo `advanced` exponía el cambio de almacenamiento de pedidos y funciones experimentales (ocultos); un reembolso no devolvía el stock sin `api_restock` y, en la ruta nueva de WooCommerce, sin `api_refund` explícito intentaría devolver el dinero.
+
+**Terminado cuando:** el agente crea un producto variable con sus fotos, abre la tienda con la moneda y los envíos de España, crea un cupón y, con permiso, gestiona un pedido hasta el reembolso; todo se puede deshacer salvo los reembolsos y los correos enviados.
+
+---
+
 ## Fuera de alcance en esta etapa
 - Instalar, activar o actualizar temas. Los plugins se tratan en la Fase 8.
-- WooCommerce (fase posterior del sitio).
+- WooCommerce: configurar pasarelas de pago, crear o editar pedidos a mano (líneas e importes), editar clientes, informes y analítica, suscripciones y extensiones de pago.
 - Usuarios y roles más allá del rol `spiral_mcp_agent`.
 - Temas distintos de YOOtheme: las abilities de contenido, menús, medios y SEO deben funcionar con cualquier tema; las de diseño pueden exigir YOOtheme y devolver un error claro si no está activo.
 

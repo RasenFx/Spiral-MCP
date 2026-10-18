@@ -1,6 +1,6 @@
 # Referencia de abilities spiral-mcp/*
 
-Generada a partir de los esquemas registrados por el plugin (v1.25.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
+Generada a partir de los esquemas registrados por el plugin (v1.26.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
 
 Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; destructiva = requiere `"confirm": true`.
 
@@ -17,6 +17,8 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 - [Snapshots](#snapshots)
 - [Plugins](#plugins)
 - [Formularios (Contact Form 7)](#formularios-contact-form-7)
+- [Tienda (WooCommerce)](#tienda-woocommerce)
+- [Pedidos y clientes (WooCommerce)](#pedidos-y-clientes-woocommerce)
 - [Auditoría](#auditoria)
 
 ## Contenido, taxonomías y SEO
@@ -24,9 +26,9 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 | Ability | Tipo | Parámetros |
 |---|---|---|
 | `list-post-types` | lectura | — |
-| `list-content` | lectura | post_type `"any" / "post" / "page"`, status `"any" / "publish" / "future" / "draft" / "pending" / "private" / "trash"`, search `string`, parent `integer`, per_page `integer`, page `integer` |
+| `list-content` | lectura | post_type `"any" / "post" / "page" / "product"`, status `"any" / "publish" / "future" / "draft" / "pending" / "private" / "trash"`, search `string`, parent `integer`, per_page `integer`, page `integer` |
 | `get-content` | lectura | **id** `integer` |
-| `create-content` | escritura | post_type `"post" / "page"`, **title** `string`, content `string`, excerpt `string`, status `"publish" / "future" / "draft" / "pending" / "private"`, slug `string`, parent `integer`, menu_order `integer`, template `string`, author `integer`, date `string`, comment_status `"open" / "closed"`, terms `object`, featured_media `integer`, meta `object` |
+| `create-content` | escritura | post_type `"post" / "page" / "product"`, **title** `string`, content `string`, excerpt `string`, status `"publish" / "future" / "draft" / "pending" / "private"`, slug `string`, parent `integer`, menu_order `integer`, template `string`, author `integer`, date `string`, comment_status `"open" / "closed"`, terms `object`, featured_media `integer`, meta `object` |
 | `update-content` | escritura | **id** `integer`, title `string`, content `string`, excerpt `string`, status `"publish" / "future" / "draft" / "pending" / "private"`, slug `string`, parent `integer`, menu_order `integer`, template `string`, author `integer`, date `string`, comment_status `"open" / "closed"`, terms `object`, featured_media `integer`, meta `object` |
 | `trash-content` | escritura | **id** `integer` |
 | `restore-content` | escritura | **id** `integer` |
@@ -170,6 +172,48 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 | `create-form` | escritura | **title** `string`, template `string`, mail `object`, mail_2 `object`, messages `object`, additional_settings `string`, confirm `boolean`, copy_from `string / integer`, locale `string` |
 | `update-form` | escritura | **id** `string / integer`, title `string`, template `string`, mail `object`, mail_2 `object`, messages `object`, additional_settings `string`, confirm `boolean` |
 | `delete-form` | destructiva | **id** `string / integer`, **confirm** `boolean` |
+
+## Tienda (WooCommerce)
+
+| Ability | Tipo | Parámetros |
+|---|---|---|
+| `list-products` | lectura | search `string`, status `"any" / "draft" / "pending" / "private" / "publish" / "trash"`, type `"simple" / "variable" / "grouped" / "external"`, category `integer`, tag `integer`, sku `string`, stock_status `"instock" / "outofstock" / "onbackorder"`, on_sale `boolean`, featured `boolean`, orderby `"date" / "modified" / "title" / "price" / "popularity" / "rating" / "menu_order" / "id"`, order `"asc" / "desc"`, page `integer`, per_page `integer` |
+| `get-product` | lectura | **id** `integer` |
+| `create-product` | escritura | **fields** `object` |
+| `update-product` | escritura | **id** `integer`, **fields** `object` |
+| `delete-product` | destructiva | **id** `integer`, force `boolean`, **confirm** `boolean` |
+| `update-variations` | escritura | **product_id** `integer`, create `array`, update `array`, delete `array`, confirm `boolean` |
+| `list-product-attributes` | lectura | — |
+| `create-product-attribute` | escritura | **name** `string`, slug `string`, order_by `"menu_order" / "name" / "name_num" / "id"`, has_archives `boolean`, terms `array` |
+| `update-product-attribute` | escritura | **id** `integer`, name `string`, slug `string`, order_by `"menu_order" / "name" / "name_num" / "id"`, has_archives `boolean`, terms `array` |
+| `delete-product-attribute` | destructiva | **id** `integer`, **confirm** `boolean` |
+| `list-coupons` | lectura | search `string`, page `integer`, per_page `integer` |
+| `get-coupon` | lectura | **id** `integer` |
+| `create-coupon` | escritura | **fields** `object` |
+| `update-coupon` | escritura | **id** `integer`, **fields** `object` |
+| `delete-coupon` | destructiva | **id** `integer`, force `boolean`, **confirm** `boolean` |
+| `get-shop-settings` | lectura | group `string` |
+| `update-shop-settings` | escritura | **group** `string`, **values** `object`, confirm `boolean` |
+| `list-shipping-zones` | lectura | — |
+| `save-shipping-zone` | escritura | id `integer`, name `string`, order `integer`, locations `array` |
+| `delete-shipping-zone` | destructiva | **id** `integer`, **confirm** `boolean` |
+| `save-shipping-method` | escritura | **zone_id** `integer`, instance_id `integer`, method_id `string`, enabled `boolean`, order `integer`, settings `object` |
+| `delete-shipping-method` | destructiva | **zone_id** `integer`, **instance_id** `integer`, **confirm** `boolean` |
+| `list-tax-rates` | lectura | class `string` |
+| `update-tax-rates` | escritura | create `array`, update `array`, delete `array`, confirm `boolean` |
+| `list-payment-gateways` | lectura | — |
+
+## Pedidos y clientes (WooCommerce)
+
+| Ability | Tipo | Parámetros |
+|---|---|---|
+| `list-orders` | lectura | status `"any" / "pending" / "processing" / "on-hold" / "completed" / "cancelled" / "refunded" / "failed" / "checkout-draft"`, customer `integer`, search `string`, after `string`, before `string`, page `integer`, per_page `integer` |
+| `get-order` | lectura | **id** `integer` |
+| `update-order` | escritura | **id** `integer`, status `"pending" / "processing" / "on-hold" / "completed" / "cancelled" / "refunded" / "failed" / "checkout-draft"`, customer_note `string`, billing `object`, shipping `object`, confirm `boolean` |
+| `add-order-note` | escritura | **id** `integer`, **note** `string`, customer_note `boolean`, confirm `boolean` |
+| `create-refund` | destructiva | **order_id** `integer`, amount `string`, reason `string`, line_items `array`, api_refund `boolean`, restock `boolean`, **confirm** `boolean` |
+| `list-customers` | lectura | search `string`, page `integer`, per_page `integer` |
+| `get-customer` | lectura | **id** `integer` |
 
 ## Auditoría
 

@@ -2,6 +2,17 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.26.0] — 2026-10-17 · Fase 11: WooCommerce
+
+### Añadido
+- Módulos de WooCommerce (solo si está activo), que usan su API REST (wc/v3) por dentro: valida como wp-admin y dispara sus hooks; sus permisos se conceden solo durante cada llamada, así que el rol del agente no recibe `manage_woocommerce` ni las capacidades de productos o pedidos.
+  - `includes/woocommerce.php` (categoría `spiral-mcp-shop`): `list-products`, `get-product`, `create-product` (en borrador por defecto), `update-product`, `delete-product` (papelera; `force` con `confirm`), `update-variations` (crear, cambiar y borrar variaciones en un paso), `list-product-attributes`, `create-product-attribute`, `update-product-attribute`, `delete-product-attribute`, `list-coupons`, `get-coupon`, `create-coupon`, `update-coupon`, `delete-coupon`. Imágenes solo por ID de la biblioteca. Snapshot kinds `wc_product` (con sus variaciones), `wc_coupon` y `wc_attribute`; restaurar el de una creación borra lo creado.
+  - `includes/woocommerce-store.php`: `get-shop-settings` y `update-shop-settings` por grupos (general, productos, impuestos, envío, cuentas, correos, avanzado, modo "próximamente"), sin pagos, integraciones, funciones experimentales ni el almacenamiento de pedidos; cambiar el destinatario de un correo exige `confirm`. `list-shipping-zones`, `save-shipping-zone`, `delete-shipping-zone`, `save-shipping-method`, `delete-shipping-method`, `list-tax-rates`, `update-tax-rates` y `list-payment-gateways` (solo lectura). Snapshot kinds `wc_settings`, `wc_shipping_zone` y `wc_tax_rates`.
+  - `includes/woocommerce-orders.php` (categoría `spiral-mcp-orders`): `list-orders`, `get-order`, `update-order` (estado, nota, direcciones; cancelar, reembolsar o marcar como fallido exige `confirm`), `add-order-note` (la que va al cliente exige `confirm`), `create-refund` (con `confirm`; por defecto solo lo anota y devuelve el stock; `api_refund` devuelve el dinero por la pasarela), `list-customers` y `get-customer` (solo lectura). Snapshot kind `wc_order`.
+- Capacidades `spiral_mcp_shop` (el rol del agente la tiene) y `spiral_mcp_orders` (no la tiene por defecto: datos personales y dinero). Con `spiral_mcp_shop`, el rol recibe los permisos de términos de producto (`manage_product_terms`…), así que las abilities de taxonomías sirven para categorías, etiquetas y atributos. `manage_woocommerce` pasa a la lista de nativas que nunca se conceden.
+- `tests/smoke.sh`: pruebas de la tienda (si WooCommerce está activo).
+- Skill: recetas de la tienda.
+
 ## [1.25.0] — 2026-10-17 · Fase 10: ajustes generales de Yoast SEO
 
 ### Añadido

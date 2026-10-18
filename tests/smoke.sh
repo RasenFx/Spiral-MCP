@@ -103,6 +103,7 @@ rest GET '/wp/v2/users/me&context=edit'
 check 'autenticación con Application Password' 200 roles || exit 1
 # Capacidades efectivas del usuario (el administrador puede haber cambiado las del rol en Ajustes > Spiral-MCP).
 HAS_CACHE_CAP=$(jget capabilities.spiral_mcp_cache || echo false)
+HAS_ORDERS_CAP=$(jget capabilities.spiral_mcp_orders || echo false)
 case "$(jget roles)" in
 	*spiral_mcp_agent*) ok 'el usuario tiene el rol spiral_mcp_agent' ;;
 	*) ko 'el usuario debe tener el rol spiral_mcp_agent' ;;
@@ -501,6 +502,63 @@ if [ "$STATUS" = 200 ]; then
 	printf '%s' "$BODY" | grep -q spiral_mcp_bad_value && ok 'update-seo-settings: comprueba el tipo' || ko 'update-seo-settings debería rechazar un texto en noindex-page'
 else
 	ok 'ajustes de Yoast: Yoast SEO no está activo (se omiten)'
+fi
+
+# WooCommerce (solo si está activo: si no, las abilities no se registran).
+call GET spiral-mcp/list-products
+if [ "$STATUS" = 200 ]; then
+	check 'list-products' 200 total items
+	call POST spiral-mcp/create-product '{"fields":{"name":"Smoke producto","regular_price":"9.99","sku":"SMOKE-1"}}'
+	if check 'create-product (borrador)' 200 id snapshot_id; then
+		PROD_ID=$(jget id)
+		eq 'create-product: en borrador' status draft
+		call POST spiral-mcp/update-product "{\"id\":$PROD_ID,\"fields\":{\"sale_price\":\"7.99\"}}"
+		check 'update-product' 200 snapshot_id && eq 'update-product: precio de oferta' sale_price 7.99
+		call POST spiral-mcp/update-product "{\"id\":$PROD_ID,\"fields\":{\"images\":[{\"src\":\"https://example.com/a.jpg\"}]}}"
+		printf '%s' "$BODY" | grep -q spiral_mcp_wc_bad_image && ok 'update-product: imágenes solo por ID' || ko 'update-product debería rechazar imágenes por URL'
+		call POST spiral-mcp/update-product "{\"id\":$PROD_ID,\"fields\":{\"precio\":\"1\"}}"
+		printf '%s' "$BODY" | grep -q spiral_mcp_wc_bad_field && ok 'update-product: rechaza campos desconocidos' || ko 'update-product debería rechazar "precio"'
+		call POST spiral-mcp/update-variations "{\"product_id\":$PROD_ID,\"create\":[{\"regular_price\":\"1\"}]}"
+		printf '%s' "$BODY" | grep -q spiral_mcp_wc_not_variable && ok 'update-variations: exige producto variable' || ko 'update-variations debería exigir un producto variable'
+		call GET spiral-mcp/get-product "{\"id\":$PROD_ID}"
+		eq 'get-product: SKU' sku SMOKE-1
+		call POST spiral-mcp/delete-product "{\"id\":$PROD_ID,\"force\":true,\"confirm\":true}"
+		check 'delete-product' 200 deleted snapshot_id
+	fi
+	call GET spiral-mcp/list-product-attributes
+	check 'list-product-attributes' 200 attributes
+	call GET spiral-mcp/list-coupons
+	check 'list-coupons' 200 total items
+	call GET spiral-mcp/get-shop-settings
+	check 'get-shop-settings' 200 groups
+	call GET spiral-mcp/get-shop-settings '{"group":"general"}'
+	if check 'get-shop-settings general' 200 fields; then
+		CURRENCY=$(printf '%s' "$BODY" | php -r '$d = json_decode( stream_get_contents( STDIN ), true ); foreach ( $d["fields"] as $f ) { if ( "woocommerce_currency" === $f["id"] ) { echo $f["value"]; } }')
+		call POST spiral-mcp/update-shop-settings "{\"group\":\"general\",\"values\":{\"woocommerce_currency\":\"$CURRENCY\"}}"
+		check 'update-shop-settings (sin cambios)' 200 snapshot_id && eq 'update-shop-settings: nada cambiado' 'changed.#' 0
+	fi
+	call GET spiral-mcp/get-shop-settings '{"group":"checkout"}'
+	[ "$STATUS" -ge 400 ] && ok 'get-shop-settings: pagos fuera de alcance' || ko 'get-shop-settings no debería leer el grupo checkout'
+	call POST spiral-mcp/update-shop-settings '{"group":"advanced","values":{"woocommerce_custom_orders_table_enabled":"no"}}'
+	printf '%s' "$BODY" | grep -q spiral_mcp_bad_key && ok 'update-shop-settings: no toca el almacenamiento de pedidos' || ko 'update-shop-settings no debería cambiar woocommerce_custom_orders_table_enabled'
+	call POST spiral-mcp/update-shop-settings '{"group":"email_new_order","values":{"recipient":"alguien@ejemplo.com"}}'
+	printf '%s' "$BODY" | grep -q spiral_mcp_confirm && ok 'update-shop-settings: cambiar el destinatario exige confirm' || ko 'update-shop-settings debería pedir confirm para el destinatario'
+	call GET spiral-mcp/list-shipping-zones
+	check 'list-shipping-zones' 200 zones method_types
+	call GET spiral-mcp/list-tax-rates
+	check 'list-tax-rates' 200 rates classes
+	call GET spiral-mcp/list-payment-gateways
+	check 'list-payment-gateways' 200 gateways
+	call GET spiral-mcp/list-orders
+	if [ "$HAS_ORDERS_CAP" = true ]; then
+		check 'list-orders' 200 total items
+		call GET spiral-mcp/list-customers
+		check 'list-customers' 200 total items
+	else
+		[ "$STATUS" = 403 ] && ok 'list-orders: el agente no tiene spiral_mcp_orders por defecto (403)' || ko "list-orders debería exigir spiral_mcp_orders (HTTP $STATUS)"
+	fi
+else
+	ok 'tienda: WooCommerce no está activo (se omite)'
 fi
 
 # Cambiar ajustes de caché exige spiral_mcp_cache, que el rol del agente no tiene por defecto.

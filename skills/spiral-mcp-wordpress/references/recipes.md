@@ -23,6 +23,11 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 - [Un cambio no se ve (cachés)](#un-cambio-no-se-ve-cachés)
 - [Acelerar el sitio](#acelerar-el-sitio)
 - [Añadir un formulario de contacto](#añadir-un-formulario-de-contacto)
+- [Tienda: crear un producto](#tienda-crear-un-producto)
+- [Tienda: producto con variaciones (tallas, colores)](#tienda-producto-con-variaciones-tallas-colores)
+- [Tienda: abrirla (moneda, envíos, impuestos)](#tienda-abrirla-moneda-envíos-impuestos)
+- [Tienda: cupones](#tienda-cupones)
+- [Tienda: pedidos y reembolsos](#tienda-pedidos-y-reembolsos)
 - [Instalar un plugin](#instalar-un-plugin)
 - [Deshacer un cambio](#deshacer-un-cambio)
 
@@ -256,6 +261,48 @@ Necesita Contact Form 7 activo (si no, no existen las herramientas `*-form`; pro
 6. Inserta el `shortcode` en la página: `patch-layout` con un elemento `{"type": "text", "props": {"content": "<p>[contact-form-7 id=\"a58ff5f\" title=\"Contacto\"]</p>"}}` donde corresponda (o en el contenido, si la página no usa YOOtheme).
 7. Revisa con `get-preview-url` + una captura o `inspect-page`, y mira `config_errors` de la respuesta: CF7 avisa, p. ej., de un remitente de otro dominio, o de "Unsafe email config" si activas el correo de respuesta al visitante (`mail_2`) sin reCAPTCHA o Turnstile (díselo al usuario).
 8. Contact Form 7 no guarda los mensajes recibidos (`stores_submissions` en `list-forms`; hace falta el plugin Flamingo).
+
+## Tienda: crear un producto
+
+Solo con WooCommerce activo (si no, estas herramientas no existen).
+
+1. Fotos: `upload-media` con `alt` para cada una; guarda los IDs.
+2. Categoría: `list-terms {"taxonomy": "product_cat"}`; si no existe, `create-term {"taxonomy": "product_cat", "name": "Camisetas"}`.
+3. `create-product {"fields": {"name": "Camiseta básica", "regular_price": "19.90", "sku": "CAM-001", "manage_stock": true, "stock_quantity": 10, "categories": [{"id": <cat>}], "images": [{"id": <foto principal>}, {"id": <otra>}], "short_description": "..."}}`. Se crea en **borrador**. Los precios van como texto con punto decimal; la moneda y su formato son de la tienda (`get-shop-settings {"group": "general"}`).
+4. Revisa con `get-product` y, cuando el usuario lo apruebe, `update-product {"id": <id>, "fields": {"status": "publish"}}`. Oferta: `"sale_price"` (y opcionalmente `date_on_sale_from` / `date_on_sale_to`).
+5. Las listas (`images`, `categories`, `attributes`…) se reemplazan enteras: para añadir una foto, envía todas.
+
+## Tienda: producto con variaciones (tallas, colores)
+
+1. `list-product-attributes`: si no existe el atributo, `create-product-attribute {"name": "Talla", "terms": ["S", "M", "L"]}` (devuelve su `id`). Términos nuevos de uno que ya existe: `update-product-attribute {"id": 1, "terms": ["XL"]}`.
+2. `create-product {"fields": {"name": "Sudadera", "type": "variable", "attributes": [{"id": 1, "options": ["S", "M", "L"], "visible": true, "variation": true}], ...}}`.
+3. `update-variations {"product_id": <id>, "create": [{"attributes": [{"id": 1, "option": "S"}], "regular_price": "39.00"}, ...]}`: una variación por combinación, con su precio (sin precio no se puede comprar), stock e imagen opcional (`"image": {"id": <foto>}`).
+4. Cambios después: `update-variations` con `"update": [{"id": <variación>, "sale_price": "29.00"}]`; borrar, con `"delete": [ids]` y `"confirm": true`. `get-product` lista las variaciones con sus IDs.
+
+## Tienda: abrirla (moneda, envíos, impuestos)
+
+Una tienda nueva arranca en modo "próximamente": los visitantes ven una página de espera.
+
+1. `get-shop-settings {"group": "general"}` y ajusta con `update-shop-settings` lo que diga el usuario, p. ej. `{"group": "general", "values": {"woocommerce_default_country": "ES:M", "woocommerce_currency": "EUR", "woocommerce_currency_pos": "right_space", "woocommerce_price_decimal_sep": ",", "woocommerce_price_thousand_sep": ".", "woocommerce_calc_taxes": "yes"}}`.
+2. Envíos: `save-shipping-zone {"name": "España peninsular", "locations": [{"code": "ES", "type": "country"}]}`; luego `save-shipping-method {"zone_id": <zona>, "method_id": "flat_rate", "settings": {"title": "Envío estándar", "cost": "4.95"}}` y, si hay envío gratis desde un importe, `{"method_id": "free_shipping", "settings": {"requires": "min_amount", "min_amount": "50"}}`.
+3. Impuestos (si `woocommerce_calc_taxes` es "yes"): `update-tax-rates {"create": [{"country": "ES", "rate": "21.0000", "name": "IVA", "shipping": true}]}`. Si los precios se introducen con IVA: grupo `tax`, `woocommerce_prices_include_tax: "yes"`.
+4. Pagos: `list-payment-gateways` dice cuáles hay y si están activos. Activarlos o configurarlos (claves de Stripe, cuenta bancaria…) se hace en wp-admin: explícaselo al usuario.
+5. Páginas legales: grupo `advanced`, `woocommerce_terms_page_id`.
+6. Cuando el usuario lo apruebe: `update-shop-settings {"group": "site-visibility", "values": {"woocommerce_coming_soon": "no"}}`. Comprueba una ficha de producto con `inspect-page` o una captura.
+
+## Tienda: cupones
+
+`create-coupon {"fields": {"code": "BIENVENIDA10", "discount_type": "percent", "amount": "10", "individual_use": true, "usage_limit_per_user": 1, "date_expires": "2026-12-31T23:59:59"}}`. Funciona en cuanto se crea: confirma el código y las condiciones con el usuario antes. `list-coupons` muestra los usos; `delete-coupon` con `"confirm": true` lo desactiva (papelera).
+
+## Tienda: pedidos y reembolsos
+
+Exigen el permiso `spiral_mcp_orders`, que el agente no tiene por defecto: si recibes 403, dile al usuario que un administrador puede darlo en Ajustes > Spiral-MCP > Permisos del agente. Hay datos personales: muestra solo lo necesario.
+
+1. `list-orders {"status": "processing"}` (pagados y por preparar) y `get-order {"id": <id>}` (líneas, direcciones, notas, reembolsos).
+2. `update-order {"id": <id>, "status": "completed"}`: WooCommerce envía su correo al cliente. Cancelar, marcar como reembolsado o fallido exige `"confirm": true`.
+3. Notas: `add-order-note` (privada por defecto). Con `"customer_note": true` le llega al cliente por correo: enséñale antes el texto al usuario y añade `"confirm": true`.
+4. Reembolso (irreversible): enseña al usuario importe, líneas y motivo, y con su aprobación `create-refund {"order_id": <id>, "line_items": [{"id": <línea>, "quantity": 1, "refund_total": "14.90"}], "reason": "...", "confirm": true}`. Por defecto solo se anota (el dinero se devuelve a mano) y las unidades vuelven al stock; `"api_refund": true` pide a la pasarela que devuelva el dinero.
+5. Clientes: `list-customers` y `get-customer` (solo lectura, con sus últimos pedidos).
 
 ## Instalar un plugin
 
