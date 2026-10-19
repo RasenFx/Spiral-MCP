@@ -145,7 +145,8 @@ function spiral_mcp_clear_cache( $object_cache = false ) {
  */
 function spiral_mcp_maybe_auto_clear_cache( $ability, array $groups, $input = null, $result = null, array $log = array() ) {
 	// Las abilities de caché (purgar, precargar, ajustes) ya hacen lo suyo: purgar todo después lo desharía.
-	if ( 'cache' === ( $log['type'] ?? '' ) || ! array_intersect( $groups, array( 'content', 'design', 'media' ) ) ) {
+	// 'purge' => false en el 'log' de la ability: no cambia nada visible (p. ej. subir un medio que aún no se usa).
+	if ( 'cache' === ( $log['type'] ?? '' ) || false === ( $log['purge'] ?? true ) || ! array_intersect( $groups, array( 'content', 'design', 'media' ) ) ) {
 		return;
 	}
 	if ( ! apply_filters( 'spiral_mcp_auto_clear_cache', spiral_mcp_setting( 'auto_purge' ), $ability ) ) {

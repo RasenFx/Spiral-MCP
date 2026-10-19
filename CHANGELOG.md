@@ -2,6 +2,17 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.27.0] — 2026-10-19 · Subidas de medios más rápidas
+
+### Añadido
+- `spiral-mcp/create-upload-url`: enlace de subida directa de un solo uso (caduca en 10 minutos por defecto, máximo 1 hora) para subir un archivo local por POST multipart (`curl -F "file=@foto.jpg" <upload_url>`) sin convertirlo a base64. El token es aleatorio, en la BD solo se guarda su hash (transient) y queda ligado al usuario que lo pidió, cuyos permisos se vuelven a comprobar al subir. Endpoint REST `spiral-mcp/v1/upload/<token>`; la subida se anota en la auditoría como `upload-media`.
+- `upload-media` devuelve `timings` (`fetch_ms`: descarga o decodificación; `process_ms`: guardar y generar las miniaturas).
+
+### Cambiado
+- `upload-media` ya no purga la caché: un adjunto nuevo no cambia ninguna página hasta que se usa. Nueva clave `'purge' => false` en el `'log'` del wrapper para las abilities que escriben sin cambiar nada visible.
+- La descripción de `upload-media` pide usar `url` siempre que se pueda y `data_base64` solo para archivos muy pequeños: con base64 el agente tiene que escribir el archivo entero como texto, que era la causa de las subidas lentas.
+- Lógica común de subida en `spiral_mcp_media_import()`.
+
 ## [1.26.0] — 2026-10-17 · Fase 11: WooCommerce
 
 ### Añadido

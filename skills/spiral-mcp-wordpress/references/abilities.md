@@ -1,6 +1,6 @@
 # Referencia de abilities spiral-mcp/*
 
-Generada a partir de los esquemas registrados por el plugin (v1.26.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
+Generada a partir de los esquemas registrados por el plugin (v1.27.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
 
 Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; destructiva = requiere `"confirm": true`.
 
@@ -106,6 +106,7 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 | Ability | Tipo | Parámetros |
 |---|---|---|
 | `upload-media` | escritura | url `string`, data_base64 `string`, filename `string`, title `string`, alt `string`, caption `string`, description `string`, attach_to `integer` |
+| `create-upload-url` | escritura | filename `string`, title `string`, alt `string`, caption `string`, description `string`, attach_to `integer`, expires_in `integer` |
 | `list-media` | lectura | search `string`, mime `"image" / "video" / "application/pdf"`, parent `integer`, per_page `integer`, page `integer` |
 | `get-media` | lectura | **id** `integer` |
 | `update-media` | escritura | **id** `integer`, alt `string`, title `string`, caption `string`, description `string` |

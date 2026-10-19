@@ -27,7 +27,7 @@ Las abilities llevan el prefijo `spiral-mcp/`. La referencia completa de paráme
 | Contenido | listar, leer, crear y editar páginas, entradas y tipos propios; papelera; revisiones; taxonomías y términos; SEO (Yoast o salida propia) |
 | Layouts de YOOtheme | esquema de un layout, textos, nodo, `patch-layout` (operaciones JSON Patch atómicas), duplicar, catálogo de elementos y validación |
 | Tema | configuración de YOOtheme (header, logo, navbar…), footer y mega menús, widgets (también de builder), plantillas, biblioteca y [librería online de YOOtheme](https://yootheme.com) |
-| Medios | subir (URL o base64), listar, editar, borrar, imagen destacada, dónde se usa un medio |
+| Medios | subir (URL, base64 o enlace de subida directa para archivos locales), listar, editar, borrar, imagen destacada, dónde se usa un medio |
 | Estilos | CSS adicional; estilo, variables LESS y estado de compilación de YOOtheme |
 | Verificación | URL de vista previa sin sesión, inspección de una página (encabezados, enlaces rotos, alt, SEO efectivo) |
 | Ajustes | identidad del sitio, portada, zona horaria; con Yoast SEO activo, sus ajustes generales (plantillas de título, Schema, redes sociales, migas de pan, mapas del sitio, verificación, rastreo) |

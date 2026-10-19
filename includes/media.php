@@ -147,6 +147,137 @@ function spiral_mcp_media_check_type( $tmp, $name ) {
 	return $name;
 }
 
+/**
+ * Crea el adjunto a partir de un archivo temporal ya descargado o recibido: valida el
+ * tipo, lo pasa por media_handle_sideload() (mueve a uploads y genera las miniaturas)
+ * y aplica title, alt, caption y description. Devuelve el adjunto (spiral_mcp_media_out)
+ * con "timings.process_ms" o WP_Error. Borra el temporal si falla.
+ */
+function spiral_mcp_media_import( $tmp, $name, array $fields, $attach = 0 ) {
+	spiral_mcp_media_require_admin();
+	$name = spiral_mcp_media_check_type( $tmp, $name );
+	if ( is_wp_error( $name ) ) {
+		@unlink( $tmp ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		return $name;
+	}
+	$post_data = array();
+	if ( isset( $fields['title'] ) ) {
+		$post_data['post_title'] = (string) $fields['title'];
+	}
+	$start = microtime( true );
+	$id    = media_handle_sideload( array( 'name' => $name, 'tmp_name' => $tmp ), (int) $attach, null, $post_data );
+	if ( is_wp_error( $id ) ) {
+		@unlink( $tmp ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		return $id;
+	}
+	$process = (int) round( ( microtime( true ) - $start ) * 1000 );
+	$res     = spiral_mcp_media_apply_fields( $id, array_intersect_key( $fields, array_flip( array( 'alt', 'caption', 'description' ) ) ) );
+	if ( is_wp_error( $res ) ) {
+		return $res;
+	}
+	$out            = spiral_mcp_media_out( $id );
+	$out['timings'] = array( 'process_ms' => $process );
+	return $out;
+}
+
+/* -------------------------------------------------------------------------
+ * Enlaces de subida directa (create-upload-url)
+ *
+ * Un token aleatorio de un solo uso; en la BD solo se guarda su hash, en un
+ * transient con el usuario que lo pidió, los campos del adjunto y la caducidad.
+ * El archivo se envía por POST multipart al endpoint REST spiral-mcp/v1/upload/<token>,
+ * sin pasar por el modelo ni por base64.
+ * ---------------------------------------------------------------------- */
+
+/** Clave del transient de un token. */
+function spiral_mcp_upload_key( $token ) {
+	return 'spiral_mcp_upload_' . substr( hash( 'sha256', (string) $token ), 0, 40 );
+}
+
+/** Crea un enlace de subida. Devuelve [ token, caducidad ]. */
+function spiral_mcp_upload_create( array $fields, $attach, $seconds ) {
+	$token   = wp_generate_password( 40, false, false );
+	$expires = time() + (int) $seconds;
+	set_transient( spiral_mcp_upload_key( $token ), array(
+		'user'    => get_current_user_id(),
+		'fields'  => $fields,
+		'attach'  => (int) $attach,
+		'expires' => $expires,
+	), (int) $seconds );
+	return array( $token, $expires );
+}
+
+/** Datos de un token vigente o null. Con $take = true lo consume (un solo uso). */
+function spiral_mcp_upload_token( $token, $take = false ) {
+	if ( ! preg_match( '/^[A-Za-z0-9]{40}$/', (string) $token ) ) {
+		return null;
+	}
+	$key  = spiral_mcp_upload_key( $token );
+	$data = get_transient( $key );
+	if ( ! is_array( $data ) || (int) ( $data['expires'] ?? 0 ) <= time() ) {
+		return null;
+	}
+	if ( $take ) {
+		delete_transient( $key );
+	}
+	return $data;
+}
+
+/** Endpoint POST /spiral-mcp/v1/upload/<token>: recibe el archivo en el campo "file". */
+function spiral_mcp_upload_endpoint( WP_REST_Request $request ) {
+	$data = spiral_mcp_upload_token( $request['token'], true );
+	if ( ! $data ) {
+		return new WP_Error( 'spiral_mcp_upload_token', 'El enlace de subida no existe, ya se usó o caducó. Pide otro con spiral-mcp/create-upload-url.', array( 'status' => 403 ) );
+	}
+	wp_set_current_user( (int) $data['user'] );
+	$attach = (int) $data['attach'];
+	if ( ! spiral_mcp_user_can_any( array( 'media' ) ) || ! current_user_can( 'upload_files' ) || ( $attach && ! current_user_can( 'edit_post', $attach ) ) ) {
+		return new WP_Error( 'spiral_mcp_forbidden', 'El usuario que pidió el enlace ya no tiene permiso para subir medios.', array( 'status' => 403 ) );
+	}
+	$files = $request->get_file_params();
+	$file  = $files['file'] ?? null;
+	$max   = wp_max_upload_size();
+	if ( ! is_array( $file ) || empty( $file['tmp_name'] ) ) {
+		return new WP_Error( 'spiral_mcp_bad_input', 'Envía el archivo en el campo "file" con multipart/form-data, p. ej. curl -F "file=@foto.jpg" <upload_url>. El enlace ya se ha usado: pide otro.', array( 'status' => 400 ) );
+	}
+	if ( UPLOAD_ERR_OK !== (int) $file['error'] || (int) $file['size'] > $max ) {
+		$too_big = in_array( (int) $file['error'], array( UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE ), true ) || (int) $file['size'] > $max;
+		return new WP_Error(
+			$too_big ? 'spiral_mcp_too_big' : 'spiral_mcp_upload_failed',
+			$too_big ? sprintf( 'El archivo supera el máximo de subida (%s).', size_format( $max ) ) : sprintf( 'La subida falló (código PHP %d).', (int) $file['error'] ),
+			array( 'status' => 400 )
+		);
+	}
+	$fields = (array) $data['fields'];
+	$name   = sanitize_file_name( ! empty( $fields['filename'] ) ? $fields['filename'] : (string) $file['name'] );
+	$log    = array_merge( array( 'via' => 'create-upload-url', 'filename' => $name, 'size' => (int) $file['size'] ), $fields );
+	if ( $attach ) {
+		$log['attach_to'] = $attach;
+	}
+	// Se anota en la auditoría como una subida más, con su duración.
+	$result = spiral_mcp_log_run( 'spiral-mcp/upload-media', function () use ( $file, $name, $fields, $attach ) {
+		return spiral_mcp_media_import( $file['tmp_name'], $name, $fields, $attach );
+	}, $log, array( 'type' => 'media', 'id' => 'id' ) );
+	if ( is_wp_error( $result ) ) {
+		$result->add_data( array( 'status' => 400 ) );
+		return $result;
+	}
+	return new WP_REST_Response( $result, 201 );
+}
+
+add_action( 'rest_api_init', function () {
+	register_rest_route( 'spiral-mcp/v1', '/upload/(?P<token>[A-Za-z0-9]{40})', array(
+		'methods'             => 'POST',
+		'callback'            => 'spiral_mcp_upload_endpoint',
+		// La autorización es el token (de un solo uso, ligado a quien lo pidió); se comprueba aquí y se consume en el callback.
+		'permission_callback' => function ( WP_REST_Request $request ) {
+			return null !== spiral_mcp_upload_token( $request['token'] )
+				? true
+				: new WP_Error( 'spiral_mcp_upload_token', 'El enlace de subida no existe, ya se usó o caducó. Pide otro con spiral-mcp/create-upload-url.', array( 'status' => 403 ) );
+		},
+	) );
+} );
+
 /** Ruta relativa a la raíz del sitio, el formato de los props de imagen de YOOtheme. */
 function spiral_mcp_media_relative( $url ) {
 	$path = (string) wp_parse_url( $url, PHP_URL_PATH );
@@ -413,10 +544,11 @@ add_action( 'wp_abilities_api_init', function () {
 	/* 1. Subir ------------------------------------------------------------ */
 	spiral_mcp_register_ability( 'spiral-mcp/upload-media', array(
 		'label'               => 'Subir archivo a la biblioteca de medios',
-		'description'         => 'Sube una imagen, PDF o vídeo a la biblioteca de medios desde una URL pública https ("url") o desde datos en base64 ("data_base64" + "filename"). Tipos: ' . implode( ', ', spiral_mcp_media_types() ) . '. Máximo ' . size_format( wp_max_upload_size() ) . '. Rellena siempre "alt" en las imágenes. ' . $media_desc . ' Para usarla en un layout pon su path_relative en el prop de imagen del elemento.',
+		'description'         => 'Sube una imagen, PDF o vídeo a la biblioteca de medios desde una URL pública https ("url") o desde datos en base64 ("data_base64" + "filename"). Tipos: ' . implode( ', ', spiral_mcp_media_types() ) . '. Máximo ' . size_format( wp_max_upload_size() ) . '. Usa "url" siempre que el archivo esté en internet. "data_base64" obliga a escribir el archivo entero como texto (lento y caro): solo para archivos muy pequeños (menos de ~50 KB); para un archivo local más grande usa spiral-mcp/create-upload-url. Rellena siempre "alt" en las imágenes. ' . $media_desc . ' Además devuelve "timings" (fetch_ms: descarga o decodificación; process_ms: guardar y generar las miniaturas). Para usarla en un layout pon su path_relative en el prop de imagen del elemento.',
 		'category'            => 'spiral-mcp-media',
 		'group'               => 'media',
-		'log'                 => array( 'type' => 'media', 'id' => 'id' ),
+		// Un adjunto nuevo no cambia ninguna página hasta que se usa: no purgar la caché.
+		'log'                 => array( 'type' => 'media', 'id' => 'id', 'purge' => false ),
 		'input_schema'        => array(
 			'type'       => 'object',
 			'properties' => array(
@@ -447,34 +579,70 @@ add_action( 'wp_abilities_api_init', function () {
 			}
 			spiral_mcp_media_require_admin();
 
-			$file = $has_url ? spiral_mcp_media_download( $input['url'] ) : spiral_mcp_media_from_base64( $input['data_base64'], $input['filename'] ?? '' );
+			$start = microtime( true );
+			$file  = $has_url ? spiral_mcp_media_download( $input['url'] ) : spiral_mcp_media_from_base64( $input['data_base64'], $input['filename'] ?? '' );
 			if ( is_wp_error( $file ) ) {
 				return $file;
 			}
+			$fetch = (int) round( ( microtime( true ) - $start ) * 1000 );
 			list( $tmp, $name ) = $file;
 			if ( $has_url && ! empty( $input['filename'] ) ) {
 				$name = sanitize_file_name( $input['filename'] );
 			}
-			$name = spiral_mcp_media_check_type( $tmp, $name );
-			if ( is_wp_error( $name ) ) {
-				@unlink( $tmp ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
-				return $name;
+			$out = spiral_mcp_media_import( $tmp, $name, $input, $attach );
+			if ( ! is_wp_error( $out ) ) {
+				$out['timings'] = array( 'fetch_ms' => $fetch ) + $out['timings'];
 			}
+			return $out;
+		},
+		'meta'                => spiral_mcp_meta( false ),
+	) );
 
-			$post_data = array();
-			if ( isset( $input['title'] ) ) {
-				$post_data['post_title'] = (string) $input['title'];
+	/* 1b. Enlace de subida directa ------------------------------------------ */
+	spiral_mcp_register_ability( 'spiral-mcp/create-upload-url', array(
+		'label'               => 'Crear enlace de subida directa',
+		'description'         => 'Para subir un archivo LOCAL (de tu equipo o del usuario) sin convertirlo a base64: devuelve "upload_url", un enlace de un solo uso que caduca en "expires_in" segundos (600 por defecto, máximo 3600). Envía el archivo por POST multipart en el campo "file", p. ej. curl -F "file=@ruta/foto.jpg" "<upload_url>" (devuelve el adjunto en JSON, HTTP 201, igual que upload-media). Si no puedes ejecutar comandos, da al usuario el comando curl. title, alt, caption, description, filename y attach_to se fijan aquí, al crear el enlace. El enlace no necesita contraseña: no lo publiques. Tipos: ' . implode( ', ', spiral_mcp_media_types() ) . '. Máximo ' . size_format( wp_max_upload_size() ) . '.',
+		'category'            => 'spiral-mcp-media',
+		'group'               => 'media',
+		'log'                 => array( 'type' => 'media', 'id' => 'attach_to', 'purge' => false ),
+		'input_schema'        => array(
+			'type'       => 'object',
+			'properties' => array(
+				'filename'    => array( 'type' => 'string', 'description' => 'Nombre con extensión para el archivo en la biblioteca. Por defecto, el del archivo enviado.' ),
+				'title'       => array( 'type' => 'string' ),
+				'alt'         => array( 'type' => 'string', 'description' => 'Texto alternativo (accesibilidad y SEO).' ),
+				'caption'     => array( 'type' => 'string' ),
+				'description' => array( 'type' => 'string' ),
+				'attach_to'   => array( 'type' => 'integer', 'description' => 'ID de la página o entrada a la que se asocia.' ),
+				'expires_in'  => array( 'type' => 'integer', 'minimum' => 60, 'maximum' => 3600, 'default' => 600, 'description' => 'Segundos de validez del enlace.' ),
+			),
+		),
+		'permission_callback' => function ( $input = array() ) {
+			$attach = (int) ( ( (array) $input )['attach_to'] ?? 0 );
+			return current_user_can( 'upload_files' ) && ( ! $attach || current_user_can( 'edit_post', $attach ) );
+		},
+		'execute_callback'    => function ( $input = array() ) {
+			$input  = (array) $input;
+			$attach = (int) ( $input['attach_to'] ?? 0 );
+			if ( $attach && ! get_post( $attach ) ) {
+				return new WP_Error( 'spiral_mcp_not_found', 'No existe el post indicado en "attach_to".' );
 			}
-			$id = media_handle_sideload( array( 'name' => $name, 'tmp_name' => $tmp ), $attach, null, $post_data );
-			if ( is_wp_error( $id ) ) {
-				@unlink( $tmp ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
-				return $id;
+			if ( ! empty( $input['filename'] ) && ! pathinfo( sanitize_file_name( $input['filename'] ), PATHINFO_EXTENSION ) ) {
+				return new WP_Error( 'spiral_mcp_bad_filename', '"filename" debe llevar extensión, p. ej. foto.jpg.' );
 			}
-			$res = spiral_mcp_media_apply_fields( $id, array_intersect_key( $input, array_flip( array( 'alt', 'caption', 'description' ) ) ) );
-			if ( is_wp_error( $res ) ) {
-				return $res;
-			}
-			return spiral_mcp_media_out( $id );
+			$seconds = min( 3600, max( 60, (int) ( $input['expires_in'] ?? 600 ) ) );
+			$fields  = array_intersect_key( $input, array_flip( array( 'filename', 'title', 'alt', 'caption', 'description' ) ) );
+			list( $token, $expires ) = spiral_mcp_upload_create( $fields, $attach, $seconds );
+			$url = rest_url( 'spiral-mcp/v1/upload/' . $token );
+			return array(
+				'upload_url' => $url,
+				'method'     => 'POST',
+				'field'      => 'file',
+				'example'    => 'curl -F "file=@ruta/al/archivo.jpg" "' . $url . '"',
+				'expires_at' => gmdate( 'Y-m-d\TH:i:s\Z', $expires ),
+				'max_size'   => size_format( wp_max_upload_size() ),
+				'single_use' => true,
+			);
 		},
 		'meta'                => spiral_mcp_meta( false ),
 	) );

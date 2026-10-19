@@ -78,7 +78,12 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 
 ## Subir una imagen y usarla
 
-1. `upload-media {"url": "https://…/foto.jpg", "alt": "Equipo en la oficina", "attach_to": 12}`. También acepta `data_base64` + `filename`, y solo URLs https públicas. Guarda `path_relative` y `id`.
+1. Según dónde esté el archivo:
+   - En internet: `upload-media {"url": "https://…/foto.jpg", "alt": "Equipo en la oficina", "attach_to": 12}` (solo URLs https públicas).
+   - En tu equipo o el del usuario: `create-upload-url {"alt": "Equipo en la oficina", "attach_to": 12}` y luego `curl -F "file=@ruta/foto.jpg" "<upload_url>"` (un solo uso, caduca en 10 minutos). Si no puedes ejecutar comandos, dale el comando al usuario.
+   - `data_base64` + `filename` solo para archivos muy pequeños (iconos de pocos KB): tendrías que escribir el archivo entero como texto, y una foto tarda minutos.
+
+   Guarda `path_relative` y `id`. `timings` dice cuánto tardó la descarga (`fetch_ms`) y el proceso con las miniaturas (`process_ms`): una foto de móvil de 4000 px tarda unos segundos.
 2. En el layout: `{"op": "replace", "path": ".../props/image", "value": "wp-content/uploads/2026/10/foto.jpg"}`, más `image_alt`.
 3. Imagen destacada: `set-featured-image {"post_id": 12, "media_id": 345}` (o `featured_media` en `update-content`).
 4. Para cambiar el alt después: `update-media {"id": 345, "alt": "..."}`.

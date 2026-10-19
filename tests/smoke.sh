@@ -115,7 +115,7 @@ check 'listado de abilities' 200
 for name in list-content get-content create-content update-content get-yootheme-layout update-yootheme-layout \
 	list-menus get-menu create-menu update-menu delete-menu add-menu-item update-menu-item delete-menu-item \
 	get-theme-layout update-theme-layout list-theme-backups restore-theme-backup list-widgets update-widget create-widget delete-widget \
-	list-activity list-snapshots restore-snapshot upload-media list-media get-media update-media delete-media \
+	list-activity list-snapshots restore-snapshot upload-media create-upload-url list-media get-media update-media delete-media \
 	set-featured-image find-media-usage list-elements get-element-schema get-layout-outline get-layout-texts get-layout-node \
 	patch-layout duplicate-content get-theme-config update-theme-config list-templates get-template \
 	create-template update-template delete-template list-library get-library-item save-to-library \
@@ -698,9 +698,27 @@ call POST spiral-mcp/upload-media '{"url":"https://127.0.0.1/x.png"}'
 call POST spiral-mcp/upload-media "{\"data_base64\":\"$(printf '<svg xmlns="http://www.w3.org/2000/svg"/>' | base64 | tr -d '\n')\",\"filename\":\"x.svg\"}"
 [ "$STATUS" -ge 400 ] && ok 'upload-media rechaza SVG' || ko 'upload-media debería rechazar SVG'
 
+# Enlace de subida directa: multipart sin Application Password, un solo uso.
+call POST spiral-mcp/create-upload-url '{"alt":"Subida directa","expires_in":120}'
+if check 'create-upload-url' 200 upload_url expires_at; then
+	UP_URL=$(jget upload_url)
+	UP_FILE="$(mktemp).png"
+	printf '%s' "$PIXEL" | base64 -d > "$UP_FILE"
+	STATUS=$(curl -sk -o "$TMP" -w '%{http_code}' -F "file=@$UP_FILE" "$UP_URL"); BODY=$(cat "$TMP")
+	if check 'subida por el enlace (multipart)' 201 id path_relative timings.process_ms; then
+		eq 'subida por el enlace: alt' alt 'Subida directa'
+		UP_MEDIA_ID=$(jget id)
+		STATUS=$(curl -sk -o "$TMP" -w '%{http_code}' -F "file=@$UP_FILE" "$UP_URL"); BODY=$(cat "$TMP")
+		[ "$STATUS" = 403 ] && ok 'el enlace de subida es de un solo uso' || ko 'el enlace de subida debería rechazar un segundo uso'
+		call DELETE spiral-mcp/delete-media "{\"id\":$UP_MEDIA_ID,\"confirm\":true}"
+		check 'limpieza: borrar la imagen subida por el enlace' 200 deleted
+	fi
+	rm -f "$UP_FILE"
+fi
+
 if [ -n "${SMOKE_MEDIA_URL-https://s.w.org/style/images/about/WordPress-logotype-wmark.png}" ]; then
 	call POST spiral-mcp/upload-media "{\"url\":\"${SMOKE_MEDIA_URL-https://s.w.org/style/images/about/WordPress-logotype-wmark.png}\",\"alt\":\"Prueba URL\"}"
-	if check 'upload-media (URL https)' 200 id width; then
+	if check 'upload-media (URL https)' 200 id width timings.fetch_ms timings.process_ms; then
 		URL_MEDIA_ID=$(jget id)
 		call DELETE spiral-mcp/delete-media "{\"id\":$URL_MEDIA_ID,\"confirm\":true}"
 		check 'limpieza: borrar la imagen descargada' 200 deleted
