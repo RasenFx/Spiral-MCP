@@ -74,6 +74,7 @@ function spiral_mcp_settings_defaults() {
 		'online_download'          => true,  // Descargar diseños de la librería online con la clave de API.
 		'drop_tables_on_uninstall' => false, // Borrar auditoría y snapshots al desinstalar.
 		'plugins_management'       => false, // Segundo cerrojo de la gestión de plugins (el primero es spiral_mcp_plugins).
+		'upload_link_max_mb'       => 20,    // Tamaño máximo por enlace de subida directa (create-upload-url). 0 = el del servidor.
 	);
 }
 

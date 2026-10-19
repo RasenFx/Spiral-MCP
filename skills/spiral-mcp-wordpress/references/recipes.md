@@ -80,7 +80,7 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 
 1. Según dónde esté el archivo:
    - En internet: `upload-media {"url": "https://…/foto.jpg", "alt": "Equipo en la oficina", "attach_to": 12}` (solo URLs https públicas).
-   - En tu equipo o el del usuario: `create-upload-url {"alt": "Equipo en la oficina", "attach_to": 12}` y luego `curl -F "file=@ruta/foto.jpg" "<upload_url>"` (un solo uso, caduca en 10 minutos). Si no puedes ejecutar comandos, dale el comando al usuario.
+   - En tu equipo o el del usuario: `create-upload-url {"alt": "Equipo en la oficina", "attach_to": 12}` y luego el comando de `example`: `curl -H "X-Spiral-Upload-Token: <token>" -F "file=@ruta/foto.jpg" "<upload_url>"` (un solo uso, caduca en 10 minutos; máximo `max_size`, 20 MB por defecto). Si no puedes ejecutar comandos, dale el comando al usuario.
    - `data_base64` + `filename` solo para archivos muy pequeños (iconos de pocos KB): tendrías que escribir el archivo entero como texto, y una foto tarda minutos.
 
    Guarda `path_relative` y `id`. `timings` dice cuánto tardó la descarga (`fetch_ms`) y el proceso con las miniaturas (`process_ms`): una foto de móvil de 4000 px tarda unos segundos.

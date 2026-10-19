@@ -185,9 +185,23 @@ function spiral_mcp_media_import( $tmp, $name, array $fields, $attach = 0 ) {
  *
  * Un token aleatorio de un solo uso; en la BD solo se guarda su hash, en un
  * transient con el usuario que lo pidió, los campos del adjunto y la caducidad.
- * El archivo se envía por POST multipart al endpoint REST spiral-mcp/v1/upload/<token>,
- * sin pasar por el modelo ni por base64.
+ * El archivo se envía por POST multipart a spiral-mcp/v1/upload con el token en la
+ * cabecera X-Spiral-Upload-Token (así no queda en los logs del servidor web), sin
+ * pasar por el modelo ni por base64. También se acepta en la ruta (/upload/<token>).
  * ---------------------------------------------------------------------- */
+
+/** Tamaño máximo en bytes de una subida directa: el ajuste upload_link_max_mb, sin pasar del servidor. */
+function spiral_mcp_upload_max_size() {
+	$server = (int) wp_max_upload_size();
+	$mb     = (int) spiral_mcp_setting( 'upload_link_max_mb' );
+	return $mb > 0 ? min( $server, $mb * MB_IN_BYTES ) : $server;
+}
+
+/** Token de la petición: cabecera X-Spiral-Upload-Token o, si no, la ruta. */
+function spiral_mcp_upload_request_token( WP_REST_Request $request ) {
+	$header = (string) $request->get_header( 'x_spiral_upload_token' );
+	return '' !== $header ? trim( $header ) : (string) $request['token'];
+}
 
 /** Clave del transient de un token. */
 function spiral_mcp_upload_key( $token ) {
@@ -217,15 +231,16 @@ function spiral_mcp_upload_token( $token, $take = false ) {
 	if ( ! is_array( $data ) || (int) ( $data['expires'] ?? 0 ) <= time() ) {
 		return null;
 	}
-	if ( $take ) {
-		delete_transient( $key );
+	// Consumo atómico: el borrado solo tiene éxito en una de dos peticiones simultáneas.
+	if ( $take && ! delete_transient( $key ) ) {
+		return null;
 	}
 	return $data;
 }
 
-/** Endpoint POST /spiral-mcp/v1/upload/<token>: recibe el archivo en el campo "file". */
+/** Endpoint POST /spiral-mcp/v1/upload: recibe el archivo en el campo "file". */
 function spiral_mcp_upload_endpoint( WP_REST_Request $request ) {
-	$data = spiral_mcp_upload_token( $request['token'], true );
+	$data = spiral_mcp_upload_token( spiral_mcp_upload_request_token( $request ), true );
 	if ( ! $data ) {
 		return new WP_Error( 'spiral_mcp_upload_token', 'El enlace de subida no existe, ya se usó o caducó. Pide otro con spiral-mcp/create-upload-url.', array( 'status' => 403 ) );
 	}
@@ -236,9 +251,9 @@ function spiral_mcp_upload_endpoint( WP_REST_Request $request ) {
 	}
 	$files = $request->get_file_params();
 	$file  = $files['file'] ?? null;
-	$max   = wp_max_upload_size();
+	$max   = spiral_mcp_upload_max_size();
 	if ( ! is_array( $file ) || empty( $file['tmp_name'] ) ) {
-		return new WP_Error( 'spiral_mcp_bad_input', 'Envía el archivo en el campo "file" con multipart/form-data, p. ej. curl -F "file=@foto.jpg" <upload_url>. El enlace ya se ha usado: pide otro.', array( 'status' => 400 ) );
+		return new WP_Error( 'spiral_mcp_bad_input', 'Envía el archivo en el campo "file" con multipart/form-data, p. ej. curl -H "X-Spiral-Upload-Token: <token>" -F "file=@foto.jpg" <upload_url>. El enlace ya se ha usado: pide otro.', array( 'status' => 400 ) );
 	}
 	if ( UPLOAD_ERR_OK !== (int) $file['error'] || (int) $file['size'] > $max ) {
 		$too_big = in_array( (int) $file['error'], array( UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE ), true ) || (int) $file['size'] > $max;
@@ -266,16 +281,18 @@ function spiral_mcp_upload_endpoint( WP_REST_Request $request ) {
 }
 
 add_action( 'rest_api_init', function () {
-	register_rest_route( 'spiral-mcp/v1', '/upload/(?P<token>[A-Za-z0-9]{40})', array(
+	$args = array(
 		'methods'             => 'POST',
 		'callback'            => 'spiral_mcp_upload_endpoint',
 		// La autorización es el token (de un solo uso, ligado a quien lo pidió); se comprueba aquí y se consume en el callback.
 		'permission_callback' => function ( WP_REST_Request $request ) {
-			return null !== spiral_mcp_upload_token( $request['token'] )
+			return null !== spiral_mcp_upload_token( spiral_mcp_upload_request_token( $request ) )
 				? true
 				: new WP_Error( 'spiral_mcp_upload_token', 'El enlace de subida no existe, ya se usó o caducó. Pide otro con spiral-mcp/create-upload-url.', array( 'status' => 403 ) );
 		},
-	) );
+	);
+	register_rest_route( 'spiral-mcp/v1', '/upload', $args );
+	register_rest_route( 'spiral-mcp/v1', '/upload/(?P<token>[A-Za-z0-9]{40})', $args );
 } );
 
 /** Ruta relativa a la raíz del sitio, el formato de los props de imagen de YOOtheme. */
@@ -601,7 +618,7 @@ add_action( 'wp_abilities_api_init', function () {
 	/* 1b. Enlace de subida directa ------------------------------------------ */
 	spiral_mcp_register_ability( 'spiral-mcp/create-upload-url', array(
 		'label'               => 'Crear enlace de subida directa',
-		'description'         => 'Para subir un archivo LOCAL (de tu equipo o del usuario) sin convertirlo a base64: devuelve "upload_url", un enlace de un solo uso que caduca en "expires_in" segundos (600 por defecto, máximo 3600). Envía el archivo por POST multipart en el campo "file", p. ej. curl -F "file=@ruta/foto.jpg" "<upload_url>" (devuelve el adjunto en JSON, HTTP 201, igual que upload-media). Si no puedes ejecutar comandos, da al usuario el comando curl. title, alt, caption, description, filename y attach_to se fijan aquí, al crear el enlace. El enlace no necesita contraseña: no lo publiques. Tipos: ' . implode( ', ', spiral_mcp_media_types() ) . '. Máximo ' . size_format( wp_max_upload_size() ) . '.',
+		'description'         => 'Para subir un archivo LOCAL (de tu equipo o del usuario) sin convertirlo a base64: devuelve "upload_url" y un "token" de un solo uso que caduca en "expires_in" segundos (600 por defecto, máximo 3600). Envía el archivo por POST multipart en el campo "file" con el token en la cabecera X-Spiral-Upload-Token: usa el comando de "example" (curl -H "X-Spiral-Upload-Token: <token>" -F "file=@ruta/foto.jpg" "<upload_url>"); devuelve el adjunto en JSON (HTTP 201), igual que upload-media. Si no puedes ejecutar comandos, da al usuario ese comando. title, alt, caption, description, filename y attach_to se fijan aquí, al crear el enlace. El token no necesita contraseña: no lo publiques. Tipos: ' . implode( ', ', spiral_mcp_media_types() ) . '. Máximo ' . size_format( spiral_mcp_upload_max_size() ) . ' (lo ajusta el administrador).',
 		'category'            => 'spiral-mcp-media',
 		'group'               => 'media',
 		'log'                 => array( 'type' => 'media', 'id' => 'attach_to', 'purge' => false ),
@@ -633,14 +650,16 @@ add_action( 'wp_abilities_api_init', function () {
 			$seconds = min( 3600, max( 60, (int) ( $input['expires_in'] ?? 600 ) ) );
 			$fields  = array_intersect_key( $input, array_flip( array( 'filename', 'title', 'alt', 'caption', 'description' ) ) );
 			list( $token, $expires ) = spiral_mcp_upload_create( $fields, $attach, $seconds );
-			$url = rest_url( 'spiral-mcp/v1/upload/' . $token );
+			$url = rest_url( 'spiral-mcp/v1/upload' );
 			return array(
 				'upload_url' => $url,
 				'method'     => 'POST',
+				'header'     => 'X-Spiral-Upload-Token',
+				'token'      => $token,
 				'field'      => 'file',
-				'example'    => 'curl -F "file=@ruta/al/archivo.jpg" "' . $url . '"',
+				'example'    => 'curl -H "X-Spiral-Upload-Token: ' . $token . '" -F "file=@ruta/al/archivo.jpg" "' . $url . '"',
 				'expires_at' => gmdate( 'Y-m-d\TH:i:s\Z', $expires ),
-				'max_size'   => size_format( wp_max_upload_size() ),
+				'max_size'   => size_format( spiral_mcp_upload_max_size() ),
 				'single_use' => true,
 			);
 		},

@@ -2,6 +2,17 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.28.0] — 2026-10-19 · Enlaces de subida más seguros
+
+### Cambiado
+- `create-upload-url` devuelve `upload_url` (`/wp-json/spiral-mcp/v1/upload`, sin el token) y `token`, que se envía en la cabecera `X-Spiral-Upload-Token`: así no queda en los logs del servidor web ni de proxies. `example` trae el comando curl completo. El formato anterior (token en la ruta) se sigue aceptando.
+
+### Añadido
+- Ajuste "Tamaño máximo de las subidas directas" en Ajustes > Spiral-MCP > Comportamiento (`upload_link_max_mb`, 20 MB por defecto; 0 = el del servidor, que nunca se supera). `create-upload-url` lo devuelve en `max_size`.
+
+### Arreglado
+- El token se consume de forma atómica: con varias peticiones simultáneas con el mismo token solo una sube el archivo (antes, en una carrera, podían subir varias).
+
 ## [1.27.0] — 2026-10-19 · Subidas de medios más rápidas
 
 ### Añadido

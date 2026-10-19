@@ -62,7 +62,7 @@ Sin medios, el agente no puede poner logos ni fotos en los diseños.
   - Tipos permitidos: jpg, jpeg, png, webp, gif, avif, pdf, mp4, webm. **SVG no** (riesgo de XSS) salvo que esté activo un plugin de saneado de SVG (filtro `spiral_mcp_allow_svg`).
   - Límite de tamaño: `wp_max_upload_size()`. Solo URLs `https`, y rechazar IPs privadas y loopback (SSRF).
   - Salida: `id`, `url`, `path_relative` (`wp-content/uploads/…`, el formato que usan los props de imagen de YOOtheme), `width`, `height`, `mime`, `alt` y `sizes`.
-- [x] `spiral-mcp/create-upload-url` (v1.27): enlace de un solo uso para subir un archivo local por POST multipart sin base64 (con base64 el agente escribe el archivo entero como texto: lento). `upload-media` devuelve `timings` y ya no purga la caché.
+- [x] `spiral-mcp/create-upload-url` (v1.27): enlace de un solo uso para subir un archivo local por POST multipart sin base64 (con base64 el agente escribe el archivo entero como texto: lento). `upload-media` devuelve `timings` y ya no purga la caché. v1.28: token en la cabecera `X-Spiral-Upload-Token` (fuera de los logs), consumo atómico y límite de tamaño propio (ajuste `upload_link_max_mb`).
 - [x] `spiral-mcp/list-media`: filtros `search`, `mime` (image, video, application/pdf), `parent`, paginación. Devuelve lo mismo que la salida de `upload-media`.
 - [x] `spiral-mcp/get-media`: un adjunto por ID.
 - [x] `spiral-mcp/update-media`: `alt`, `title`, `caption`, `description`. Hace snapshot `media_meta` del estado anterior.

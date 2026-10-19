@@ -700,18 +700,28 @@ call POST spiral-mcp/upload-media "{\"data_base64\":\"$(printf '<svg xmlns="http
 
 # Enlace de subida directa: multipart sin Application Password, un solo uso.
 call POST spiral-mcp/create-upload-url '{"alt":"Subida directa","expires_in":120}'
-if check 'create-upload-url' 200 upload_url expires_at; then
+if check 'create-upload-url' 200 upload_url token expires_at max_size; then
 	UP_URL=$(jget upload_url)
+	UP_TOKEN=$(jget token)
 	UP_FILE="$(mktemp).png"
 	printf '%s' "$PIXEL" | base64 -d > "$UP_FILE"
 	STATUS=$(curl -sk -o "$TMP" -w '%{http_code}' -F "file=@$UP_FILE" "$UP_URL"); BODY=$(cat "$TMP")
-	if check 'subida por el enlace (multipart)' 201 id path_relative timings.process_ms; then
+	[ "$STATUS" = 403 ] && ok 'el endpoint de subida exige el token' || ko 'el endpoint de subida debería rechazar peticiones sin token'
+	STATUS=$(curl -sk -o "$TMP" -w '%{http_code}' -H "X-Spiral-Upload-Token: $UP_TOKEN" -F "file=@$UP_FILE" "$UP_URL"); BODY=$(cat "$TMP")
+	if check 'subida con el token en la cabecera (multipart)' 201 id path_relative timings.process_ms; then
 		eq 'subida por el enlace: alt' alt 'Subida directa'
 		UP_MEDIA_ID=$(jget id)
-		STATUS=$(curl -sk -o "$TMP" -w '%{http_code}' -F "file=@$UP_FILE" "$UP_URL"); BODY=$(cat "$TMP")
-		[ "$STATUS" = 403 ] && ok 'el enlace de subida es de un solo uso' || ko 'el enlace de subida debería rechazar un segundo uso'
+		STATUS=$(curl -sk -o "$TMP" -w '%{http_code}' -H "X-Spiral-Upload-Token: $UP_TOKEN" -F "file=@$UP_FILE" "$UP_URL"); BODY=$(cat "$TMP")
+		[ "$STATUS" = 403 ] && ok 'el token de subida es de un solo uso' || ko 'el token de subida debería rechazar un segundo uso'
 		call DELETE spiral-mcp/delete-media "{\"id\":$UP_MEDIA_ID,\"confirm\":true}"
 		check 'limpieza: borrar la imagen subida por el enlace' 200 deleted
+	fi
+	# Formato antiguo: el token en la ruta.
+	call POST spiral-mcp/create-upload-url '{"alt":"Subida directa (ruta)"}'
+	STATUS=$(curl -sk -o "$TMP" -w '%{http_code}' -F "file=@$UP_FILE" "$(jget upload_url)/$(jget token)"); BODY=$(cat "$TMP")
+	if check 'subida con el token en la ruta' 201 id; then
+		call DELETE spiral-mcp/delete-media "{\"id\":$(jget id),\"confirm\":true}"
+		check 'limpieza: borrar la segunda imagen subida por el enlace' 200 deleted
 	fi
 	rm -f "$UP_FILE"
 fi

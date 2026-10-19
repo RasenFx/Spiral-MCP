@@ -152,6 +152,7 @@ add_action( 'admin_post_spiral_mcp_save_behavior', function () {
 		'online_download'          => ! empty( $_POST['online_download'] ),
 		'drop_tables_on_uninstall' => ! empty( $_POST['drop_tables_on_uninstall'] ),
 		'plugins_management'       => ! empty( $_POST['plugins_management'] ),
+		'upload_link_max_mb'       => min( 10240, isset( $_POST['upload_link_max_mb'] ) ? absint( wp_unslash( $_POST['upload_link_max_mb'] ) ) : 20 ), // phpcs:ignore WordPress.Security.NonceVerification.Missing
 	);
 	update_option( 'spiral_mcp_settings', $new, true );
 	$changed = array();
@@ -385,6 +386,11 @@ function spiral_mcp_admin_render_behavior() {
 				<th scope="row"><label for="snapshot_retention_days">Conservar los snapshots</label></th>
 				<td><input type="number" min="0" max="3650" id="snapshot_retention_days" name="snapshot_retention_days" value="<?php echo (int) $v( 'snapshot_retention_days' ); ?>" class="small-text"> días
 				<p class="description">Las copias que permiten deshacer cambios de configuración, menús, widgets, medios… Pasado este plazo ya no se pueden restaurar. 0 = no borrar nunca.</p></td>
+			</tr>
+			<tr>
+				<th scope="row"><label for="upload_link_max_mb">Tamaño máximo de las subidas directas</label></th>
+				<td><input type="number" min="0" max="10240" id="upload_link_max_mb" name="upload_link_max_mb" value="<?php echo (int) $v( 'upload_link_max_mb' ); ?>" class="small-text"> MB
+				<p class="description">Límite de cada archivo enviado por un enlace de <code>create-upload-url</code>. Nunca supera el del servidor (ahora <?php echo esc_html( size_format( wp_max_upload_size() ) ); ?>). 0 = el del servidor.</p></td>
 			</tr>
 			<tr>
 				<th scope="row">Librería online de YOOtheme</th>
