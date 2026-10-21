@@ -2,6 +2,11 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.28.1] — 2026-10-20 · MCP Adapter como dependencia
+
+### Cambiado
+- MCP Adapter ([wordpress.org/plugins/mcp-adapter](https://wordpress.org/plugins/mcp-adapter/)) queda declarado como dependencia en la cabecera (`Requires Plugins: mcp-adapter`). WordPress lo muestra en la lista de plugins ("Requiere: MCP Adapter"), ofrece instalarlo, no deja activar Spiral-MCP-Control sin él y no deja desactivar MCP Adapter mientras Spiral-MCP-Control esté activo.
+
 ## [1.28.0] — 2026-10-19 · Enlaces de subida más seguros
 
 ### Cambiado

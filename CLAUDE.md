@@ -6,7 +6,7 @@ El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes d
 
 ## Requisitos
 - WordPress 6.9+ (Abilities API: `wp_register_ability`, `wp_register_ability_category`).
-- Plugin **MCP Adapter** activo (es el que publica las abilities como herramientas MCP).
+- Plugin **MCP Adapter** activo (es el que publica las abilities como herramientas MCP). Declarado en la cabecera como `Requires Plugins: mcp-adapter` (slug de wordpress.org): WordPress no deja activar este plugin sin él.
 - YOOtheme Pro activo (o un tema hijo de YOOtheme) para todo lo relacionado con el builder y los estilos.
 - PHP 7.4 como mínimo: no usar sintaxis de PHP 8 (match, nullsafe `?->`, argumentos con nombre, tipos de unión, `readonly`, enums).
 

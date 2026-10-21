@@ -8,15 +8,16 @@ Cada cambio queda en un registro de auditoría y, salvo en los posts (que tienen
 
 - WordPress 6.9 o superior (Abilities API).
 - PHP 7.4 o superior.
-- Plugin [MCP Adapter](https://github.com/WordPress/mcp-adapter) activo.
+- Plugin [MCP Adapter](https://wordpress.org/plugins/mcp-adapter/) de wordpress.org, activo. Es una dependencia declarada (`Requires Plugins: mcp-adapter`): WordPress lo muestra en la lista de plugins ("Requiere: MCP Adapter"), ofrece instalarlo y no deja activar Spiral-MCP-Control sin él ni desactivar MCP Adapter mientras Spiral-MCP-Control esté activo. Instálalo desde *Plugins > Añadir nuevo*: WordPress reconoce la dependencia por la carpeta `mcp-adapter`, así que un ZIP de GitHub con otro nombre de carpeta no cuenta.
 - YOOtheme Pro (o un tema hijo) para todo lo relacionado con el builder y los estilos. Las abilities de contenido, menús, medios, SEO y cachés funcionan con cualquier tema.
 
 ## Instalación
 
 1. Descarga el ZIP de la versión (o genéralo: ver [Desarrollo](#desarrollo)) y súbelo en *Plugins > Añadir nuevo > Subir plugin*.
-2. Actívalo. Se crean las tablas de auditoría y snapshots, las capacidades `spiral_mcp_*` (los administradores las reciben todas) y el rol **Agente Spiral-MCP** (`spiral_mcp_agent`).
-3. Crea un usuario con ese rol, genera una *Application Password* para él y conecta tu cliente MCP al MCP Adapter con esas credenciales.
-4. Para el agente, instala el skill de Claude `skills/spiral-mcp-wordpress/` (método de trabajo, recetas y errores frecuentes).
+2. Si MCP Adapter no está instalado, WordPress lo indica en la ficha del plugin: instálalo y actívalo (*Plugins > Añadir nuevo*, busca "MCP Adapter").
+3. Activa Spiral-MCP-Control. Se crean las tablas de auditoría y snapshots, las capacidades `spiral_mcp_*` (los administradores las reciben todas) y el rol **Agente Spiral-MCP** (`spiral_mcp_agent`).
+4. Crea un usuario con ese rol, genera una *Application Password* para él y conecta tu cliente MCP al MCP Adapter con esas credenciales.
+5. Para el agente, instala el skill de Claude `skills/spiral-mcp-wordpress/` (método de trabajo, recetas y errores frecuentes).
 
 ## Qué puede hacer el agente
 
