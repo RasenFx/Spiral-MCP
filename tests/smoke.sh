@@ -3,7 +3,7 @@
 # de un usuario con el rol spiral_mcp_agent, contra un WordPress LOCAL.
 #
 # Uso:
-#   WP_URL=https://spiral-mcp-control.test WP_USER=agente WP_APP_PASSWORD='xxxx xxxx xxxx xxxx xxxx xxxx' tests/smoke.sh
+#   WP_URL=https://wordpress-dev.test WP_USER=agente WP_APP_PASSWORD='xxxx xxxx xxxx xxxx xxxx xxxx' tests/smoke.sh
 #
 # Requisitos: bash, curl y php (para leer el JSON). Usa ?rest_route=, así que
 # funciona también con los enlaces permanentes "simples". curl va con -k
