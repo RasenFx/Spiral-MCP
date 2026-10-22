@@ -8,9 +8,9 @@ El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes d
 - WordPress 6.9+ (Abilities API: `wp_register_ability`, `wp_register_ability_category`).
 - Plugin **MCP Adapter** activo (es el que publica las abilities como herramientas MCP). Declarado en la cabecera como `Requires Plugins: mcp-adapter` (slug de wordpress.org): WordPress no deja activar este plugin sin él.
 - YOOtheme Pro activo (o un tema hijo de YOOtheme) para todo lo relacionado con el builder y los estilos.
-- PHP 7.4 como mínimo: no usar sintaxis de PHP 8 (match, nullsafe `?->`, argumentos con nombre, tipos de unión, `readonly`, enums).
+- PHP 8.1 como mínimo (lo exige la librería cliente de SPUpdater). El archivo principal no debe usar sintaxis posterior a PHP 7.4: tiene que poder interpretarse para mostrar el aviso de requisitos.
 
-## Estructura actual (v1.28.0)
+## Estructura actual (v1.29.0)
 ```
 spiral-mcp-control.php   cabecera, constantes, comprobación de requisitos, require_once y hooks de activación
 uninstall.php            borra el rol y las capacidades (las tablas solo con el filtro spiral_mcp_uninstall_drop_tables)
@@ -46,6 +46,8 @@ tests/smoke.sh           prueba de humo por REST (ver "Entorno de desarrollo")
 tests/fixtures/          layouts de YOOtheme de ejemplo
 tests/gen-skill-abilities.php  regenera la referencia de abilities del skill
 skills/spiral-mcp-wordpress/   skill de Claude para el agente que usa el plugin
+includes/updates.php     actualizaciones desde SPUpdater (https://plugins.rasenfx.com, producto `spiral-mcp-control`, gratuito)
+includes/spupdater/      copia de spupdater/packages/spupdater-wp-client/src con el namespace SpiralMcp\SPUpdater\WpClient (+ autoload.php)
 dist/                    ZIP para instalar (no versionar)
 ```
 
@@ -81,7 +83,7 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - **JSON**: `spiral_mcp_json( $x )` (`wp_json_encode` con `JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE`).
 - **Errores**: devolver `WP_Error` con mensaje en español que diga cómo corregir la llamada. No lanzar excepciones hacia fuera.
 - **Enlaces internos**: rutas relativas (`/contacto/`), nunca el dominio completo. Aplica a ejemplos, descripciones y valores por defecto.
-- **Sin dependencias externas** (ni Composer en runtime): el plugin debe instalarse subiendo un ZIP.
+- **Sin dependencias externas** (ni Composer en runtime): el plugin debe instalarse subiendo un ZIP. La librería de SPUpdater va copiada en `includes/spupdater/` con su namespace prefijado (`SpiralMcp\SPUpdater\WpClient`): nktools trae otra copia con el namespace original y, si coincidieran, solo se cargaría una para los dos plugins. Para sincronizarla, copia de nuevo `src/` y repite el cambio de namespace.
 
 ## Lo que ya sabemos de YOOtheme (comprobado en producción)
 - **Layout de una página**: JSON al final de `post_content`, dentro del último comentario `<!-- {…} -->`. Raíz `{"type":"layout","children":[section > row > column > elementos]}`. Lo que va antes del comentario es el HTML de respaldo. Ver `spiral_mcp_split_layout()`.
@@ -128,7 +130,8 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - **Ruta REST de la Abilities API** (comprobada en WP 7.1.3): `/wp-abilities/v1/abilities` (listado) y `/wp-abilities/v1/abilities/<nombre>/run` (ejecutar). El método HTTP depende de las anotaciones: `GET` si `readonly`, `DELETE` si `destructive` e `idempotent`, `POST` en el resto. En `GET`/`DELETE` la entrada va en la query (`input[id]=5`) y el core la convierte a los tipos del esquema; en `POST`, en el cuerpo JSON `{"input": {…}}`. Con enlaces permanentes simples: `/?rest_route=/wp-abilities/v1/abilities/spiral-mcp/list-content/run`. Las Application Passwords exigen HTTPS (o `WP_ENVIRONMENT_TYPE` = `local`).
 
 ## Versionado y entrega
-- SemVer en la cabecera del plugin (`Version:`) y en `SPIRAL_MCP_VERSION`.
+- SemVer en la cabecera del plugin (`Version:`) y en `SPIRAL_MCP_VERSION`. `SPIRAL_MCP_VERSION` es también la versión que se envía a SPUpdater: si no coincide con la del release, WordPress ofrece la actualización una y otra vez.
 - Cada versión anota sus cambios en `CHANGELOG.md`.
 - ZIP: carpeta raíz `spiral-mcp-control/`, sin `.git`, `dist/`, `tests/`, `docs/` ni `skills/` (p. ej. `git archive --format=zip --prefix=spiral-mcp-control/ -o dist/spiral-mcp-control-X.Y.Z.zip HEAD -- spiral-mcp-control.php uninstall.php includes LICENSE CHANGELOG.md`).
+- Publicación: en `https://plugins.rasenfx.com/admin` → **Releases → New**, subir el ZIP del producto `spiral-mcp-control` (no en plugins.nkcore.com, que es el servidor de nktools).
 - Al terminar una fase: actualizar las casillas de `docs/ROADMAP.md`.

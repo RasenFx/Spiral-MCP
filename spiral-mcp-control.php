@@ -2,9 +2,9 @@
 /**
  * Plugin Name:       Spiral-MCP-Control
  * Description:       Registra abilities (Abilities API) para leer y editar páginas/entradas, layouts de YOOtheme, medios, menús, el footer de YOOtheme y widgets, expuestas al MCP Adapter. Con registro de auditoría, snapshots y rol propio para el agente.
- * Version:           1.28.1
+ * Version:           1.29.0
  * Requires at least: 6.9
- * Requires PHP:      7.4
+ * Requires PHP:      8.1
  * Requires Plugins:  mcp-adapter
  * Author:            RasenFx
  * License:           GPL-2.0-or-later
@@ -13,9 +13,15 @@
 
 defined( 'ABSPATH' ) || exit;
 
-const SPIRAL_MCP_VERSION = '1.28.1';
+const SPIRAL_MCP_VERSION = '1.29.0';
 const SPIRAL_MCP_FILE    = __FILE__;
 define( 'SPIRAL_MCP_DIR', plugin_dir_path( __FILE__ ) );
+
+// Antes de comprobar los requisitos: así un sitio que no los cumple sigue
+// recibiendo actualizaciones. La librería de SPUpdater necesita PHP 8.1.
+if ( PHP_VERSION_ID >= 80100 ) {
+	require_once SPIRAL_MCP_DIR . 'includes/updates.php';
+}
 
 if ( ! function_exists( 'wp_register_ability' ) ) {
 	add_action( 'admin_notices', function () {

@@ -7,7 +7,7 @@ Cada cambio queda en un registro de auditoría y, salvo en los posts (que tienen
 ## Requisitos
 
 - WordPress 6.9 o superior (Abilities API).
-- PHP 7.4 o superior.
+- PHP 8.1 o superior.
 - Plugin [MCP Adapter](https://wordpress.org/plugins/mcp-adapter/) de wordpress.org, activo. Es una dependencia declarada (`Requires Plugins: mcp-adapter`): WordPress lo muestra en la lista de plugins ("Requiere: MCP Adapter"), ofrece instalarlo y no deja activar Spiral-MCP-Control sin él ni desactivar MCP Adapter mientras Spiral-MCP-Control esté activo. Instálalo desde *Plugins > Añadir nuevo*: WordPress reconoce la dependencia por la carpeta `mcp-adapter`, así que un ZIP de GitHub con otro nombre de carpeta no cuenta.
 - YOOtheme Pro (o un tema hijo) para todo lo relacionado con el builder y los estilos. Las abilities de contenido, menús, medios, SEO y cachés funcionan con cualquier tema.
 
@@ -18,6 +18,8 @@ Cada cambio queda en un registro de auditoría y, salvo en los posts (que tienen
 3. Activa Spiral-MCP-Control. Se crean las tablas de auditoría y snapshots, las capacidades `spiral_mcp_*` (los administradores las reciben todas) y el rol **Agente Spiral-MCP** (`spiral_mcp_agent`).
 4. Crea un usuario con ese rol, genera una *Application Password* para él y conecta tu cliente MCP al MCP Adapter con esas credenciales.
 5. Para el agente, instala el skill de Claude `skills/spiral-mcp-wordpress/` (método de trabajo, recetas y errores frecuentes).
+
+Las versiones nuevas llegan por el actualizador de WordPress (*Escritorio → Actualizaciones*), servidas por SPUpdater desde `https://plugins.rasenfx.com`. No hace falta clave de licencia.
 
 ## Qué puede hacer el agente
 
@@ -97,7 +99,8 @@ Para añadir otra herramienta sin tocar el plugin, registra un adaptador con el 
 ## Desarrollo
 
 - Plan de trabajo e historial de decisiones: [`docs/ROADMAP.md`](docs/ROADMAP.md). Convenciones y lo aprendido de YOOtheme: [`CLAUDE.md`](CLAUDE.md). Cambios por versión: [`CHANGELOG.md`](CHANGELOG.md).
-- Sin dependencias externas: el plugin se instala subiendo un ZIP.
+- Sin dependencias externas: el plugin se instala subiendo un ZIP. La librería cliente de SPUpdater va copiada en `includes/spupdater/` con el namespace `SpiralMcp\SPUpdater\WpClient`.
+- Publicar una versión: genera el ZIP (abajo) y súbelo en `https://plugins.rasenfx.com/admin` → **Releases → New** (producto `spiral-mcp-control`), con el mismo número que `SPIRAL_MCP_VERSION`.
 - Prueba de humo contra un WordPress **local** (nunca en producción), con un usuario del rol del agente:
 
   ```bash

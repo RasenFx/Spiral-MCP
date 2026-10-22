@@ -2,6 +2,14 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.29.0] — 2026-10-22 · Actualizaciones desde SPUpdater
+
+### Añadido
+- Actualizaciones automáticas desde SPUpdater (`https://plugins.rasenfx.com`, producto `spiral-mcp-control`, gratuito): las versiones nuevas aparecen en *Escritorio → Actualizaciones* con su changelog en "Ver detalles". Cada chequeo registra el dominio en el servidor. La librería cliente va incluida en `includes/spupdater/` con el namespace `SpiralMcp\SPUpdater\WpClient`, para no chocar con la copia que llevan otros plugins.
+
+### Cambiado
+- Requiere PHP 8.1 (antes 7.4), que es lo que pide la librería cliente.
+
 ## [1.28.1] — 2026-10-20 · MCP Adapter como dependencia
 
 ### Cambiado
