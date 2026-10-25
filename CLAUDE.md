@@ -133,5 +133,5 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - SemVer en la cabecera del plugin (`Version:`) y en `SPIRAL_MCP_VERSION`. `SPIRAL_MCP_VERSION` es también la versión que se envía a SPUpdater: si no coincide con la del release, WordPress ofrece la actualización una y otra vez.
 - Cada versión anota sus cambios en `CHANGELOG.md`.
 - ZIP: carpeta raíz `spiral-mcp-control/`, sin `.git`, `dist/`, `tests/`, `docs/` ni `skills/` (p. ej. `git archive --format=zip --prefix=spiral-mcp-control/ -o dist/spiral-mcp-control-X.Y.Z.zip HEAD -- spiral-mcp-control.php uninstall.php includes LICENSE CHANGELOG.md`).
-- Publicación: en `https://plugins.rasenfx.com/admin` → **Releases → New**, subir el ZIP del producto `spiral-mcp-control` (no en plugins.nkcore.com, que es el servidor de nktools).
+- Publicación: en `https://plugins.rasenfx.com/admin` → **Releases → New**, subir el ZIP del producto `spiral-mcp-control` (no en plugins.nkcore.com, que es el servidor de nktools). Si cambió el skill, súbelo en la misma release en **Archivos adicionales** con la clave `skill` (enlace público: `https://plugins.rasenfx.com/download/spiral-mcp-control/skill`).
 - Al terminar una fase: actualizar las casillas de `docs/ROADMAP.md`.
