@@ -393,6 +393,30 @@ Que el agente lleve la tienda: catálogo, cupones, ajustes, envíos e impuestos 
 
 ---
 
+## Fase 12 — Idiomas (Polylang)
+
+Que el agente lleve un sitio multilingüe: idiomas, traducciones de páginas (con su diseño de YOOtheme), entradas y términos, textos sueltos, menús por idioma y selector de idioma. Solo se registra si Polylang está activo.
+
+**Decisiones:**
+- **Permisos:** gestionar idiomas, ajustes y textos va en el grupo `settings` + `edit_theme_options`, como los ajustes de Yoast (Polylang pide `manage_options`, que el agente no tiene; se usa su modelo por dentro). Las traducciones de contenidos y términos, en `content` con la capacidad nativa del objeto (`edit_post`, `edit_term`). Menús por idioma y selector, en `design`.
+- **Ampliar en vez de duplicar:** filtro nuevo `spiral_mcp_ability_args` en `spiral_mcp_register_ability()`. El módulo de Polylang añade `language` (y `translation_of`) a `list-content`, `get-content`, `create-content`, `duplicate-content`, `list-terms` y `create-term`, las ubicaciones por idioma a `list-menus`, `create-menu` y `update-menu`, y `pll_lang` a `create-widget` y `update-widget`. Los módulos de contenido, términos y menús no saben nada de Polylang.
+- **Traducir = copiar y enlazar:** `create-translation` copia el contenido como borrador en el otro idioma (layout de YOOtheme incluido) y el agente traduce los textos con `get-layout-texts` + `patch-layout`. Solo asigna términos y página madre que ya tengan traducción (Polylang crearía copias sin traducir) y avisa de los que faltan.
+- **Confirmación** para lo que cambia las URLs del sitio (`default_lang`, `force_lang`, `hide_default`, `rewrite`, `domains`, el slug de un idioma) y para borrar un idioma.
+
+- [x] `list-languages`, `create-language`, `update-language`, `delete-language` (snapshot completo: idioma, contenidos, términos, grupos y textos), `update-language-settings`, `assign-missing-languages`.
+- [x] `get-translations`, `create-translation` (contenido y término), `update-translations` (idioma y enlaces), con snapshot kind `pll_translations`.
+- [x] `list-string-translations` y `update-string-translations` (snapshot kind `pll_strings`).
+- [x] `set-menu-locations` (snapshot kind `pll_menu_locations`) y `add-language-switcher`.
+- [x] Prueba de humo (si Polylang está activo con dos idiomas o más), recetas del skill y errores, README.
+
+**Resultado 12** (Polylang 3.9.1, español por defecto + inglés; probado por REST con el rol del agente): categoría "Noticias" y su traducción "News"; un término "Noticias" en inglés recibe el slug `noticias-en`. Entrada en español traducida con `create-translation`: borrador en inglés con la categoría "News", publicada en `/en/hello-multilingual-world/` con `lang="en-US"` y el nombre del sitio traducido en el `<title>` (`update-string-translations`). Página de YOOtheme "Servicios" traducida: `/en/services/` con el mismo diseño y los textos cambiados con `patch-layout`. Menú por idioma en la misma ubicación (`navbar`) con el selector de idioma: cada idioma ve su menú y los enlaces a la traducción de la página actual. Widget con `pll_lang: "en"` visible solo en inglés. Idioma francés creado, renombrado, con una traducción, borrado y restaurado con su traducción enlazada. `assign-missing-languages` y su snapshot (vuelve a dejar sin idioma). Rechazados: traducción duplicada en un idioma, `translation_of` sin `language`, textos no registrados, claves internas de Polylang (`version`), valores que Polylang no valida (`not_applied`) y cambios de URL sin `confirm`. `smoke.sh`: 196 correctas. Sitio restaurado desde copia de la BD al terminar.
+
+**Encontrado y corregido durante las pruebas:** al enlazar un contenido que ya tenía traducciones, la antigua seguía apuntando al grupo nuevo (Polylang reutiliza el término de grupo de cualquier miembro: ahora se desenlaza todo antes de rehacer los grupos, también al restaurar). `duplicate-content` copiaba las taxonomías internas de Polylang y metía la copia en el grupo de traducciones del original. Con Polylang, la web ignora el theme mod `nav_menu_locations` (lee la opción `nav_menus` por idioma), así que `locations` de los menús no se veía. La clase de cada widget descarta `pll_lang` al guardar. `update-menu` en otro idioma sin `name` no hacía nada. Con la prueba de la home en tres idiomas (español, inglés y japonés, creado con `create-language {"locale": "ja"}`): al pasar la portada de "últimas entradas" a una página, `/en/` y `/ja/` daban "Nothing Found" porque Polylang solo carga `PLL_Static_Pages` en REST si la portada ya era una página (ahora se carga y se limpia la caché); y cambiar `redirect_lang` no cambiaba las URLs hasta limpiar la caché de idiomas (ahora se limpia tras cualquier cambio de ajustes, y `redirect_lang` exige `confirm`).
+
+**Terminado cuando:** el agente añade un idioma, traduce una página de YOOtheme y una entrada con su categoría, pone un menú por idioma con el selector y traduce el nombre del sitio; todo se puede deshacer.
+
+---
+
 ## Fuera de alcance en esta etapa
 - Instalar, activar o actualizar temas. Los plugins se tratan en la Fase 8.
 - WooCommerce: configurar pasarelas de pago, crear o editar pedidos a mano (líneas e importes), editar clientes, informes y analítica, suscripciones y extensiones de pago.

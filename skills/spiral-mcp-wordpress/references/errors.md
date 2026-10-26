@@ -29,6 +29,14 @@
 | `spiral_mcp_form_mail_confirm` | El cambio hace que los mensajes del formulario lleguen a otra dirección (destinatario, Cc/Bcc, adjuntos o correo 2) | Enséñale al usuario `data.changes` y repite con `"confirm": true` solo si lo aprueba. |
 | `spiral_mcp_form_not_found` (404) | El formulario no existe (o el texto no coincide con ID, hash ni título) | Búscalo con `list-forms`. |
 | Herramientas `*-form` ausentes | Contact Form 7 no está activo | Díselo al usuario; instalarlo es la receta «Instalar un plugin». |
+| Herramientas de idiomas ausentes (`list-languages`…) | Polylang no está activo | Díselo al usuario; instalarlo es la receta «Instalar un plugin». |
+| `spiral_mcp_pll_bad_language` | El idioma no existe en el sitio | Usa el `slug` o el `locale` de `list-languages`, o créalo con `create-language` si el usuario lo quiere. |
+| `spiral_mcp_pll_translation_exists` | Ese contenido o término ya tiene traducción en ese idioma | Edita la que hay (el mensaje da su ID) o desenlázala antes con `update-translations` (`{"en": 0}`). |
+| `spiral_mcp_pll_language_mismatch` | Al enlazar, el objeto está en otro idioma que el de su clave | Cambia antes su idioma (`update-translations` con `language`) o ponlo en la clave correcta. |
+| `spiral_mcp_pll_not_translated` | Polylang no traduce ese tipo de contenido o taxonomía | Activa su traducción en `post_types` o `taxonomies` con `update-language-settings` (si el usuario lo quiere). |
+| `spiral_mcp_pll_unknown_string` | El texto no está registrado para traducir (o no es exacto) | Copia el `original` de `list-string-translations`. Los textos que un tema registra solo en wp-admin no se pueden traducir desde aquí. |
+| `spiral_mcp_confirm` en `update-language-settings` | El ajuste cambia las URLs de todo el sitio | Explícale al usuario qué URLs cambian y repite con `"confirm": true` solo si lo aprueba. |
+| La traducción no tiene categorías o página madre | No estaban traducidas cuando se creó (`warnings`) | Tradúcelas con `create-translation` y asígnalas con `update-content` (`terms`, `parent`). |
 | `spiral_mcp_snapshot_later` | Después de ese snapshot hubo otros cambios en el mismo objeto, y restaurarlo los desharía | Restaura solo la parte que toca (`"parts"`, en la configuración del tema) o revierte el valor con su herramienta. `"include_later": true` solo si el usuario quiere volver al estado completo. |
 | Enlace roto con `target_status` en `inspect-page` | El destino existe pero no está publicado (borrador, programado…) | Publica el destino cuando el usuario lo apruebe, o cambia el enlace. La ruta está bien. |
 | `warnings` de `get-menu` / `create-menu` sobre elementos en borrador | El menú enlaza a contenido sin publicar | Igual que arriba: el elemento se ve en el menú, pero da 404 hasta publicar. |

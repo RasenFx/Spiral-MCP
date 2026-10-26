@@ -561,6 +561,67 @@ else
 	ok 'tienda: WooCommerce no está activo (se omite)'
 fi
 
+# Idiomas con Polylang (solo si está activo y tiene al menos dos idiomas).
+call GET spiral-mcp/list-languages
+if [ "$STATUS" = 200 ] && [ "$(jget 'languages.#')" -ge 2 ]; then
+	check 'list-languages' 200 default settings settings_help without_language
+	PLL_DEF=$(jget default)
+	PLL_OTHER=$(printf '%s' "$BODY" | php -r '$d = json_decode( stream_get_contents( STDIN ), true ); foreach ( $d["languages"] as $l ) { if ( ! $l["default"] ) { echo $l["slug"]; break; } }')
+	call POST spiral-mcp/create-term "{\"taxonomy\":\"category\",\"name\":\"Smoke idiomas\",\"language\":\"$PLL_DEF\"}"
+	if check 'create-term con language' 200 id snapshot_id; then
+		eq 'create-term: idioma' language "$PLL_DEF"
+		PLL_TERM=$(jget id)
+		call POST spiral-mcp/create-translation "{\"type\":\"term\",\"id\":$PLL_TERM,\"language\":\"$PLL_OTHER\",\"title\":\"Smoke languages\"}"
+		check 'create-translation (término)' 200 id snapshot_id && eq 'create-translation (término): enlazado' "translations.$PLL_DEF" "$PLL_TERM"
+		PLL_TERM_TR=$(jget id)
+		call POST spiral-mcp/create-term "{\"taxonomy\":\"category\",\"name\":\"Smoke idiomas\",\"language\":\"$PLL_OTHER\",\"translation_of\":$PLL_TERM}"
+		printf '%s' "$BODY" | grep -q spiral_mcp_pll_translation_exists && ok 'create-term: no duplica una traducción' || ko 'create-term debería rechazar una segunda traducción en el mismo idioma'
+		call POST spiral-mcp/create-content "{\"post_type\":\"post\",\"title\":\"Smoke idiomas\",\"language\":\"$PLL_DEF\",\"terms\":{\"category\":[$PLL_TERM]}}"
+		if check 'create-content con language' 200 id language; then
+			PLL_POST=$(jget id)
+			call POST spiral-mcp/create-translation "{\"type\":\"post\",\"id\":$PLL_POST,\"language\":\"$PLL_OTHER\",\"title\":\"Smoke languages\"}"
+			if check 'create-translation (contenido)' 200 id translations; then
+				PLL_POST_TR=$(jget id)
+				eq 'create-translation: borrador' status draft
+				call GET spiral-mcp/get-content "{\"id\":$PLL_POST_TR}"
+				eq 'create-translation: término traducido' terms.category.0.id "$PLL_TERM_TR"
+				call GET spiral-mcp/list-content "{\"post_type\":\"post\",\"language\":\"$PLL_OTHER\",\"search\":\"Smoke languages\"}"
+				eq 'list-content por idioma' items.0.id "$PLL_POST_TR"
+				call GET spiral-mcp/get-translations "{\"type\":\"post\",\"id\":$PLL_POST}"
+				eq 'get-translations' "translations.$PLL_OTHER.id" "$PLL_POST_TR"
+				call POST spiral-mcp/update-translations "{\"type\":\"post\",\"id\":$PLL_POST,\"translations\":{\"$PLL_OTHER\":0}}"
+				check 'update-translations (desenlazar)' 200 snapshot_id && eq 'update-translations: falta la traducción' 'missing.0' "$PLL_OTHER"
+				call POST spiral-mcp/restore-snapshot "{\"id\":$(jget snapshot_id),\"confirm\":true}"
+				check 'restore-snapshot (pll_translations)' 200 objects
+				call GET spiral-mcp/get-translations "{\"type\":\"post\",\"id\":$PLL_POST_TR}"
+				eq 'restore-snapshot: vuelven a estar enlazadas' "translations.$PLL_DEF.id" "$PLL_POST"
+				call POST spiral-mcp/trash-content "{\"id\":$PLL_POST_TR}"
+				call DELETE spiral-mcp/delete-content "{\"id\":$PLL_POST_TR,\"confirm\":true}"
+			fi
+			call POST spiral-mcp/trash-content "{\"id\":$PLL_POST}"
+			call DELETE spiral-mcp/delete-content "{\"id\":$PLL_POST,\"confirm\":true}"
+			check 'limpieza: borrar los contenidos de prueba' 200
+		fi
+		[ -n "${PLL_TERM_TR:-}" ] && call DELETE spiral-mcp/delete-term "{\"term_id\":$PLL_TERM_TR,\"confirm\":true}"
+		call DELETE spiral-mcp/delete-term "{\"term_id\":$PLL_TERM,\"confirm\":true}"
+		check 'limpieza: borrar los términos de prueba' 200
+	fi
+	call GET spiral-mcp/list-string-translations '{"context":"WordPress"}'
+	check 'list-string-translations' 200 strings contexts
+	call POST spiral-mcp/update-string-translations "{\"language\":\"$PLL_OTHER\",\"strings\":[{\"original\":\"smoke: texto que no existe\",\"translation\":\"x\"}]}"
+	printf '%s' "$BODY" | grep -q spiral_mcp_pll_unknown_string && ok 'update-string-translations: solo textos registrados' || ko 'update-string-translations debería rechazar un texto no registrado'
+	call POST spiral-mcp/update-language-settings '{"settings":{"hide_default":"cambio"}}'
+	printf '%s' "$BODY" | grep -q spiral_mcp_confirm && ok 'update-language-settings: cambiar las URLs exige confirm' || ko 'update-language-settings debería pedir confirm para hide_default'
+	call POST spiral-mcp/update-language-settings '{"settings":{"version":"1"}}'
+	printf '%s' "$BODY" | grep -q spiral_mcp_bad_key && ok 'update-language-settings: rechaza claves internas' || ko 'update-language-settings debería rechazar "version"'
+	call GET spiral-mcp/list-menus
+	check 'list-menus: ubicaciones por idioma' 200 "locations.0.languages.$PLL_DEF"
+	call POST spiral-mcp/delete-language "{\"language\":\"$PLL_OTHER\",\"confirm\":false}"
+	[ "$STATUS" -ge 400 ] && ok 'delete-language exige confirm' || ko 'delete-language sin confirm no debería borrar'
+else
+	ok 'idiomas: Polylang no está activo o tiene menos de dos idiomas (se omite)'
+fi
+
 # Cambiar ajustes de caché exige spiral_mcp_cache, que el rol del agente no tiene por defecto.
 if [ "$HAS_CACHE_CAP" = true ] && [ "${SMOKE_CACHE_WRITE:-0}" != 1 ]; then
 	ok 'update-cache-settings: el rol tiene spiral_mcp_cache (concedido en Ajustes); no se prueba el 403'

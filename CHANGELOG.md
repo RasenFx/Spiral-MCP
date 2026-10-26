@@ -2,6 +2,21 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.30.0] — 2026-10-26 · Idiomas con Polylang
+
+### Añadido
+- Módulo de idiomas, activo solo con Polylang: el agente gestiona un sitio multilingüe sin entrar en wp-admin.
+  - Idiomas y ajustes: `list-languages`, `create-language`, `update-language`, `delete-language` (con `confirm`; restore-snapshot vuelve a crear el idioma con sus contenidos, términos, traducciones y textos), `update-language-settings` (los ajustes que cambian las URLs exigen `confirm`) y `assign-missing-languages` (idioma para el contenido que no tiene).
+  - Traducciones: `get-translations`, `create-translation` (copia una página o entrada como borrador en otro idioma con su diseño de YOOtheme, página madre y términos traducidos, y la enlaza; también términos) y `update-translations` (cambiar el idioma y enlazar o desenlazar traducciones).
+  - Textos sueltos (nombre y descripción del sitio, formatos de fecha, widgets, otros plugins): `list-string-translations` y `update-string-translations`.
+  - Menús: `set-menu-locations` (un menú por idioma en cada ubicación) y `add-language-switcher` (selector de idioma de Polylang en un menú).
+  - Snapshots `pll_settings`, `pll_menu_locations`, `pll_translations`, `pll_strings` y `pll_language`.
+- Con Polylang, `language` en `list-content`, `get-content`, `create-content` (y `translation_of`), `duplicate-content`, `list-terms` y `create-term` (y `translation_of`); `list-menus` muestra el menú de cada idioma en cada ubicación y `create-menu` / `update-menu` aceptan `language`; `pll_lang` en `create-widget` / `update-widget` limita un widget a un idioma.
+- Filtro `spiral_mcp_ability_args` para que una integración amplíe el esquema, la descripción y los callbacks de abilities de otros módulos.
+
+### Arreglado
+- Con Polylang activo, `duplicate-content` metía la copia en el grupo de traducciones del original, `locations` de `create-menu` / `update-menu` no se veía en la web (Polylang lee las ubicaciones por idioma de su propia opción), y al poner una página como portada con `update-site-settings` las portadas de los demás idiomas daban "Nothing Found" (Polylang no recalculaba su caché de idiomas en una petición REST).
+
 ## [1.29.0] — 2026-10-22 · Actualizaciones desde SPUpdater
 
 ### Añadido

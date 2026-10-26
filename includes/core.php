@@ -112,6 +112,8 @@ function spiral_mcp_register_ability( $name, array $args ) {
 	if ( 0 !== strpos( $name, 'spiral-mcp/' ) ) {
 		$name = 'spiral-mcp/' . $name;
 	}
+	// Las integraciones (p. ej. Polylang) amplían aquí el esquema, la descripción y los callbacks de abilities de otros módulos.
+	$args   = (array) apply_filters( 'spiral_mcp_ability_args', $args, $name );
 	$groups = (array) ( $args['group'] ?? 'content' );
 	$log    = (array) ( $args['log'] ?? array() );
 	unset( $args['group'], $args['log'] );

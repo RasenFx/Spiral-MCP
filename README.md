@@ -1,6 +1,6 @@
 # Spiral-MCP-Control
 
-Plugin de WordPress que permite a un agente de IA (por ejemplo, Claude) gestionar un sitio con **YOOtheme Pro** sin entrar al wp-admin. Registra *abilities* de la [Abilities API](https://developer.wordpress.org/) de WordPress y el plugin **MCP Adapter** las publica como herramientas MCP. Con ellas el agente puede gestionar contenido, layouts del builder, plantillas, menús, widgets, medios, estilos, SEO, ajustes y cachés.
+Plugin de WordPress que permite a un agente de IA (por ejemplo, Claude) gestionar un sitio con **YOOtheme Pro** sin entrar al wp-admin. Registra *abilities* de la [Abilities API](https://developer.wordpress.org/) de WordPress y el plugin **MCP Adapter** las publica como herramientas MCP. Con ellas el agente puede gestionar contenido, layouts del builder, plantillas, menús, widgets, medios, estilos, SEO, ajustes, cachés y, con Polylang, idiomas y traducciones.
 
 Cada cambio queda en un registro de auditoría y, salvo en los posts (que tienen revisiones), se guarda antes un *snapshot* para poder deshacerlo.
 
@@ -37,6 +37,7 @@ Las abilities llevan el prefijo `spiral-mcp/`. La referencia completa de paráme
 | Plugins | listar los instalados, buscar en wordpress.org, instalar (sin activar), activar con comprobación de salud, desactivar, actualizar (vuelve a la versión anterior si rompe el sitio) y borrar; con doble cerrojo, cerrado por defecto |
 | Tienda | con WooCommerce activo: productos simples y variables, variaciones, atributos, cupones, ajustes de la tienda (incluido el modo "próximamente"), zonas y métodos de envío, impuestos y pasarelas de pago (solo lectura) |
 | Pedidos | con WooCommerce activo y permiso aparte: pedidos (estado, notas, reembolsos) y clientes (lectura) |
+| Idiomas | con Polylang activo: idiomas y ajustes, traducciones de páginas (con su diseño de YOOtheme), entradas y términos, textos sueltos (nombre del sitio, widgets), menús por idioma y selector de idioma; las abilities de contenido, términos, menús y widgets aceptan `language` |
 | Formularios | con Contact Form 7 activo: listar (y dónde se usan), leer, crear, editar y borrar; cambiar a quién llega el correo exige confirmación |
 | Cachés | estado, purga, precarga y ajustes de la herramienta de caché del sitio (ver abajo) |
 | Auditoría | registro de actividad, snapshots y restauración (también parcial) |
@@ -48,7 +49,7 @@ Las abilities llevan el prefijo `spiral-mcp/`. La referencia completa de paráme
 | `spiral_mcp_content` | contenido, taxonomías, SEO, formularios | sí |
 | `spiral_mcp_design` | builder, tema, menús, widgets, estilos | sí |
 | `spiral_mcp_media` | medios | sí |
-| `spiral_mcp_settings` | ajustes del sitio y de Yoast SEO | sí |
+| `spiral_mcp_settings` | ajustes del sitio, de Yoast SEO y de Polylang (idiomas) | sí |
 | `spiral_mcp_code` | JS personalizado (sección `scripts` de YOOtheme) | sí |
 | `spiral_mcp_cache` | **cambiar** los ajustes de caché | **no** |
 | `spiral_mcp_plugins` | gestionar plugins de wordpress.org (además hay que activar "Permitir que el agente gestione plugins" en *Comportamiento*) | **no** |
@@ -109,7 +110,7 @@ Para añadir otra herramienta sin tocar el plugin, registra un adaptador con el 
 
   Opcionales: `SMOKE_INSPECT=1` (inspección de páginas), `SMOKE_ONLINE=1` (librería online de YOOtheme), `SMOKE_CACHE_WRITE=1` (escritura de ajustes de caché; el usuario necesita `spiral_mcp_cache`), `SMOKE_PLUGINS=1` (con los dos cerrojos de plugins abiertos para ese usuario: comprueba los protegidos y `confirm`; sin él, comprueba que la gestión está cerrada).
 - Plugins de prueba para la gestión de plugins en [`tests/fixtures/plugins/`](tests/fixtures/plugins/): uno que da error fatal al cargarse, otro que rompe la web pública, uno incompatible, uno con desinstalación y uno cuya versión 2.0.0 rompe la portada (con un mu-plugin que anuncia esa actualización). Cópialos a `wp-content/plugins` de un sitio **local**.
-- Tras añadir o cambiar abilities: `php tests/gen-skill-abilities.php /ruta/al/wordpress` regenera la referencia del skill.
+- Tras añadir o cambiar abilities: `php tests/gen-skill-abilities.php /ruta/al/wordpress` regenera la referencia del skill. Solo ve las abilities registradas: hazlo con Contact Form 7, Yoast SEO, WooCommerce y Polylang activos, o quitará sus secciones (revisa el diff).
 - ZIP de instalación:
 
   ```bash

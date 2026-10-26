@@ -1,6 +1,6 @@
 # Referencia de abilities spiral-mcp/*
 
-Generada a partir de los esquemas registrados por el plugin (v1.28.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
+Generada a partir de los esquemas registrados por el plugin (v1.30.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
 
 Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; destructiva = requiere `"confirm": true`.
 
@@ -19,6 +19,7 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 - [Formularios (Contact Form 7)](#formularios-contact-form-7)
 - [Tienda (WooCommerce)](#tienda-woocommerce)
 - [Pedidos y clientes (WooCommerce)](#pedidos-y-clientes-woocommerce)
+- [Idiomas (Polylang)](#idiomas-polylang)
 - [Auditoría](#auditoria)
 
 ## Contenido, taxonomías y SEO
@@ -26,9 +27,9 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 | Ability | Tipo | Parámetros |
 |---|---|---|
 | `list-post-types` | lectura | — |
-| `list-content` | lectura | post_type `"any" / "post" / "page" / "product"`, status `"any" / "publish" / "future" / "draft" / "pending" / "private" / "trash"`, search `string`, parent `integer`, per_page `integer`, page `integer` |
+| `list-content` | lectura | post_type `"any" / "post" / "page" / "product"`, status `"any" / "publish" / "future" / "draft" / "pending" / "private" / "trash"`, search `string`, parent `integer`, per_page `integer`, page `integer`, language `string` |
 | `get-content` | lectura | **id** `integer` |
-| `create-content` | escritura | post_type `"post" / "page" / "product"`, **title** `string`, content `string`, excerpt `string`, status `"publish" / "future" / "draft" / "pending" / "private"`, slug `string`, parent `integer`, menu_order `integer`, template `string`, author `integer`, date `string`, comment_status `"open" / "closed"`, terms `object`, featured_media `integer`, meta `object` |
+| `create-content` | escritura | post_type `"post" / "page" / "product"`, **title** `string`, content `string`, excerpt `string`, status `"publish" / "future" / "draft" / "pending" / "private"`, slug `string`, parent `integer`, menu_order `integer`, template `string`, author `integer`, date `string`, comment_status `"open" / "closed"`, terms `object`, featured_media `integer`, meta `object`, language `string`, translation_of `integer` |
 | `update-content` | escritura | **id** `integer`, title `string`, content `string`, excerpt `string`, status `"publish" / "future" / "draft" / "pending" / "private"`, slug `string`, parent `integer`, menu_order `integer`, template `string`, author `integer`, date `string`, comment_status `"open" / "closed"`, terms `object`, featured_media `integer`, meta `object` |
 | `trash-content` | escritura | **id** `integer` |
 | `restore-content` | escritura | **id** `integer` |
@@ -38,8 +39,8 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 | `get-yootheme-layout` | lectura | **id** `integer` |
 | `update-yootheme-layout` | escritura | **id** `integer`, **layout** `object` |
 | `list-taxonomies` | lectura | — |
-| `list-terms` | lectura | **taxonomy** `string`, search `string`, parent `integer`, per_page `integer`, page `integer` |
-| `create-term` | escritura | **taxonomy** `string`, **name** `string`, slug `string`, description `string`, parent `integer` |
+| `list-terms` | lectura | **taxonomy** `string`, search `string`, parent `integer`, per_page `integer`, page `integer`, language `string` |
+| `create-term` | escritura | **taxonomy** `string`, **name** `string`, slug `string`, description `string`, parent `integer`, language `string`, translation_of `integer` |
 | `update-term` | escritura | **term_id** `integer`, name `string`, slug `string`, description `string`, parent `integer` |
 | `delete-term` | destructiva | **term_id** `integer`, **confirm** `boolean` |
 | `get-seo` | lectura | **id** `integer` |
@@ -55,7 +56,7 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 | `get-layout-texts` | lectura | id `integer`, area `string`, path `string`, kinds `array` |
 | `get-layout-node` | lectura | id `integer`, area `string`, **path** `string` |
 | `patch-layout` | escritura | id `integer`, area `string`, **operations** `array` |
-| `duplicate-content` | escritura | **id** `integer`, title `string`, slug `string` |
+| `duplicate-content` | escritura | **id** `integer`, title `string`, slug `string`, language `string` |
 | `insert-from-library` | escritura | **item_id** `string`, id `integer`, area `string`, **path** `string` |
 
 ## Tema: áreas, configuración, plantillas, biblioteca, widgets y caché
@@ -94,8 +95,8 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 |---|---|---|
 | `list-menus` | lectura | — |
 | `get-menu` | lectura | **menu** `integer / string` |
-| `create-menu` | escritura | **name** `string`, locations `array`, items `array` |
-| `update-menu` | escritura | **menu** `integer / string`, name `string`, locations `array` |
+| `create-menu` | escritura | **name** `string`, locations `array`, items `array`, language `string` |
+| `update-menu` | escritura | **menu** `integer / string`, name `string`, locations `array`, language `string` |
 | `delete-menu` | destructiva | **menu** `integer / string`, **confirm** `boolean` |
 | `add-menu-item` | escritura | **menu** `integer / string`, parent_id `integer`, position `integer`, title `string`, **type** `string`, url `string`, object_id `integer`, target_blank `boolean`, classes `string` |
 | `update-menu-item` | escritura | **item_id** `integer`, parent_id `integer`, position `integer`, title `string`, type `string`, url `string`, object_id `integer`, target_blank `boolean`, classes `string` |
@@ -215,6 +216,24 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 | `create-refund` | destructiva | **order_id** `integer`, amount `string`, reason `string`, line_items `array`, api_refund `boolean`, restock `boolean`, **confirm** `boolean` |
 | `list-customers` | lectura | search `string`, page `integer`, per_page `integer` |
 | `get-customer` | lectura | **id** `integer` |
+
+## Idiomas (Polylang)
+
+| Ability | Tipo | Parámetros |
+|---|---|---|
+| `list-languages` | lectura | — |
+| `create-language` | escritura | name `string`, slug `string`, **locale** `string`, rtl `boolean`, order `integer`, flag `string` |
+| `update-language` | escritura | **language** `string`, name `string`, slug `string`, locale `string`, rtl `boolean`, order `integer`, flag `string`, confirm `boolean` |
+| `delete-language` | destructiva | **language** `string`, **confirm** `boolean` |
+| `update-language-settings` | escritura | **settings** `object`, confirm `boolean` |
+| `assign-missing-languages` | escritura | language `string` |
+| `get-translations` | lectura | **type** `"post" / "term"`, **id** `integer` |
+| `create-translation` | escritura | **type** `"post" / "term"`, **id** `integer`, **language** `string`, title `string`, slug `string`, description `string` |
+| `update-translations` | escritura | **type** `"post" / "term"`, **id** `integer`, language `string`, translations `object` |
+| `list-string-translations` | lectura | language `string`, context `string`, search `string`, untranslated `boolean` |
+| `update-string-translations` | escritura | **language** `string`, **strings** `array` |
+| `set-menu-locations` | escritura | **language** `string`, **locations** `object` |
+| `add-language-switcher` | escritura | **menu** `integer / string`, parent_id `integer`, layout `"horizontal" / "dropdown"`, show_labels `"names" / "codes" / ""`, show_flags `boolean`, hide_current `boolean`, hide_if_no_translation `boolean`, force_home `boolean` |
 
 ## Auditoría
 

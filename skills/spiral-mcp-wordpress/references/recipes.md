@@ -29,6 +29,10 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 - [Tienda: cupones](#tienda-cupones)
 - [Tienda: pedidos y reembolsos](#tienda-pedidos-y-reembolsos)
 - [Instalar un plugin](#instalar-un-plugin)
+- [Idiomas: preparar un sitio multilingüe (Polylang)](#idiomas-preparar-un-sitio-multilingüe-polylang)
+- [Idiomas: traducir una página o entrada](#idiomas-traducir-una-página-o-entrada)
+- [Idiomas: menús, selector de idioma, header y footer](#idiomas-menús-selector-de-idioma-header-y-footer)
+- [Idiomas: nombre del sitio y otros textos sueltos](#idiomas-nombre-del-sitio-y-otros-textos-sueltos)
 - [Deshacer un cambio](#deshacer-un-cambio)
 
 ## Crear una página nueva a partir de otra
@@ -321,10 +325,45 @@ Solo si el usuario lo pide. Instalar código es el cambio de más riesgo: ve pas
 6. Para quitarlo: `deactivate-plugin` (conserva sus datos). Para borrarlo del todo, `delete-plugin` con `"confirm": true` tras avisar al usuario de que sus datos pueden borrarse y no vuelven. Spiral-MCP-Control y MCP Adapter no se pueden desactivar, actualizar ni borrar desde aquí.
 7. Actualizaciones: `list-plugins {"status": "update"}` dice cuáles tienen y a qué versión. Díselas al usuario y actualiza de una en una con `update-plugin` y `"confirm": true`; si devuelve `spiral_mcp_plugin_update_rolled_back`, sigue con la versión anterior y el sitio funciona: cuéntaselo.
 
+## Idiomas: preparar un sitio multilingüe (Polylang)
+
+Las herramientas de idiomas solo aparecen con Polylang activo. Con Polylang, cada contenido, categoría y etiqueta tiene **un idioma**, y sus traducciones son contenidos aparte enlazados entre sí.
+
+1. `list-languages`: idiomas, el de por defecto, ajustes y `without_language` (contenido sin idioma).
+2. Falta un idioma: `create-language {"locale": "en_US"}` (Polylang completa nombre, código y bandera). Si avisa de que WordPress no tiene su traducción, díselo al usuario: los textos del tema saldrían en inglés en ese idioma.
+3. Si `without_language` no es 0 (pasa al instalar Polylang en un sitio con contenido), `assign-missing-languages` les pone el idioma por defecto. Sin idioma, Polylang no los muestra bien.
+4. Ajustes (`update-language-settings`): por defecto las URLs llevan el idioma como directorio (`/en/`) salvo el idioma por defecto. Cambiar `default_lang`, `force_lang`, `hide_default`, `rewrite` o `domains` cambia las URLs de todo el sitio: explícaselo al usuario (enlaces compartidos, SEO) antes de enviar `"confirm": true`.
+5. Para listar o crear contenido de un idioma, usa `"language"` en `list-content`, `create-content`, `list-terms` y `create-term`. Sin `language`, lo nuevo queda en el idioma por defecto.
+
+## Idiomas: traducir una página o entrada
+
+1. `get-translations {"type": "post", "id": 12}`: qué idiomas faltan (`missing`).
+2. Si es una entrada con categorías o etiquetas, tradúcelas primero: `create-translation {"type": "term", "id": <categoría>, "language": "en", "title": "News"}`. Si no, la traducción se queda sin ellas (lo dice `warnings`). Haz lo mismo con la página madre si la página es hija.
+3. `create-translation {"type": "post", "id": 12, "language": "en", "title": "Services", "slug": "services"}`: crea un **borrador** con el mismo diseño de YOOtheme, enlazado como traducción.
+4. Traduce los textos: `get-layout-texts {"id": <nuevo>}` y un `patch-layout` con un `replace` por texto (botones, alt de imágenes y metas incluidos). Sin layout de YOOtheme, `update-content` con `content` y `excerpt`.
+5. Revisa los enlaces: un botón a `/contacto/` debe ir a `/en/contact/` (la traducción de esa página; búscala con `get-translations`). Si no existe, díselo al usuario en lugar de enlazar a la del otro idioma.
+6. `update-seo` en ese idioma, `inspect-page`, y publica con `update-content {"status": "publish"}`.
+
+Para enlazar dos contenidos que ya existen como traducciones (o desenlazarlos), `update-translations {"type": "post", "id": 12, "translations": {"en": 34}}` (`0` desenlaza). `duplicate-content` hace una copia en el mismo idioma, **no** una traducción.
+
+## Idiomas: menús, selector de idioma, header y footer
+
+- **Menús:** un menú por idioma, con enlaces a las páginas de ese idioma. `create-menu {"name": "Main EN", "language": "en", "locations": ["navbar"], "items": [...]}` lo pone en la misma ubicación que el del idioma por defecto. `list-menus` muestra en cada ubicación el menú de cada idioma (`languages`); `set-menu-locations {"language": "en", "locations": {"navbar": 20}}` cambia solo un idioma. Ojo: con Polylang la web usa estas ubicaciones por idioma, no las de antes de instalarlo.
+- **Selector de idioma:** `add-language-switcher {"menu": <menú>, "show_flags": true}` en el menú de **cada** idioma (`"layout": "dropdown"` para un desplegable, `"show_labels": "codes"` para EN/ES). Compruébalo con `inspect-page {"path": "/en/"}`.
+- **Header y footer:** la configuración de YOOtheme (`footer.content`, ajustes del header) es la misma en todos los idiomas. Para textos distintos por idioma, usa widgets de builder con `"pll_lang": "en"` en sus ajustes (`create-widget` / `update-widget`): ese widget solo se ve en inglés. Haz uno por idioma en la misma posición.
+- **Plantillas de YOOtheme:** una plantilla por idioma con la condición `"locale": "en_US"` (el `locale` de `list-languages`).
+
+## Idiomas: nombre del sitio y otros textos sueltos
+
+1. `list-string-translations {"language": "en", "untranslated": true}`: textos sin traducir (nombre y descripción del sitio, formatos de fecha, títulos de widgets visibles en todos los idiomas, textos de otros plugins).
+2. `update-string-translations {"language": "en", "strings": [{"original": "Mi Empresa", "translation": "My Company"}]}`. El `original` tiene que ser exacto; `""` borra la traducción.
+3. El original (idioma por defecto) se cambia donde siempre (`update-site-settings`, `update-widget`): al cambiarlo, su traducción se pierde y hay que volver a hacerla.
+
 ## Deshacer un cambio
 
 - **Página o entrada (título, contenido, layout):** `restore-revision {"revision_id": <undo_revision_id>, "confirm": true}` (o búscala con `list-revisions {"id": 12}`). Antes guarda el estado actual, así que también se puede deshacer la restauración.
 - **Un valor concreto** (un color, una sección de la configuración): lo más seguro es revertir solo ese valor con la herramienta que lo cambió. Por ejemplo `update-theme-style {"less": {"@global-primary-background": null}}` vuelve al valor por defecto del estilo. Para saber el valor anterior, mira `list-activity {"ability": "spiral-mcp/update-theme-style", "result": "ok"}`.
 - **Con snapshot:** `list-activity` (filtra por `ability` u `object_id`) → `restore-snapshot {"id": <snapshot_id>, "confirm": true}`. Si después hubo otros cambios en el mismo objeto, la llamada falla y los lista (en la configuración del tema, también en qué secciones difiere). Entonces restaura solo la parte que toca: `"parts": ["less"]` (estilo) o `["footer"]`. `"include_later": true` lo restaura entero y deshace también lo posterior: solo si el usuario lo quiere.
 - Restaurar el snapshot de un menú recién creado lo borra.
+- Idiomas: los snapshots de `update-translations` y `assign-missing-languages` devuelven el idioma y los enlaces de traducción de antes; el de `delete-language` vuelve a crear el idioma con sus contenidos, términos y textos (las ubicaciones de menú hay que reasignarlas). Una traducción creada con `create-translation` es un contenido normal: se quita con `trash-content`.
 - Si lo restaurado cambia el estilo, vuelve a hacer falta recompilar (`get-style-status`).
