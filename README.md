@@ -50,7 +50,7 @@ Las abilities llevan el prefijo `spiral-mcp/`. La referencia completa de paráme
 | `spiral_mcp_design` | builder, tema, menús, widgets, estilos | sí |
 | `spiral_mcp_media` | medios | sí |
 | `spiral_mcp_settings` | ajustes del sitio, de Yoast SEO y de Polylang (idiomas) | sí |
-| `spiral_mcp_code` | JS personalizado (sección `scripts` de YOOtheme) | sí |
+| `spiral_mcp_code` | JS personalizado (sección `scripts` de YOOtheme) y HTML sin filtrar en los layouts (elemento `html`, `<script>`, `<iframe>`, atributos `on*`…); sin él, el HTML de los elementos pasa por `wp_kses_post`, como el de cualquier usuario sin `unfiltered_html` | sí |
 | `spiral_mcp_cache` | **cambiar** los ajustes de caché | **no** |
 | `spiral_mcp_plugins` | gestionar plugins de wordpress.org (además hay que activar "Permitir que el agente gestione plugins" en *Comportamiento*) | **no** |
 | `spiral_mcp_shop` | tienda de WooCommerce: catálogo, cupones, ajustes, envíos e impuestos | sí |
@@ -109,6 +109,7 @@ Para añadir otra herramienta sin tocar el plugin, registra un adaptador con el 
   ```
 
   Opcionales: `SMOKE_INSPECT=1` (inspección de páginas), `SMOKE_ONLINE=1` (librería online de YOOtheme), `SMOKE_CACHE_WRITE=1` (escritura de ajustes de caché; el usuario necesita `spiral_mcp_cache`), `SMOKE_PLUGINS=1` (con los dos cerrojos de plugins abiertos para ese usuario: comprueba los protegidos y `confirm`; sin él, comprueba que la gestión está cerrada).
+- Pruebas de seguridad (plan, batería automatizada y resultados): [`docs/pruebas-seguridad.md`](docs/pruebas-seguridad.md). Contra un WordPress **local**: `php tests/security-setup.php /ruta/wordpress https://mi-sitio.test /ruta/privada/creds.env` y después `SEC_ENV=/ruta/privada/creds.env WP_PATH=/ruta/wordpress bash tests/security.sh`.
 - Plugins de prueba para la gestión de plugins en [`tests/fixtures/plugins/`](tests/fixtures/plugins/): uno que da error fatal al cargarse, otro que rompe la web pública, uno incompatible, uno con desinstalación y uno cuya versión 2.0.0 rompe la portada (con un mu-plugin que anuncia esa actualización). Cópialos a `wp-content/plugins` de un sitio **local**.
 - Tras añadir o cambiar abilities: `php tests/gen-skill-abilities.php /ruta/al/wordpress` regenera la referencia del skill. Solo ve las abilities registradas: hazlo con Contact Form 7, Yoast SEO, WooCommerce y Polylang activos, o quitará sus secciones (revisa el diff).
 - ZIP de instalación:

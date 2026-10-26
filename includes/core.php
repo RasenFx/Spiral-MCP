@@ -150,16 +150,43 @@ function spiral_mcp_register_ability( $name, array $args ) {
 		return call_user_func( $permission, $input );
 	};
 
-	if ( empty( $args['meta']['annotations']['readonly'] ) && isset( $args['execute_callback'] ) ) {
+	if ( isset( $args['execute_callback'] ) ) {
 		$execute                  = $args['execute_callback'];
-		$args['execute_callback'] = function ( $input = null ) use ( $name, $execute, $log, $groups ) {
-			$result = spiral_mcp_log_run( $name, $execute, $input, $log );
-			if ( ! is_wp_error( $result ) ) {
-				spiral_mcp_maybe_auto_clear_cache( $name, $groups, $input, $result, $log );
+		$readonly                 = ! empty( $args['meta']['annotations']['readonly'] );
+		$args['execute_callback'] = function ( $input = null ) use ( $name, $execute, $log, $groups, $readonly ) {
+			if ( $readonly ) {
+				$result = call_user_func( $execute, $input );
+			} else {
+				$result = spiral_mcp_log_run( $name, $execute, $input, $log );
+				if ( ! is_wp_error( $result ) ) {
+					spiral_mcp_maybe_auto_clear_cache( $name, $groups, $input, $result, $log );
+				}
 			}
-			return $result;
+			return is_wp_error( $result ) ? spiral_mcp_error_status( $result ) : $result;
 		};
 	}
 
 	return wp_register_ability( $name, $args );
+}
+
+/**
+ * Da un código HTTP a un WP_Error que no lo trae: sin "status" en sus datos,
+ * la Abilities API lo devuelve como 500 y un rechazo parece un fallo del
+ * servidor. 403 para permisos y cerrojos, 404 para lo que no existe y 400
+ * para el resto (entrada incorrecta).
+ */
+function spiral_mcp_error_status( WP_Error $error ) {
+	$data = $error->get_error_data();
+	if ( is_array( $data ) && isset( $data['status'] ) ) {
+		return $error;
+	}
+	$code   = (string) $error->get_error_code();
+	$status = 400;
+	if ( preg_match( '/_(forbidden|protected|capability|disabled|file_mods|locked|unfiltered_html)$/', $code ) ) {
+		$status = 403;
+	} elseif ( preg_match( '/_not_found$/', $code ) ) {
+		$status = 404;
+	}
+	$error->add_data( ( is_array( $data ) ? $data : array() ) + array( 'status' => $status ) );
+	return $error;
 }

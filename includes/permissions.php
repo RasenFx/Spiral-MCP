@@ -67,7 +67,7 @@ function spiral_mcp_cap_descriptions() {
 		'spiral_mcp_design'   => 'Diseño: builder, configuración del tema, menús, widgets, plantillas, estilos y cachés (purga y precarga).',
 		'spiral_mcp_media'    => 'Medios: subir, editar y borrar archivos de la biblioteca.',
 		'spiral_mcp_settings' => 'Ajustes del sitio: identidad, portada y zona horaria.',
-		'spiral_mcp_code'     => 'Código: JavaScript personalizado (sección "scripts" de YOOtheme). Es el permiso de más riesgo.',
+		'spiral_mcp_code'     => 'Código: JavaScript personalizado (sección "scripts" de YOOtheme) y HTML sin filtrar en los layouts (elemento "html", script, iframe, atributos on*…); sin él se aplica wp_kses_post como a cualquier usuario sin unfiltered_html. Es el permiso de más riesgo.',
 		'spiral_mcp_cache'    => 'Cambiar los ajustes de la herramienta de caché (activarla, caducidad, exclusiones…).',
 		'spiral_mcp_plugins'  => 'Gestionar plugins de wordpress.org (instalar, activar, desactivar, actualizar, borrar). Además hay que activar "Permitir que el agente gestione plugins" en Comportamiento. Es el permiso de más riesgo: instalar código es tener el control del sitio.',
 		'spiral_mcp_shop'     => 'Tienda (WooCommerce): productos, variaciones, atributos, categorías de producto, cupones, ajustes de la tienda, envíos e impuestos. Las pasarelas de pago, solo en lectura.',

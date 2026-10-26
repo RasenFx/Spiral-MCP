@@ -2,6 +2,18 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.31.0] — 2026-10-26 · Pruebas de seguridad y HTML filtrado en layouts
+
+### Seguridad
+- Los layouts (páginas, footer, mega menús, widgets de builder y plantillas) ya no admiten HTML sin filtrar de un usuario sin `unfiltered_html` ni `spiral_mcp_code`: los props de texto pasan por `wp_kses_post` (se avisa en `warnings`) y el elemento `html` con script, iframe o atributos `on*` se rechaza (`spiral_mcp_unfiltered_html`, 403). Antes, YOOtheme quitaba kses al guardar y el rol del agente podía inyectar JavaScript en el sitio público con solo `design` o `content`.
+- `spiral_mcp_code` documenta que también cubre el HTML sin filtrar en layouts.
+
+### Corregido
+- Los `WP_Error` sin `status` se devolvían como HTTP 500: el wrapper les pone 403 (permisos y cerrojos), 404 (no existe) o 400 (entrada incorrecta).
+
+### Añadido
+- `tests/security.sh` y `tests/security-setup.php`: batería de pruebas de seguridad contra un WordPress local, con su plan y resultados en `docs/pruebas-seguridad.md`.
+
 ## [1.30.0] — 2026-10-26 · Idiomas con Polylang
 
 ### Añadido

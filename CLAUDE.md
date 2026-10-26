@@ -10,7 +10,7 @@ El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes d
 - YOOtheme Pro activo (o un tema hijo de YOOtheme) para todo lo relacionado con el builder y los estilos.
 - PHP 8.1 como mínimo (lo exige la librería cliente de SPUpdater). El archivo principal no debe usar sintaxis posterior a PHP 7.4: tiene que poder interpretarse para mostrar el aviso de requisitos.
 
-## Estructura actual (v1.30.0)
+## Estructura actual (v1.31.0)
 ```
 spiral-mcp-control.php   cabecera, constantes, comprobación de requisitos, require_once y hooks de activación
 uninstall.php            borra el rol y las capacidades (las tablas solo con el filtro spiral_mcp_uninstall_drop_tables)
@@ -44,6 +44,7 @@ includes/polylang.php    idiomas (solo si Polylang está activo): idiomas y ajus
 includes/admin.php       página Ajustes > Spiral-MCP (solo admin): abilities, permisos del rol del agente, comportamiento y actividad (con restaurar)
 includes/styles.php      CSS adicional (+ snapshot kind "custom_css") y estilo de YOOtheme: catálogo de variables, cambios y estado de compilación
 tests/smoke.sh           prueba de humo por REST (ver "Entorno de desarrollo")
+tests/security.sh        pruebas de seguridad por REST (docs/pruebas-seguridad.md); tests/security-setup.php crea sus usuarios y páginas
 tests/fixtures/          layouts de YOOtheme de ejemplo
 tests/gen-skill-abilities.php  regenera la referencia de abilities del skill
 skills/spiral-mcp-wordpress/   skill de Claude para el agente que usa el plugin
@@ -79,6 +80,8 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - **Snapshots**: cada módulo registra sus tipos con el filtro `spiral_mcp_snapshot_kinds` (`group`, `cap`, `capture`, `restore`; opcionales `parts` y `partial` para restaurar por partes, como `theme_config`) y llama a `spiral_mcp_snapshot_capture( $kind, $ref, $note )` antes de escribir. Si devuelve `WP_Error`, no escribir. Devolver `snapshot_id` en la respuesta.
 - **Descripciones en español, escritas para un agente**: qué hace, qué leer antes ("primero lee con X"), qué devuelve y qué es irreversible. Las descripciones son la documentación que verá el agente.
 - **Permisos**: el wrapper exige la capacidad `spiral_mcp_*` del grupo; además, `permission_callback` comprueba la nativa del objeto (`edit_post` con ese ID, `edit_theme_options`…). Nunca `__return_true`.
+- **HTML en layouts**: todo layout se guarda tras `spiral_mcp_layout_check( $layout )` (por referencia): sin `unfiltered_html` ni `spiral_mcp_code` filtra los props de texto con `wp_kses_post` (aviso) y rechaza el elemento `html` con código (error 403). YOOtheme quita kses al guardar layouts (`RemoveContentFilter`), así que este filtro es el único. Las abilities nuevas que escriban layouts deben pasar por ahí.
+- **Errores con código HTTP**: el wrapper añade `status` a los `WP_Error` que no lo traen (`spiral_mcp_error_status()`: 403 para `*_forbidden|_protected|_capability|_disabled|_locked`, 404 para `*_not_found`, 400 para el resto); sin él la Abilities API responde 500.
 - **Acciones destructivas** (borrar, restaurar, reemplazar algo sin revisión): exigir `"confirm": true` con `spiral_mcp_require_confirm()` y marcar `destructive => true`.
 - **Antes de escribir en opciones o theme mods, guardar una copia** (snapshot). Los posts ya tienen revisiones; lo demás no.
 - **Esquemas con varios tipos** (`'type' => array( … )`): poner `string` primero y `array` antes que `object`. El core convierte la entrada al primer tipo que la valide y un texto con espacios pasa como lista (`wp_parse_list`).
@@ -141,6 +144,7 @@ Abilities existentes (todas con prefijo `spiral-mcp/`):
 - WordPress local de pruebas con YOOtheme Pro, MCP Adapter y este plugin enlazado (junction en `wp-content/plugins/Spiral-MCP-Control`).
 - Nunca probar contra un sitio en producción.
 - Entorno local actual: `D:\web-data\www\wordpress-dev` (Laragon), compartido con los demás plugins del repo paraguas `D:\WP-Plugin-Develop` (ver su `docs/entorno-local.md`). WordPress 7.1.3, prefijo `wp_`, base de datos `wordpress-dev`, `home` = `https://wordpress-dev.test`. El plugin está enlazado con `mklink /J D:\web-data\www\wordpress-dev\wp-content\plugins\Spiral-MCP-Control D:\WP-Plugin-Develop\Spiral-MCP-Control`: no borrarlo ni actualizarlo desde wp-admin (borraría o sobrescribiría el repo). Enlaces permanentes `/%postname%/` (funciona `/wp-json/`). Apache de Laragon usa mod_fcgid, que no pasa la cabecera `Authorization` a PHP: el `.htaccess` del sitio lleva `SetEnvIf Authorization "(.+)" HTTP_AUTHORIZATION=$1` (fuera del bloque de WordPress) para que funcionen las Application Passwords. `smoke.sh` contra el dominio real puede usar `SMOKE_INSPECT=1`.
+- Plan de pruebas de seguridad y resultados: [`docs/pruebas-seguridad.md`](docs/pruebas-seguridad.md). Batería automatizada: `php tests/security-setup.php <wp> <url> <creds.env>` una vez y después `SEC_ENV=<creds.env> WP_PATH=<wp> bash tests/security.sh` (solo en local; cambia cerrojos y los restaura).
 - Comprobación mínima antes de cada commit: `php -l` en todos los archivos PHP y `tests/smoke.sh`:
   `WP_URL=https://wordpress-dev.test WP_USER=<usuario con rol spiral_mcp_agent> WP_APP_PASSWORD='…' bash tests/smoke.sh`
 - **Ruta REST de la Abilities API** (comprobada en WP 7.1.3): `/wp-abilities/v1/abilities` (listado) y `/wp-abilities/v1/abilities/<nombre>/run` (ejecutar). El método HTTP depende de las anotaciones: `GET` si `readonly`, `DELETE` si `destructive` e `idempotent`, `POST` en el resto. En `GET`/`DELETE` la entrada va en la query (`input[id]=5`) y el core la convierte a los tipos del esquema; en `POST`, en el cuerpo JSON `{"input": {…}}`. Con enlaces permanentes simples: `/?rest_route=/wp-abilities/v1/abilities/spiral-mcp/list-content/run`. Las Application Passwords exigen HTTPS (o `WP_ENVIRONMENT_TYPE` = `local`).

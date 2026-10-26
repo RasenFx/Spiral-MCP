@@ -294,13 +294,112 @@ function spiral_mcp_validate_node( $node, $path, $parent, array $types, array &$
 	}
 }
 
-/** Valida y devuelve WP_Error si hay errores. Si no, la lista de avisos. */
-function spiral_mcp_layout_check( array $layout ) {
+/* -------------------------------------------------------------------------
+ * HTML en los layouts
+ *
+ * YOOtheme quita los filtros kses al guardar un layout (RemoveContentFilter)
+ * y el elemento "html" imprime su contenido tal cual: sin este filtro, un
+ * usuario sin unfiltered_html podría meter <script> en cualquier página o
+ * área del tema. Se aplica wp_kses_post() a los props de texto de todos los
+ * elementos, como hace WordPress con el contenido de ese usuario; en el
+ * elemento "html" (pensado para código) se rechaza el layout entero.
+ * ---------------------------------------------------------------------- */
+
+/** ¿El usuario actual puede guardar HTML sin filtrar (script, iframe, on*…) en los layouts? */
+function spiral_mcp_layout_unfiltered() {
+	return current_user_can( 'unfiltered_html' ) || current_user_can( 'spiral_mcp_code' );
+}
+
+/**
+ * Firma de un HTML sin lo cosmético (comillas, espacios, entidades): dos
+ * valores con la misma firma solo difieren en normalización de kses, no en
+ * etiquetas ni atributos.
+ */
+function spiral_mcp_html_signature( $html ) {
+	$text = html_entity_decode( (string) $html, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+	return strtolower( preg_replace( '/[\s"\'`=\/]+/u', '', $text ) );
+}
+
+/**
+ * Filtra con wp_kses_post() los props de texto de un elemento (recursivo).
+ * Devuelve los nombres de los props que han perdido etiquetas o atributos
+ * (los cambios solo cosméticos no cuentan y no se tocan).
+ */
+function spiral_mcp_sanitize_props( array &$props, $prefix = '' ) {
+	$changed = array();
+	foreach ( $props as $key => &$value ) {
+		if ( is_array( $value ) ) {
+			$changed = array_merge( $changed, spiral_mcp_sanitize_props( $value, $prefix . $key . '.' ) );
+			continue;
+		}
+		if ( ! is_string( $value ) || '' === $value ) {
+			continue;
+		}
+		// Un enlace o ruta con protocolo peligroso (javascript:, data:…): como en los atributos href.
+		if ( false === strpos( $value, '<' ) ) {
+			if ( preg_match( '/^\s*[a-z][a-z0-9+.\-]*\s*:/i', $value ) ) {
+				$clean = wp_kses_bad_protocol( $value, wp_allowed_protocols() );
+				if ( $clean !== $value ) {
+					$value     = $clean;
+					$changed[] = $prefix . $key;
+				}
+			}
+			continue;
+		}
+		$clean = wp_kses_post( $value );
+		if ( spiral_mcp_html_signature( $clean ) !== spiral_mcp_html_signature( $value ) ) {
+			$value     = $clean;
+			$changed[] = $prefix . $key;
+		}
+	}
+	unset( $value );
+	return $changed;
+}
+
+/** Recorre el layout filtrando el HTML de cada nodo. Añade avisos (o errores, en "html") a $result. */
+function spiral_mcp_layout_sanitize( array &$node, $path, array &$result ) {
+	$at   = '' === $path ? '/' : $path;
+	$type = isset( $node['type'] ) && is_string( $node['type'] ) ? $node['type'] : '';
+	if ( isset( $node['props'] ) && is_array( $node['props'] ) ) {
+		$changed = spiral_mcp_sanitize_props( $node['props'] );
+		if ( $changed ) {
+			if ( 'html' === $type ) {
+				$result['errors'][] = sprintf( 'En %s (html): "%s" lleva HTML que tu usuario no puede guardar (script, iframe, atributos on*, javascript:…). Sin la capacidad unfiltered_html ni el permiso spiral_mcp_code solo se admite el HTML de wp_kses_post; para texto o imágenes usa los elementos text, headline o image.', $at, implode( '", "', $changed ) );
+			} else {
+				$result['warnings'][] = sprintf( 'En %s (%s): se ha quitado HTML no permitido de "%s" (script, iframe, atributos on*, javascript:…) porque tu usuario no tiene unfiltered_html ni spiral_mcp_code.', $at, $type, implode( '", "', $changed ) );
+			}
+		}
+	}
+	if ( isset( $node['children'] ) && is_array( $node['children'] ) ) {
+		$i = 0;
+		foreach ( $node['children'] as &$child ) {
+			if ( is_array( $child ) ) {
+				spiral_mcp_layout_sanitize( $child, $path . '/children/' . $i, $result );
+			}
+			$i++;
+		}
+		unset( $child );
+	}
+}
+
+/**
+ * Filtra el HTML (si el usuario no puede guardarlo sin filtrar), valida y
+ * devuelve WP_Error si hay errores. Si no, la lista de avisos. Modifica
+ * $layout: es lo que hay que guardar.
+ */
+function spiral_mcp_layout_check( array &$layout ) {
+	$result = array( 'errors' => array(), 'warnings' => array() );
+	if ( ! spiral_mcp_layout_unfiltered() ) {
+		spiral_mcp_layout_sanitize( $layout, '', $result );
+		if ( $result['errors'] ) {
+			return new WP_Error( 'spiral_mcp_unfiltered_html', 'El layout no se ha guardado. ' . implode( ' ', array_slice( $result['errors'], 0, 10 ) ), array( 'status' => 403 ) );
+		}
+	}
 	$check = spiral_mcp_layout_validate( $layout );
 	if ( $check['errors'] ) {
 		return new WP_Error( 'spiral_mcp_invalid_layout', 'El layout no es válido; no se ha guardado nada. ' . implode( ' ', array_slice( $check['errors'], 0, 10 ) ) );
 	}
-	return $check['warnings'];
+	return array_merge( $result['warnings'], $check['warnings'] );
 }
 
 /* -------------------------------------------------------------------------

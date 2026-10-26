@@ -15,6 +15,7 @@
 | `spiral_mcp_bad_terms` | El tipo de contenido no admite esa taxonomía, o el término no existe | `list-post-types` (taxonomías por tipo) y `create-term`. |
 | `spiral_mcp_not_trashed` | Se intentó borrar definitivamente algo que no está en la papelera | `trash-content` primero. |
 | `spiral_mcp_section_locked` | Sección de configuración no editable (`yootheme_apikey`, `version`…) o `footer.content` | El footer se edita con `update-theme-layout` o `patch-layout` y `"area": "footer"`. |
+| `spiral_mcp_unfiltered_html` (403) | El layout lleva un elemento `html` con `<script>`, `<iframe>` o atributos `on*`, y el usuario del agente no tiene `spiral_mcp_code` | No se ha guardado nada. Quita ese código (los textos normales van en un elemento `text`; para vídeos, el elemento `video`) o pide a la persona responsable el permiso `code`. En los elementos `text`, el HTML no permitido se elimina al guardar y se avisa en `warnings`. |
 | `rest_ability_cannot_execute` / `ability_invalid_permissions` | Al usuario del agente le falta un permiso | Avisa a la persona responsable del sitio; no intentes rodearlo. |
 | `ability_invalid_input` | Falta un parámetro obligatorio o tiene otro tipo | Revisa `references/abilities.md` (los obligatorios van en negrita). |
 | `inspect-page` no carga la página | El servidor no se alcanza a sí mismo por su dominio | Pide que se configure el filtro `spiral_mcp_inspect_base_url`. Mientras tanto, revisa con la URL de `get-preview-url` en tu navegador. |
