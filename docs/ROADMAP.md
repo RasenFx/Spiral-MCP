@@ -432,7 +432,8 @@ Que Spiral tenga sentido en un sitio sin YOOtheme, en especial con Elementor (lo
 - [x] `builder` en contenido, rechazo de `content` en páginas de Elementor, `duplicate-content` sin `_elementor_css`.
 - [x] Skill (sección, dos recetas, errores), README, CLAUDE.md, CHANGELOG.
 - [x] Flujo completo desde un cliente MCP con el MCP de Elementor activado (crear, componer, previsualizar, publicar) con el rol del agente.
-- [ ] Prueba de humo propia del modo Elementor (hoy es un script del scratchpad) y decidir si `dry_run` de `build-composition` debe quedar fuera de la auditoría (hoy se registra como escritura).
+- [x] `dry_run` de `build-composition` fuera de la auditoría (solo valida).
+- [ ] Prueba de humo propia del modo Elementor (hoy es un script del scratchpad).
 
 **Resultado 13b** (2026-10-27, MCP de Elementor activado, servidor por defecto del MCP Adapter `mcp-adapter-execute-ability`, usuario con el rol del agente): `elementor/create-page` → página 248 en borrador con `builder: elementor`; `build-composition` (dry_run y real) con flexbox, heading, paragraph y button; `create-preview-link` renderiza título, párrafo y botón a `/contacto/` sin sesión; `inspect-page` de Spiral lee la página de Elementor (h1 en contenido, enlaces con estado); `update-content` con `content` → `spiral_mcp_elementor_content`, con `slug` → ok; `manage-elements` cambia el título; `publish-document` publica y la web pública muestra el título editado; `list-activity` tiene las siete entradas (`elementor/*` y `spiral-mcp/*`, con el intento rechazado); `manage-global-variable` → «Permission denied» para el agente; dos revisiones de WordPress; papelera y borrado definitivo con Spiral. En el servidor propio de Elementor (`/wp-json/elementor/mcp`) el agente ve las 20 herramientas con el mismo permiso envuelto. Al terminar, `elementor_mcp_enabled` vuelve a estar desactivado en local.
 

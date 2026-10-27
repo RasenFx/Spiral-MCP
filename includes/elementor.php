@@ -122,7 +122,8 @@ function spiral_mcp_elementor_ability_map() {
  * - permission_callback: exige la capacidad spiral_mcp_<grupo> y después la comprobación propia
  *   de Elementor (edit_posts, edit_post, manage_options…).
  * - execute_callback: las escrituras pasan por spiral_mcp_log_run() (auditoría, excepciones a
- *   WP_Error) y la purga automática de caché; los WP_Error reciben su código HTTP.
+ *   WP_Error) y la purga automática de caché; los WP_Error reciben su código HTTP. Una llamada
+ *   con "dry_run": true no guarda nada y cuenta como lectura.
  * - catálogo: aparecen en Ajustes > Spiral-MCP > Abilities. Una desactivada no se puede dejar
  *   sin registrar desde un filtro, así que se oculta al MCP y a REST y su permiso devuelve false.
  */
@@ -165,7 +166,8 @@ add_filter( 'wp_register_ability_args', function ( $args, $name ) {
 	if ( isset( $args['execute_callback'] ) ) {
 		$execute                  = $args['execute_callback'];
 		$args['execute_callback'] = function ( $input = null ) use ( $name, $execute, $log, $groups, $read ) {
-			if ( $read ) {
+			// "dry_run": true (build-composition) solo valida, no guarda: no se registra como escritura.
+			if ( $read || ! empty( ( (array) $input )['dry_run'] ) ) {
 				$result = call_user_func( $execute, $input );
 			} else {
 				$result = spiral_mcp_log_run( $name, $execute, $input, $log );
