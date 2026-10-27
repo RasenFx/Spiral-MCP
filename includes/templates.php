@@ -318,6 +318,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 1. Listar plantillas ------------------------------------------------ */
 	spiral_mcp_register_ability( 'spiral-mcp/list-templates', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Listar plantillas de YOOtheme',
 		'description'         => 'Lista las plantillas del builder de YOOtheme (Personalizar > Templates): id, nombre, tipo, estado, condiciones (query), parámetros y prioridad. YOOtheme aplica la primera plantilla activa (menor "priority") cuyo tipo y condiciones encajan; una página con su propio layout de builder ignora las plantillas. Incluye "types": los tipos de plantilla de este sitio con los campos de "query" y "params" de cada uno.',
 		'category'            => 'spiral-mcp-theme',
@@ -341,6 +342,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 2. Obtener plantilla ------------------------------------------------ */
 	spiral_mcp_register_ability( 'spiral-mcp/get-template', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Obtener plantilla de YOOtheme',
 		'description'         => 'Devuelve una plantilla completa, con su layout. Para editar el layout por partes usa spiral-mcp/get-layout-outline y spiral-mcp/patch-layout con "area": "template:<id>".',
 		'category'            => 'spiral-mcp-theme',
@@ -360,6 +362,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 3. Crear plantilla -------------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/create-template', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Crear plantilla de YOOtheme',
 		'description'         => 'Crea una plantilla del builder (p. ej. para todas las entradas individuales: "type": "single-post"). Se añade al final, con la prioridad más baja. Sin "layout" se crea vacía. Valida el layout con el catálogo de elementos y lo normaliza como el Personalizador. Antes guarda un snapshot de todas las plantillas ("snapshot_id"). Para comprobar el resultado, abre una URL a la que se aplique.',
 		'category'            => 'spiral-mcp-theme',
@@ -389,6 +392,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 4. Editar plantilla ------------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/update-template', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Editar plantilla de YOOtheme',
 		'description'         => 'Cambia los campos enviados de una plantilla (name, type, status, query, params o layout completo). "query" y "params" se reemplazan enteros. Antes guarda un snapshot de todas las plantillas ("snapshot_id").',
 		'category'            => 'spiral-mcp-theme',
@@ -421,6 +425,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 5. Borrar plantilla ------------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/delete-template', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Borrar plantilla de YOOtheme',
 		'description'         => 'Borra una plantilla. Las páginas a las que se aplicaba pasan a usar la siguiente plantilla que encaje o el diseño por defecto del tema. Antes guarda un snapshot de todas las plantillas ("snapshot_id"; spiral-mcp/restore-snapshot la recupera). Requiere "confirm": true.',
 		'category'            => 'spiral-mcp-theme',
@@ -455,6 +460,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 6. Listar biblioteca ------------------------------------------------ */
 	spiral_mcp_register_ability( 'spiral-mcp/list-library', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Listar la biblioteca de layouts',
 		'description'         => 'Lista la biblioteca del builder de YOOtheme ("Mis layouts" y "Mis elementos"): id, nombre, tipo ("layout" para layouts completos o el tipo de elemento para elementos guardados) y fecha.',
 		'category'            => 'spiral-mcp-theme',
@@ -477,6 +483,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 7. Obtener elemento de la biblioteca -------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/get-library-item', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Obtener elemento de la biblioteca',
 		'description'         => 'Devuelve un layout o elemento guardado en la biblioteca, con su árbol JSON completo ("node").',
 		'category'            => 'spiral-mcp-theme',
@@ -509,6 +516,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 8. Guardar en la biblioteca ----------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/save-to-library', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Guardar en la biblioteca',
 		'description'         => 'Guarda en la biblioteca de YOOtheme un nodo de un layout, tomado por su ruta: una sección, fila o columna se guarda como layout ("Mis layouts", envuelta en layout > sección); un elemento, como elemento guardado ("Mis elementos"); "path": "" guarda el layout entero. Devuelve el id del nuevo elemento de la biblioteca.',
 		'category'            => 'spiral-mcp-theme',
@@ -563,6 +571,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 9. Insertar desde la biblioteca ------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/insert-from-library', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Insertar desde la biblioteca',
 		'description'         => 'Inserta un elemento de la biblioteca en un layout, en la posición "path" de una lista children (como "add" de spiral-mcp/patch-layout; "-" al final). Un layout guardado inserta sus secciones (path dentro de los children de la raíz de una página, p. ej. /children/2; en raíces "fragment", sus filas); un elemento guardado, el elemento (path dentro de los children de una columna). Valida el resultado y guarda como patch-layout (revisión o snapshot).',
 		'category'            => 'spiral-mcp-layout',

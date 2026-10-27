@@ -49,6 +49,42 @@ function spiral_mcp_table( $name ) {
 }
 
 /**
+ * ¿YOOtheme Pro (o un tema hijo suyo) es el tema activo? Decide si se registran las abilities
+ * del builder, la configuración del tema, las plantillas, la librería y los estilos de
+ * YOOtheme ('requires' => 'yootheme'). Filtro spiral_mcp_yootheme_active.
+ */
+function spiral_mcp_yootheme_active() {
+	$active = function_exists( 'YOOtheme\app' ) && class_exists( 'YOOtheme\Builder' );
+	return (bool) apply_filters( 'spiral_mcp_yootheme_active', $active );
+}
+
+/**
+ * Requisitos que puede declarar una ability con 'requires' en spiral_mcp_register_ability():
+ * slug => [ 'active' => se cumple, 'label' => nombre, 'reason' => texto para el administrador ].
+ * Una ability cuyo requisito no se cumple no se registra (el agente no la ve) y en Ajustes >
+ * Spiral-MCP aparece como no disponible.
+ */
+function spiral_mcp_requirements() {
+	return array(
+		'yootheme' => array(
+			'active' => spiral_mcp_yootheme_active(),
+			'label'  => 'YOOtheme Pro',
+			'reason' => 'YOOtheme Pro no es el tema activo: no se registran y el agente no las ve. Si el sitio usa Elementor, el diseño va por las herramientas elementor/* de su MCP.',
+		),
+	);
+}
+
+/** ¿Se cumple el requisito? Vacío = sin requisito; uno desconocido cuenta como no cumplido. */
+function spiral_mcp_requirement_met( $requires ) {
+	$requires = (string) $requires;
+	if ( '' === $requires ) {
+		return true;
+	}
+	$all = spiral_mcp_requirements();
+	return ! empty( $all[ $requires ]['active'] );
+}
+
+/**
  * Registra una ability con las convenciones del plugin.
  *
  * Además de los argumentos de wp_register_ability() acepta:
@@ -57,6 +93,8 @@ function spiral_mcp_table( $name ) {
  *   spiral_mcp_<grupo> antes del permission_callback propio.
  * - 'log': array( 'type' => tipo de objeto, 'id' => clave de la entrada o
  *   callable( $input, $result ) ) para el registro de auditoría.
+ * - 'requires': requisito del sitio (ver spiral_mcp_requirements(), p. ej. 'yootheme').
+ *   Si no se cumple, la ability no se registra y queda en el catálogo como no disponible.
  *
  * Fuerza el prefijo spiral-mcp/, rellena 'meta' con spiral_mcp_meta( false )
  * y, si la ability escribe (readonly = false), registra cada ejecución.
@@ -114,15 +152,17 @@ function spiral_mcp_register_ability( $name, array $args ) {
 	}
 	// Las integraciones (p. ej. Polylang) amplían aquí el esquema, la descripción y los callbacks de abilities de otros módulos.
 	$args   = (array) apply_filters( 'spiral_mcp_ability_args', $args, $name );
-	$groups = (array) ( $args['group'] ?? 'content' );
-	$log    = (array) ( $args['log'] ?? array() );
-	unset( $args['group'], $args['log'] );
+	$groups   = (array) ( $args['group'] ?? 'content' );
+	$log      = (array) ( $args['log'] ?? array() );
+	$requires = (string) ( $args['requires'] ?? '' );
+	unset( $args['group'], $args['log'], $args['requires'] );
 
 	$args['meta'] = array_replace_recursive( spiral_mcp_meta( false ), (array) ( $args['meta'] ?? array() ) );
 
 	// Registro de todas las abilities (también las desactivadas) para la página de ajustes.
 	$annotations = (array) ( $args['meta']['annotations'] ?? array() );
 	$enabled     = ! in_array( $name, spiral_mcp_disabled_abilities(), true );
+	$available   = spiral_mcp_requirement_met( $requires );
 	spiral_mcp_ability_catalog( $name, array(
 		'label'       => (string) ( $args['label'] ?? $name ),
 		'description' => (string) ( $args['description'] ?? '' ),
@@ -130,9 +170,13 @@ function spiral_mcp_register_ability( $name, array $args ) {
 		'groups'      => $groups,
 		'kind'        => ! empty( $annotations['readonly'] ) ? 'read' : ( ! empty( $annotations['destructive'] ) ? 'destructive' : 'write' ),
 		'enabled'     => $enabled,
+		'available'   => $available,
+		'requires'    => $requires,
+		'external'    => false,
 	) );
-	// Desactivada en Ajustes > Spiral-MCP: no se registra, así el MCP Adapter no la publica.
-	if ( ! $enabled ) {
+	// Sin su requisito (p. ej. YOOtheme en un sitio con otro tema) o desactivada en Ajustes >
+	// Spiral-MCP: no se registra, así el MCP Adapter no la publica y el agente no la ve.
+	if ( ! $available || ! $enabled ) {
 		return null;
 	}
 

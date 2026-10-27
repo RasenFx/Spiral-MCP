@@ -1,11 +1,11 @@
 ---
 name: spiral-mcp-wordpress
-description: "Cómo trabajar en un sitio WordPress con YOOtheme Pro a través de las herramientas MCP spiral-mcp/* (plugin Spiral-MCP-Control). Úsalo siempre que haya herramientas spiral-mcp disponibles y la tarea toque el sitio: crear, editar o publicar páginas y entradas; cambiar layouts, secciones, botones, textos o imágenes de YOOtheme; el header, el footer, menús o widgets; formularios de contacto; la tienda de WooCommerce (productos, precios, stock, cupones, envíos, impuestos, pedidos); idiomas y traducciones con Polylang (traducir páginas, menús por idioma, selector de idioma); subir imágenes; plantillas de YOOtheme; SEO; colores, tipografía o CSS de la marca; programar publicaciones; revisar una página antes de publicar o deshacer un cambio. Aplícalo aunque el usuario no diga \"YOOtheme\" ni \"MCP\" (p. ej. \"cambia el botón de la portada\", \"pon el logo nuevo\", \"crea una landing de servicios\")."
+description: "Cómo trabajar en un sitio WordPress, con YOOtheme Pro o con Elementor, a través de las herramientas MCP spiral-mcp/* (plugin Spiral-MCP-Control) y, en sitios con Elementor, las elementor/* de su MCP. Úsalo siempre que haya herramientas spiral-mcp disponibles y la tarea toque el sitio: crear, editar o publicar páginas y entradas; cambiar layouts, secciones, botones, textos o imágenes de YOOtheme; el header, el footer, menús o widgets; formularios de contacto; la tienda de WooCommerce (productos, precios, stock, cupones, envíos, impuestos, pedidos); idiomas y traducciones con Polylang (traducir páginas, menús por idioma, selector de idioma); subir imágenes; plantillas de YOOtheme; páginas construidas con Elementor (herramientas elementor/*); SEO; colores, tipografía o CSS de la marca; programar publicaciones; revisar una página antes de publicar o deshacer un cambio. Aplícalo aunque el usuario no diga \"YOOtheme\" ni \"MCP\" (p. ej. \"cambia el botón de la portada\", \"pon el logo nuevo\", \"crea una landing de servicios\")."
 ---
 
-# Trabajar en WordPress + YOOtheme con spiral-mcp
+# Trabajar en WordPress (YOOtheme o Elementor) con spiral-mcp
 
-Las herramientas `spiral-mcp/*` controlan un sitio WordPress con YOOtheme Pro sin entrar en wp-admin. Cada herramienta trae en su descripción qué hace, qué leer antes y qué devuelve: léela cuando dudes. Este skill da el método para usarlas bien juntas.
+Las herramientas `spiral-mcp/*` controlan un sitio WordPress sin entrar en wp-admin. El diseño de las páginas depende del builder del sitio: con YOOtheme Pro se edita con las herramientas de layout de spiral-mcp; con Elementor, con las herramientas `elementor/*` de su propio MCP (ver «Sitios con Elementor»). Lo primero es saber dónde estás: si en tu lista hay `list-elements` y `get-theme-config`, el sitio tiene YOOtheme; si no están y hay `elementor/*`, es un sitio de Elementor. `list-content` dice el `builder` de cada página (`yootheme`, `elementor` o `none`). Cada herramienta trae en su descripción qué hace, qué leer antes y qué devuelve: léela cuando dudes. Este skill da el método para usarlas bien juntas.
 
 Si necesitas los parámetros de una herramienta concreta, consulta `references/abilities.md`. Para tareas habituales (página nueva, sección, imagen, menú, header, footer, plantilla, marca, programar, traducir), mira `references/recipes.md`. Si una llamada falla, `references/errors.md` explica los errores frecuentes.
 
@@ -59,7 +59,22 @@ El mismo flujo sirve para el footer, los mega menús, los widgets de builder y l
 - Si no lo tienes: díselo claramente al usuario y pásale `recompile_url` para que la abra él. No digas que el cambio ya se ve.
 - Para un retoque que deba verse al instante, usa `update-custom-css` (no necesita recompilar).
 
+## Sitios con Elementor
+
+Spiral-MCP no edita el diseño de Elementor: lo hace el MCP de Elementor, cuyas herramientas `elementor/*` aparecen en tu misma lista cuando el administrador lo tiene activado (wp-admin > Elementor > Elementor MCP). Spiral les pone sus permisos por grupo y las anota en `list-activity`, así que valen las mismas reglas: lee antes de escribir, borrador primero, cuenta lo que cambiaste y cómo deshacerlo.
+
+- **Qué hace cada uno.** Con `spiral-mcp/*`: títulos, estados, slugs, páginas madre, categorías, imagen destacada, SEO, menús, widgets, medios (`upload-media`; `elementor/list-assets` los lista por `id` para componer), ajustes, cachés, plugins, formularios, tienda, idiomas, vista previa (`get-preview-url` e `inspect-page` renderizan páginas de Elementor) y deshacer (`restore-revision`: Elementor guarda sus datos en las revisiones de WordPress). Con `elementor/*`: el diseño (`get-page-structure`, `build-composition`, `manage-elements`, `update-page-settings`), el kit (`manage-global-variable`, `manage-classes`, `manage-default-styles`), los componentes y `publish-document`.
+- **Una página de Elementor** (`"builder": "elementor"` en `list-content` / `get-content`) ignora su `content`: `update-content` lo rechaza (`spiral_mcp_elementor_content`). No intentes reproducir el diseño en HTML. Los demás campos (título, estado, slug, padre, términos, imagen destacada) sí se cambian con `update-content`.
+- **Página nueva:** `elementor/create-page` (queda marcada para Elementor) → `elementor/build-composition` → `elementor/create-preview-link` o `get-preview-url` → `inspect-page` → `elementor/publish-document` (o `update-content {"status": "publish"}`). Una página creada con `create-content` no es de Elementor.
+- **Página publicada:** los cambios de `build-composition` y `manage-elements` se guardan como borrador de Elementor y no se ven en la web hasta `elementor/publish-document`. Compruébalos con `create-preview-link`.
+- **Solo elementos V4 (atómicos).** El MCP de Elementor exige el editor atómico y solo edita elementos atómicos; los widgets clásicos se tocan a mano en el editor de Elementor (`list-widget-schemas` dice cuáles puede configurar). Si una herramienta responde que el editor V4 no está activo, díselo al usuario.
+- **Lo que exige administrador:** variables globales, estilos por defecto y componentes piden `manage_options`, que el rol del agente no tiene (403); las clases globales, una capacidad propia de Elementor. Explica el cambio al usuario para que lo haga él, o que amplíe los permisos.
+- Antes de maquetar, lee `elementor/style-best-practices` y `elementor/wordpress-best-practices`: son las guías de Elementor para su builder.
+- Las herramientas de YOOtheme (`list-elements`, `patch-layout`, `get-theme-config`, plantillas, librería, `update-theme-style`) no existen en un sitio de Elementor, y las recetas de YOOtheme de `references/recipes.md` no aplican: el header, el footer y los estilos globales se hacen en Elementor (su Theme Builder; el kit con `manage-*`). Las recetas «Elementor: …» sí.
+
 ## Qué evitar
+
+- En páginas de Elementor, enviar `content` o reproducir el diseño en HTML: el diseño va por `elementor/*`.
 
 - Reenviar layouts enteros para cambios pequeños, o publicar sin `inspect-page`.
 - Restaurar un snapshot antiguo de la configuración del tema para deshacer un solo cambio (ver principio 4).

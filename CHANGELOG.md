@@ -2,6 +2,20 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.32.0] — 2026-10-27 · Modo Elementor: Spiral sin YOOtheme
+
+### Añadido
+- `includes/elementor.php`: en un sitio con Elementor 4.3+ y su MCP activado, las abilities `elementor/*` que registra Elementor pasan por Spiral mediante el filtro del core `wp_register_ability_args`: capacidad `spiral_mcp_<grupo>` (`content` para documentos, `design` para composición, kit y componentes, `media` para `list-assets`) antes del permiso propio de Elementor, registro en la auditoría y purga automática de caché en las escrituras, código HTTP en los errores y presencia en Ajustes > Spiral-MCP > Abilities (una desactivada se oculta al MCP y responde 403).
+- `builder` en `list-content` y `get-content`: `yootheme`, `elementor` o `none` (`yootheme` se mantiene como booleano).
+- `'requires'` en `spiral_mcp_register_ability()`, `spiral_mcp_requirements()` y `spiral_mcp_yootheme_active()` (filtro `spiral_mcp_yootheme_active`). Ajustes > Spiral-MCP > Abilities muestra aparte las abilities «No disponibles en este sitio» y conserva su estado.
+- Skill: sección «Sitios con Elementor», recetas «Elementor: crear una página» y «Elementor: cambiar textos o secciones», errores nuevos.
+
+### Cambiado
+- Las 31 abilities de YOOtheme (layouts, `get/update-yootheme-layout`, áreas del tema, configuración, plantillas, biblioteca, librería online y estilo) solo se registran si YOOtheme Pro es el tema activo. Antes aparecían en el catálogo del agente de cualquier sitio y fallaban con `spiral_mcp_no_yootheme`, `spiral_mcp_no_config` o `spiral_mcp_no_layout`; `get-style-status` devolvía una ruta inventada y `update-yootheme-layout` guardaba un layout que nunca se renderizaba.
+- `update-content` rechaza `content` en una página construida con Elementor (`spiral_mcp_elementor_content`, 400): Elementor ignora `post_content` y el cambio no se vería. Los demás campos siguen igual.
+- `duplicate-content` no copia la meta `_elementor_css` (caché de CSS de Elementor, que se regenera).
+- YOOtheme pasa a ser opcional en el README y en CLAUDE.md; Elementor, opcional también.
+
 ## [1.31.0] — 2026-10-26 · Pruebas de seguridad y HTML filtrado en layouts
 
 ### Seguridad

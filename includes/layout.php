@@ -370,6 +370,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 1. Resumen ---------------------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/get-layout-outline', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Resumen del layout',
 		'description'         => 'Devuelve el árbol de un layout de YOOtheme (de una página con "id" o de un área del tema con "area") resumido en una línea por nodo: ruta JSON Pointer (p. ej. /children/0/children/1/children/0/children/2), tipo, nombre y un extracto de su texto. Es el primer paso para editar: localiza aquí la ruta del nodo y después usa spiral-mcp/get-layout-node y spiral-mcp/patch-layout, sin descargar todo el JSON.',
 		'category'            => 'spiral-mcp-layout',
@@ -395,6 +396,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 1b. Textos ---------------------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/get-layout-texts', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Textos del layout',
 		'description'         => 'Lista todos los textos visibles de un layout de YOOtheme (de una página con "id" o de un área con "area"), y si se pide también sus enlaces e imágenes, cada uno con su ruta JSON Pointer completa lista para un "replace" de spiral-mcp/patch-layout. Incluye los textos que no salen en spiral-mcp/get-layout-outline: títulos y metas de items, textos de botones, etiquetas y mensajes de formularios, títulos de sección, alt de imágenes y ajustes anidados (p. ej. props/provider/message de un newsletter). Úsala para traducir o adaptar un diseño importado (spiral-mcp/import-from-online-library) sin dejarte nada. "html": true = el valor es HTML: conserva sus etiquetas y enlaces al cambiarlo. "dynamic": true = lo rellena una fuente dinámica, cambiarlo no se verá. "path" limita la búsqueda a un nodo.',
 		'category'            => 'spiral-mcp-layout',
@@ -440,6 +442,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 2. Nodo ------------------------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/get-layout-node', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Obtener un nodo del layout',
 		'description'         => 'Devuelve el JSON completo de un nodo de un layout de YOOtheme (sección, fila, columna o elemento con sus props, fuente dinámica e hijos) por su ruta JSON Pointer, tomada de spiral-mcp/get-layout-outline. "path": "" devuelve el layout entero.',
 		'category'            => 'spiral-mcp-layout',
@@ -468,6 +471,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 3. Patch ------------------------------------------------------------ */
 	spiral_mcp_register_ability( 'spiral-mcp/patch-layout', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Editar un layout por partes',
 		'description'         => 'Aplica operaciones JSON Patch (RFC 6902) a un layout de YOOtheme de una página ("id") o de un área del tema ("area"), sin reenviar el árbol completo. Operaciones: {"op":"replace","path":"/children/0/children/0/children/0/children/0/props/content","value":"Nuevo título"}; {"op":"add","path":"/children/1","value":{sección}} (inserta en esa posición de children; "-" al final); {"op":"remove","path":…}; {"op":"move","from":…,"path":…}; {"op":"copy","from":…,"path":…}; {"op":"test","path":…,"value":…} (falla si el valor cambió). Las rutas se evalúan en orden, tras aplicar las operaciones anteriores (al borrar o insertar en una lista, los índices siguientes cambian). Es atómico: si una operación falla, o el resultado tiene errores de estructura o tipos de elemento desconocidos, no se guarda nada. Conserva las fuentes dinámicas ("source") que no toques. Página: crea una revisión. Área del tema: guarda un snapshot ("snapshot_id"). Devuelve "warnings" con props desconocidos o valores fuera de sus opciones.',
 		'category'            => 'spiral-mcp-layout',
@@ -508,7 +512,7 @@ add_action( 'wp_abilities_api_init', function () {
 	/* 4. Duplicar --------------------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/duplicate-content', array(
 		'label'               => 'Duplicar página o entrada',
-		'description'         => 'Crea una copia de una página o entrada como borrador: contenido con su layout de YOOtheme, extracto, página madre, orden, plantilla, imagen destacada, categorías/etiquetas y campos personalizados. Devuelve la copia (su "id"). Útil para crear una página nueva a partir de otra parecida.',
+		'description'         => 'Crea una copia de una página o entrada como borrador: contenido con su layout de YOOtheme o sus datos de Elementor, extracto, página madre, orden, plantilla, imagen destacada, categorías/etiquetas y campos personalizados. Devuelve la copia (su "id"). Útil para crear una página nueva a partir de otra parecida.',
 		'category'            => 'spiral-mcp-layout',
 		'group'               => 'content',
 		'log'                 => array( 'type' => 'post', 'id' => 'id' ),
@@ -553,7 +557,7 @@ add_action( 'wp_abilities_api_init', function () {
 					wp_set_object_terms( $new_id, $terms, $tax );
 				}
 			}
-			$skip = array( '_edit_lock', '_edit_last', '_wp_old_slug', '_wp_old_date', '_encloseme', '_pingme', '_wp_trash_meta_status', '_wp_trash_meta_time' );
+			$skip = array( '_edit_lock', '_edit_last', '_wp_old_slug', '_wp_old_date', '_encloseme', '_pingme', '_wp_trash_meta_status', '_wp_trash_meta_time', '_elementor_css' );
 			foreach ( get_post_meta( $post->ID ) as $key => $values ) {
 				if ( in_array( $key, $skip, true ) ) {
 					continue;

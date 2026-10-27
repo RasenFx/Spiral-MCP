@@ -413,6 +413,7 @@ add_action( 'wp_abilities_api_init', function () {
 	};
 
 	spiral_mcp_register_ability( 'spiral-mcp/list-elements', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Listar elementos del builder',
 		'description'         => 'Lista los tipos de nodo del builder de YOOtheme disponibles en este sitio: estructura (layout > section > row > column), elementos (headline, text, image, button, grid…) e items (los hijos de un elemento múltiple: list > list_item, button > button_item, nav > nav_item…). Para cada uno: name (el valor de "type"), title, group, kind, qué hijos admite y, en los items, su elemento padre. Un "fragment" (sublayout) contiene filas. Después usa spiral-mcp/get-element-schema para ver sus props.',
 		'category'            => 'spiral-mcp-layout',
@@ -442,6 +443,7 @@ add_action( 'wp_abilities_api_init', function () {
 	) );
 
 	spiral_mcp_register_ability( 'spiral-mcp/get-element-schema', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Esquema de un elemento',
 		'description'         => 'Devuelve los props que admite un tipo de elemento de YOOtheme: para cada uno, su tipo de campo (text si no se indica, select, checkbox, number, editor, image, link, color…), etiqueta, opciones permitidas (en los select) y si admite contenido dinámico ("source"). Incluye los valores por defecto del tipo y, en filas, los props que se ponen en las columnas hijas (width_default, width_small, width_medium…). En una fila con varias columnas pon "layout" (una de sus opciones, p. ej. "1-3,1-3,1-3") y los width_* coherentes en cada columna: sin "layout" la fila apila las columnas a ancho completo hasta que un width_* lo cambie. Omite los controles internos del editor (botones de panel y selectores de fuente dinámica). Los props de imagen llevan rutas relativas como wp-content/uploads/2024/11/logo.webp y los enlaces, rutas relativas como /contacto/.',
 		'category'            => 'spiral-mcp-layout',

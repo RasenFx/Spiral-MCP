@@ -127,6 +127,7 @@ function spiral_mcp_theme_config_summary( $key, $value ) {
 add_action( 'wp_abilities_api_init', function () {
 
 	spiral_mcp_register_ability( 'spiral-mcp/get-theme-config', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Leer la configuración de YOOtheme',
 		'description'         => 'Lee los ajustes de YOOtheme (Personalizar). Sin "section" devuelve la lista de secciones (site, header, navbar, dialog, mobile, top, bottom, footer, logo, post, blog, consent, scripts…) con su tipo y si se pueden editar. Con "section" devuelve su valor actual y "defaults" (los ajustes que admite y sus valores por defecto); en las secciones sin valores por defecto (p. ej. logo) devuelve "known_keys" con las claves y qué hace cada una. Las claves api y otros secretos salen ocultos. Las claves con punto (p. ej. "search_dropdown.stretch") son nombres literales, no rutas. Los estilos (less, custom_less, style) se tratan en otra fase: cambiarlos no recompila el CSS.',
 		'category'            => 'spiral-mcp-theme',
@@ -168,6 +169,7 @@ add_action( 'wp_abilities_api_init', function () {
 	) );
 
 	spiral_mcp_register_ability( 'spiral-mcp/update-theme-config', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Cambiar la configuración de YOOtheme',
 		'description'         => 'Cambia una sección de los ajustes de YOOtheme. "values" se mezcla con lo que hay (merge profundo: solo cambian las claves enviadas; las listas se reemplazan enteras); con "replace": true sustituye la sección completa. Primero lee la sección con spiral-mcp/get-theme-config. Secciones editables: ' . implode( ', ', spiral_mcp_theme_config_sections() ) . '; "scripts" (JS personalizado) requiere además el permiso de código. No se pueden tocar yootheme_apikey, version, minimum_stability ni site_url. Las rutas de imagen (logo, favicon…) van relativas, p. ej. wp-content/uploads/2024/11/logo.webp (usa path_relative de spiral-mcp/upload-media). En "logo", el alt de la imagen es "text" (no el alt del medio) y conviene dar "image_width"/"image_height" si la imagen es grande. Avisa en "warnings" de claves que YOOtheme no conoce. Antes guarda un snapshot de toda la configuración ("snapshot_id"; se deshace con spiral-mcp/restore-snapshot).',
 		'category'            => 'spiral-mcp-theme',

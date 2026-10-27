@@ -84,6 +84,13 @@ add_action( 'admin_post_spiral_mcp_save_abilities', function () {
 		if ( in_array( $name, $protected, true ) ) {
 			continue;
 		}
+		if ( empty( $info['available'] ) ) {
+			// Sin su requisito (p. ej. YOOtheme) no se muestra: conserva lo que tenía.
+			if ( ! $info['enabled'] ) {
+				$disabled[] = $name;
+			}
+			continue;
+		}
 		if ( 'all' === $preset ) {
 			$on = true;
 		} elseif ( 'readonly' === $preset ) {
@@ -259,12 +266,33 @@ function spiral_mcp_admin_render_abilities() {
 	}
 	$protected = spiral_mcp_protected_abilities();
 	$by_cat    = array();
+	$missing   = array(); // categoría => requisito => nombres: abilities cuyo requisito (YOOtheme…) no cumple el sitio.
+	$external  = array(); // categorías de otro plugin (Elementor) que Spiral envuelve.
 	foreach ( $catalog as $name => $info ) {
+		if ( empty( $info['available'] ) ) {
+			$missing[ $info['category'] ][ (string) $info['requires'] ][] = $name;
+			continue;
+		}
 		$by_cat[ $info['category'] ][ $name ] = $info;
+		if ( ! empty( $info['external'] ) ) {
+			$external[ $info['category'] ] = true;
+		}
 	}
-	$off   = count( array_filter( $catalog, function ( $i ) {
+	// Las categorías de otro plugin, al final: primero las de Spiral.
+	foreach ( array_keys( $external ) as $cat ) {
+		$items = $by_cat[ $cat ];
+		unset( $by_cat[ $cat ] );
+		$by_cat[ $cat ] = $items;
+	}
+	$available = array_filter( $catalog, function ( $i ) {
+		return ! empty( $i['available'] );
+	} );
+	$off       = count( array_filter( $available, function ( $i ) {
 		return ! $i['enabled'];
 	} ) );
+	$strip     = function ( $n ) {
+		return preg_replace( '#^spiral-mcp/#', '', $n );
+	};
 	$kinds = array(
 		'read'        => array( 'Lectura', '#2271b1' ),
 		'write'       => array( 'Escritura', '#996800' ),
@@ -279,7 +307,7 @@ function spiral_mcp_admin_render_abilities() {
 		.spiral-mcp-admin .spiral-mcp-presets .button { margin-right:6px; }
 		.spiral-mcp-admin code { font-size:12px; }
 	</style>
-	<p>Decide qué herramientas ve el agente. Una ability desactivada no se publica en el MCP: el agente no la ve ni puede usarla. <strong><?php echo (int) ( count( $catalog ) - $off ); ?></strong> de <?php echo (int) count( $catalog ); ?> activas.
+	<p>Decide qué herramientas ve el agente. Una ability desactivada no se publica en el MCP: el agente no la ve ni puede usarla. <strong><?php echo (int) ( count( $available ) - $off ); ?></strong> de <?php echo (int) count( $available ); ?> activas.
 	<?php echo $protected ? ' ' . spiral_mcp_admin_code_list( array_map( function ( $n ) { // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escapado en la función.
 		return preg_replace( '#^spiral-mcp/#', '', $n );
 	}, $protected ) ) . ' están siempre activas: sin ellas el agente no podría ver ni deshacer sus cambios.' : ''; ?></p>
@@ -297,6 +325,9 @@ function spiral_mcp_admin_render_abilities() {
 			$all_on = ! in_array( false, wp_list_pluck( $items, 'enabled' ), true );
 			?>
 			<h2><label><input type="checkbox" class="spiral-mcp-cat-toggle" data-target="<?php echo esc_attr( $cat_id ); ?>" <?php checked( $all_on ); ?>> <?php echo esc_html( spiral_mcp_admin_category_label( $cat ) ); ?></label> <span class="description">(<?php echo (int) count( $items ); ?>)</span></h2>
+			<?php if ( ! empty( $external[ $cat ] ) ) : ?>
+				<p class="description">Herramientas del MCP de Elementor (wp-admin > Elementor > Elementor MCP), que Elementor registra y publica por su cuenta. Spiral-MCP les añade sus permisos por grupo (content, design, media), el registro de actividad y la purga automática de caché. Una desactivada aquí deja de publicarse en el MCP y responde 403 si se llama igualmente.</p>
+			<?php endif; ?>
 			<table class="widefat striped" id="<?php echo esc_attr( $cat_id ); ?>">
 				<tbody>
 				<?php foreach ( $items as $name => $info ) : ?>
@@ -310,6 +341,17 @@ function spiral_mcp_admin_render_abilities() {
 				<?php endforeach; ?>
 				</tbody>
 			</table>
+			<?php foreach ( $missing[ $cat ] ?? array() as $req => $names ) : ?>
+				<?php $r = spiral_mcp_requirements()[ $req ] ?? array(); ?>
+				<p class="description"><strong>No disponibles en este sitio</strong> (<?php echo esc_html( $r['reason'] ?? $req ); ?>): <?php echo spiral_mcp_admin_code_list( array_map( $strip, $names ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escapado en la función. ?></p>
+			<?php endforeach; ?>
+		<?php endforeach; ?>
+		<?php foreach ( array_diff_key( $missing, $by_cat ) as $cat => $by_req ) : ?>
+			<h2><?php echo esc_html( spiral_mcp_admin_category_label( $cat ) ); ?></h2>
+			<?php foreach ( $by_req as $req => $names ) : ?>
+				<?php $r = spiral_mcp_requirements()[ $req ] ?? array(); ?>
+				<p class="description"><strong>No disponibles en este sitio</strong> (<?php echo esc_html( $r['reason'] ?? $req ); ?>): <?php echo spiral_mcp_admin_code_list( array_map( $strip, $names ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escapado en la función. ?></p>
+			<?php endforeach; ?>
 		<?php endforeach; ?>
 		<?php submit_button( 'Guardar cambios' ); ?>
 	</form>

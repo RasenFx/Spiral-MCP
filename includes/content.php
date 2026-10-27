@@ -57,6 +57,7 @@ function spiral_mcp_summary( WP_Post $post ) {
 		'url'      => get_permalink( $post ),
 		'modified' => mysql_to_rfc3339( $post->post_modified ),
 		'yootheme' => spiral_mcp_has_layout( $post->post_content ),
+		'builder'  => spiral_mcp_builder_of( $post ),
 	);
 }
 
@@ -348,7 +349,7 @@ add_action( 'wp_abilities_api_init', function () {
 	// Campos ampliados de create-content y update-content.
 	$fields = array(
 		'title'          => array( 'type' => 'string' ),
-		'content'        => array( 'type' => 'string', 'description' => 'HTML o bloques de Gutenberg. En contenido de YOOtheme solo es el HTML de respaldo: el diseño se edita con las abilities de layout.' ),
+		'content'        => array( 'type' => 'string', 'description' => 'HTML o bloques de Gutenberg. En contenido de YOOtheme solo es el HTML de respaldo: el diseño se edita con las abilities de layout. En una página construida con Elementor ("builder": "elementor") no se admite: su diseño se edita con las herramientas elementor/*.' ),
 		'excerpt'        => array( 'type' => 'string' ),
 		'status'         => array( 'type' => 'string', 'enum' => spiral_mcp_statuses(), 'description' => 'draft (borrador), pending, private, publish, o future/publish con "date" futura para programar.' ),
 		'slug'           => array( 'type' => 'string' ),
@@ -399,7 +400,7 @@ add_action( 'wp_abilities_api_init', function () {
 	/* 1. Listar contenido ------------------------------------------------ */
 	spiral_mcp_register_ability( 'spiral-mcp/list-content', array(
 		'label'               => 'Listar contenido',
-		'description'         => 'Lista páginas, entradas u otro tipo de contenido (ver spiral-mcp/list-post-types) con filtros: estado (incluidos future = programado y trash = papelera), búsqueda y contenido padre. Devuelve ID, tipo, título, estado, slug, URL, fecha de modificación y si usa el constructor de YOOtheme.',
+		'description'         => 'Lista páginas, entradas u otro tipo de contenido (ver spiral-mcp/list-post-types) con filtros: estado (incluidos future = programado y trash = papelera), búsqueda y contenido padre. Devuelve ID, tipo, título, estado, slug, URL, fecha de modificación y "builder": qué constructor maqueta cada contenido ("yootheme", "elementor" o "none"; "yootheme" se mantiene como booleano).',
 		'category'            => 'spiral-mcp-content',
 		'input_schema'        => array(
 			'type'       => 'object',
@@ -448,7 +449,7 @@ add_action( 'wp_abilities_api_init', function () {
 	/* 2. Leer contenido -------------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/get-content', array(
 		'label'               => 'Obtener contenido',
-		'description'         => 'Devuelve la ficha completa de una página, entrada u otro contenido: título, estado, extracto, contenido en bruto, padre, orden, plantilla, autor, fecha (date local y date_gmt), comentarios, términos por taxonomía, imagen destacada (id y path_relative) y metas permitidos. Si usa YOOtheme, "content" es solo el HTML de respaldo; para el diseño usa spiral-mcp/get-layout-outline o spiral-mcp/get-yootheme-layout.',
+		'description'         => 'Devuelve la ficha completa de una página, entrada u otro contenido: título, estado, extracto, contenido en bruto, padre, orden, plantilla, autor, fecha (date local y date_gmt), comentarios, términos por taxonomía, imagen destacada (id y path_relative) y metas permitidos. Si "builder" es "yootheme", "content" es solo el HTML de respaldo; para el diseño usa spiral-mcp/get-layout-outline o spiral-mcp/get-yootheme-layout. Si es "elementor", el diseño está en los datos de Elementor y "content" no se muestra en la web: léelo y edítalo con las herramientas elementor/* (elementor/get-page-structure, elementor/manage-elements, elementor/build-composition).',
 		'category'            => 'spiral-mcp-content',
 		'input_schema'        => array(
 			'type'       => 'object',
@@ -478,7 +479,7 @@ add_action( 'wp_abilities_api_init', function () {
 	/* 3. Crear contenido ------------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/create-content', array(
 		'label'               => 'Crear contenido',
-		'description'         => 'Crea una página, entrada u otro contenido. Por defecto queda como borrador. Admite padre (páginas hijas), orden, plantilla de página, autor, fecha (futura + "status": "publish" = programar), comentarios, términos ({"category": ["noticias"]}), imagen destacada y metas permitidos. Todo se valida antes de crear nada. Para el diseño con YOOtheme, después usa spiral-mcp/update-yootheme-layout o crea la página duplicando otra con spiral-mcp/duplicate-content.',
+		'description'         => 'Crea una página, entrada u otro contenido. Por defecto queda como borrador. Admite padre (páginas hijas), orden, plantilla de página, autor, fecha (futura + "status": "publish" = programar), comentarios, términos ({"category": ["noticias"]}), imagen destacada y metas permitidos. Todo se valida antes de crear nada. Para el diseño con YOOtheme, después usa spiral-mcp/update-yootheme-layout o crea la página duplicando otra con spiral-mcp/duplicate-content. En un sitio con Elementor, una página que se vaya a maquetar con su editor se crea con elementor/create-page (queda marcada para Elementor).',
 		'category'            => 'spiral-mcp-content',
 		'log'                 => array( 'type' => 'post' ),
 		'input_schema'        => array(
@@ -521,7 +522,7 @@ add_action( 'wp_abilities_api_init', function () {
 	/* 4. Actualizar contenido -------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/update-content', array(
 		'label'               => 'Actualizar contenido',
-		'description'         => 'Actualiza los campos enviados de una página, entrada u otro contenido (los mismos que spiral-mcp/create-content). Título, contenido y extracto guardan una revisión (spiral-mcp/list-revisions); términos, imagen destacada, plantilla y metas no tienen revisiones. En contenido de YOOtheme, "content" reemplaza solo el HTML de respaldo y se conserva el layout. Para mandar a la papelera usa spiral-mcp/trash-content.',
+		'description'         => 'Actualiza los campos enviados de una página, entrada u otro contenido (los mismos que spiral-mcp/create-content). Título, contenido y extracto guardan una revisión (spiral-mcp/list-revisions); términos, imagen destacada, plantilla y metas no tienen revisiones. En contenido de YOOtheme, "content" reemplaza solo el HTML de respaldo y se conserva el layout. En una página construida con Elementor ("builder": "elementor" en spiral-mcp/get-content) "content" se rechaza, porque no se mostraría: su diseño se edita con elementor/*; los demás campos sí se pueden cambiar. Para mandar a la papelera usa spiral-mcp/trash-content.',
 		'category'            => 'spiral-mcp-content',
 		'log'                 => array( 'type' => 'post' ),
 		'input_schema'        => array(
@@ -545,6 +546,9 @@ add_action( 'wp_abilities_api_init', function () {
 				return $prep;
 			}
 			list( $postarr, $extras ) = $prep;
+			if ( array_key_exists( 'content', $input ) && spiral_mcp_elementor_built( $post->ID ) ) {
+				return spiral_mcp_elementor_content_error( $post->ID );
+			}
 			if ( array_key_exists( 'content', $input ) ) {
 				list( , $layout ) = spiral_mcp_split_layout( $post->post_content );
 				$content          = $input['content'];
@@ -775,6 +779,7 @@ add_action( 'wp_abilities_api_init', function () {
 	) );
 	/* 5. Leer layout YOOtheme -------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/get-yootheme-layout', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Obtener layout de YOOtheme',
 		'description'         => 'Devuelve el árbol JSON del constructor de YOOtheme de una página (section > row > column > elementos como headline, text, button, html). Es lo que realmente se muestra en el sitio.',
 		'category'            => 'spiral-mcp-content',
@@ -808,6 +813,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 6. Actualizar layout YOOtheme -------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/update-yootheme-layout', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Actualizar layout de YOOtheme',
 		'description'         => 'Reemplaza el árbol JSON completo del constructor de YOOtheme de una página. Primero lee el layout con spiral-mcp/get-yootheme-layout, modifícalo y envíalo entero; para cambios pequeños usa spiral-mcp/patch-layout. Valida el árbol con el catálogo de elementos (spiral-mcp/list-elements): los tipos desconocidos y las estructuras imposibles bloquean el guardado; los props desconocidos o fuera de sus opciones vuelven como "warnings". Si falta "version" en la raíz se añade la de YOOtheme. Guarda una revisión.',
 		'category'            => 'spiral-mcp-content',

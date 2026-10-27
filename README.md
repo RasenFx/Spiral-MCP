@@ -1,6 +1,6 @@
 # Spiral-MCP-Control
 
-Plugin de WordPress que permite a un agente de IA (por ejemplo, Claude) gestionar un sitio con **YOOtheme Pro** sin entrar al wp-admin. Registra *abilities* de la [Abilities API](https://developer.wordpress.org/) de WordPress y el plugin **MCP Adapter** las publica como herramientas MCP. Con ellas el agente puede gestionar contenido, layouts del builder, plantillas, menús, widgets, medios, estilos, SEO, ajustes, cachés y, con Polylang, idiomas y traducciones.
+Plugin de WordPress que permite a un agente de IA (por ejemplo, Claude) gestionar un sitio sin entrar al wp-admin: con cualquier tema, el contenido, los menús, los medios, el SEO, los ajustes, las cachés y los plugins; con **YOOtheme Pro**, además el builder, la configuración del tema, las plantillas y los estilos; y en un sitio con **Elementor**, las herramientas de su propio MCP pasan por los permisos y la auditoría de Spiral. Registra *abilities* de la [Abilities API](https://developer.wordpress.org/) de WordPress y el plugin **MCP Adapter** las publica como herramientas MCP. Con ellas el agente puede gestionar contenido, layouts del builder, plantillas, menús, widgets, medios, estilos, SEO, ajustes, cachés y, con Polylang, idiomas y traducciones.
 
 Cada cambio queda en un registro de auditoría y, salvo en los posts (que tienen revisiones), se guarda antes un *snapshot* para poder deshacerlo.
 
@@ -9,7 +9,8 @@ Cada cambio queda en un registro de auditoría y, salvo en los posts (que tienen
 - WordPress 6.9 o superior (Abilities API).
 - PHP 8.1 o superior.
 - Plugin [MCP Adapter](https://wordpress.org/plugins/mcp-adapter/) de wordpress.org, activo. Es una dependencia declarada (`Requires Plugins: mcp-adapter`): WordPress lo muestra en la lista de plugins ("Requiere: MCP Adapter"), ofrece instalarlo y no deja activar Spiral-MCP-Control sin él ni desactivar MCP Adapter mientras Spiral-MCP-Control esté activo. Instálalo desde *Plugins > Añadir nuevo*: WordPress reconoce la dependencia por la carpeta `mcp-adapter`, así que un ZIP de GitHub con otro nombre de carpeta no cuenta.
-- YOOtheme Pro (o un tema hijo) para todo lo relacionado con el builder y los estilos. Las abilities de contenido, menús, medios, SEO y cachés funcionan con cualquier tema.
+- Opcional: YOOtheme Pro (o un tema hijo) para el builder, la configuración del tema, las plantillas, la librería y los estilos. Sin él, esas 31 abilities no se registran (el agente no las ve y *Ajustes > Spiral-MCP* las muestra como no disponibles); el resto funciona con cualquier tema.
+- Opcional: Elementor 4.3 o superior con su MCP activado (*Elementor > Elementor MCP*). Spiral no reimplementa su builder: envuelve las herramientas `elementor/*` con sus permisos por grupo, el registro de actividad, la purga de caché y el interruptor por ability, y marca cada contenido con `builder` (`yootheme`, `elementor` o `none`).
 
 ## Instalación
 
@@ -30,6 +31,7 @@ Las abilities llevan el prefijo `spiral-mcp/`. La referencia completa de paráme
 | Contenido | listar, leer, crear y editar páginas, entradas y tipos propios; papelera; revisiones; taxonomías y términos; SEO (Yoast o salida propia) |
 | Layouts de YOOtheme | esquema de un layout, textos, nodo, `patch-layout` (operaciones JSON Patch atómicas), duplicar, catálogo de elementos y validación |
 | Tema | configuración de YOOtheme (header, logo, navbar…), footer y mega menús, widgets (también de builder), plantillas, biblioteca y [librería online de YOOtheme](https://yootheme.com) |
+| Elementor | con Elementor y su MCP activos: las herramientas `elementor/*` (páginas, composición, kit, componentes) bajo los permisos y la auditoría de Spiral; `list-content` y `get-content` indican el `builder` de cada contenido y `update-content` rechaza `content` en páginas de Elementor, porque Elementor lo ignora |
 | Medios | subir (URL, base64 o enlace de subida directa para archivos locales), listar, editar, borrar, imagen destacada, dónde se usa un medio |
 | Estilos | CSS adicional; estilo, variables LESS y estado de compilación de YOOtheme |
 | Verificación | URL de vista previa sin sesión, inspección de una página (encabezados, enlaces rotos, alt, SEO efectivo) |
@@ -56,7 +58,7 @@ Las abilities llevan el prefijo `spiral-mcp/`. La referencia completa de paráme
 | `spiral_mcp_shop` | tienda de WooCommerce: catálogo, cupones, ajustes, envíos e impuestos | sí |
 | `spiral_mcp_orders` | pedidos y clientes de WooCommerce (datos personales, reembolsos) | **no** |
 
-Las capacidades del rol del agente se pueden cambiar en **Ajustes > Spiral-MCP > Permisos del agente**, y la elección se mantiene al actualizar el plugin. En la pestaña **Abilities** de esa página se activa o desactiva cada herramienta o una categoría entera (con atajos "Solo lectura" y "Desactivar las destructivas"). Una ability desactivada no se publica en el MCP: el agente ni la ve. La pestaña **Comportamiento** decide si se purga la caché tras cada cambio, cuántos días se conservan el registro y los snapshots, si el agente puede descargar diseños de la librería online de YOOtheme y si al desinstalar se borran las tablas. La pestaña **Actividad** muestra los cambios del agente y permite restaurar cada uno desde wp-admin.
+Las capacidades del rol del agente se pueden cambiar en **Ajustes > Spiral-MCP > Permisos del agente**, y la elección se mantiene al actualizar el plugin. En la pestaña **Abilities** de esa página se activa o desactiva cada herramienta o una categoría entera (con atajos "Solo lectura" y "Desactivar las destructivas"). Una ability desactivada no se publica en el MCP: el agente ni la ve. Las de YOOtheme aparecen como no disponibles cuando el tema no está activo, y las de Elementor se gestionan en la misma pestaña (desactivada = oculta al MCP y 403). La pestaña **Comportamiento** decide si se purga la caché tras cada cambio, cuántos días se conservan el registro y los snapshots, si el agente puede descargar diseños de la librería online de YOOtheme y si al desinstalar se borran las tablas. La pestaña **Actividad** muestra los cambios del agente y permite restaurar cada uno desde wp-admin.
 
 Además, cada ability comprueba la capacidad nativa de WordPress del objeto (`edit_post` de ese post, `edit_theme_options`…). El rol del agente nunca recibe las capacidades nativas de administración (`manage_options`, las de plugins, temas, usuarios y actualizaciones del núcleo, `edit_files`…), ni siquiera con un filtro: las abilities de plugins usan las APIs de WordPress con su propia comprobación. Las acciones destructivas exigen `"confirm": true`.
 

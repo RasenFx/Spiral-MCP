@@ -140,7 +140,8 @@ check 'create-content (borrador)' 200 id
 PAGE_ID=$(jget id)
 
 call GET spiral-mcp/get-content "{\"id\":$PAGE_ID}"
-check 'get-content' 200 content has_yootheme
+check 'get-content' 200 content has_yootheme builder
+eq 'get-content: builder = none en una página nueva' builder none
 
 call POST spiral-mcp/update-content "{\"id\":$PAGE_ID,\"title\":\"Smoke test Spiral-MCP (editada)\"}"
 check 'update-content' 200

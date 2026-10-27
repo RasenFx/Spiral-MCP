@@ -544,6 +544,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 1. Leer layout del footer ------------------------------------------ */
 	spiral_mcp_register_ability( 'spiral-mcp/get-theme-layout', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Obtener layout de un área del tema (YOOtheme)',
 		'description'         => 'Devuelve el árbol JSON del builder de un área del tema: el footer (raíz "layout", como una página), el mega menú de un elemento de menú o un widget de builder (raíz "fragment": filas > columnas > elementos, sin secciones). Incluye "settings" (los demás ajustes del área) y "areas": todas las áreas con builder del sitio. En YOOtheme el header, la navbar, top y bottom no tienen layout propio en la configuración: su contenido de builder son widgets de builder en esas posiciones; sus ajustes (disposición, logo, sticky…) se cambian con spiral-mcp/update-theme-config. Para editar por partes usa spiral-mcp/get-layout-outline y spiral-mcp/patch-layout con "area".',
 		'category'            => 'spiral-mcp-theme',
@@ -571,6 +572,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 2. Actualizar layout del footer ------------------------------------ */
 	spiral_mcp_register_ability( 'spiral-mcp/update-theme-layout', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Actualizar layout de un área del tema (YOOtheme)',
 		'description'         => 'Reemplaza el árbol JSON completo del builder de un área del tema ("footer", "menu_item:<ID>" o "widget:<ID>"; ver spiral-mcp/get-theme-layout). La raíz debe ser "layout" en el footer y "fragment" en mega menús y widgets. Para cambios pequeños usa spiral-mcp/patch-layout. Valida el árbol con el catálogo de elementos: los errores bloquean el guardado y los avisos vuelven en "warnings". Antes guarda un snapshot ("snapshot_id"; se deshace con spiral-mcp/restore-snapshot).',
 		'category'            => 'spiral-mcp-theme',
@@ -611,6 +613,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 3. Listar copias de la configuración ------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/list-theme-backups', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Listar copias de la configuración del tema',
 		'description'         => 'OBSOLETA: usa spiral-mcp/list-snapshots con kind "theme_config". Se eliminará en la próxima versión. Lista las copias de la configuración de YOOtheme guardadas antes de cada cambio (las últimas 50); "id" es el ID del snapshot.',
 		'category'            => 'spiral-mcp-theme',
@@ -635,6 +638,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 4. Restaurar copia -------------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/restore-theme-backup', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Restaurar copia de la configuración del tema',
 		'description'         => 'OBSOLETA: usa spiral-mcp/restore-snapshot. Se eliminará en la próxima versión. Restaura TODA la configuración de YOOtheme a una copia anterior (acepta el ID de snapshot o un ID de copia de la 1.3.0). Antes guarda un snapshot del estado actual. Requiere "confirm": true.',
 		'category'            => 'spiral-mcp-theme',

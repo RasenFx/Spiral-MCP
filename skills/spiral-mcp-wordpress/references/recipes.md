@@ -33,6 +33,8 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 - [Idiomas: traducir una página o entrada](#idiomas-traducir-una-página-o-entrada)
 - [Idiomas: menús, selector de idioma, header y footer](#idiomas-menús-selector-de-idioma-header-y-footer)
 - [Idiomas: nombre del sitio y otros textos sueltos](#idiomas-nombre-del-sitio-y-otros-textos-sueltos)
+- [Elementor: crear una página](#elementor-crear-una-página)
+- [Elementor: cambiar textos o secciones de una página](#elementor-cambiar-textos-o-secciones-de-una-página)
 - [Deshacer un cambio](#deshacer-un-cambio)
 
 ## Crear una página nueva a partir de otra
@@ -358,6 +360,25 @@ Para enlazar dos contenidos que ya existen como traducciones (o desenlazarlos), 
 1. `list-string-translations {"language": "en", "untranslated": true}`: textos sin traducir (nombre y descripción del sitio, formatos de fecha, títulos de widgets visibles en todos los idiomas, textos de otros plugins).
 2. `update-string-translations {"language": "en", "strings": [{"original": "Mi Empresa", "translation": "My Company"}]}`. El `original` tiene que ser exacto; `""` borra la traducción.
 3. El original (idioma por defecto) se cambia donde siempre (`update-site-settings`, `update-widget`): al cambiarlo, su traducción se pierde y hay que volver a hacerla.
+
+## Elementor: crear una página
+
+Solo en sitios con Elementor (hay herramientas `elementor/*` y no hay `list-elements`). El diseño lo hace el MCP de Elementor; Spiral aporta lo demás (ver «Sitios con Elementor» en `SKILL.md`).
+
+1. `elementor/create-page {"title": "Servicios", "post_type": "page"}`: borrador marcado para Elementor (devuelve `id`). No uses `create-content` para esto: la página no sería de Elementor.
+2. Lee `elementor/style-best-practices` y, para los tipos y props, `elementor/list-widget-schemas` / `elementor/get-widget-schema`. Comprueba los destinos de los enlaces con `list-content` y sube las imágenes con `upload-media` (`elementor/list-assets` las lista por `id`).
+3. `elementor/build-composition {"post_id": <id>, "xml_structure": "…", "dry_run": true}` para validar; repite sin `dry_run` para guardar. La descripción de la herramienta trae el formato.
+4. Revisa: `elementor/create-preview-link {"post_id": <id>}` (o `get-preview-url`) e `inspect-page {"id": <id>}`.
+5. SEO, slug, página madre e imagen destacada: `update-seo` y `update-content` (sin `content`).
+6. Publica con `elementor/publish-document {"post_id": <id>}`. Para deshacer, `restore-revision` (Elementor guarda sus datos en las revisiones de WordPress) o `trash-content`.
+
+## Elementor: cambiar textos o secciones de una página
+
+1. `list-content {"search": "…"}` y confirma `"builder": "elementor"`.
+2. `elementor/get-page-structure {"post_id": <id>, "include_content": true}`: árbol con el `id` de cada elemento y su contenido.
+3. Cambios puntuales: `elementor/manage-elements {"post_id": <id>, "operations": [...]}` (varias operaciones en una llamada). Secciones nuevas: `elementor/build-composition` con `parent_id`.
+4. En una página publicada los cambios quedan como borrador de Elementor: compruébalos con `elementor/create-preview-link` y publícalos con `elementor/publish-document`.
+5. Si la página tiene widgets clásicos (no atómicos), Elementor no los edita desde el MCP: díselo al usuario para que los cambie en su editor.
 
 ## Deshacer un cambio
 

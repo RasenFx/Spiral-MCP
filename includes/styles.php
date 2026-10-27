@@ -374,6 +374,7 @@ add_action( 'wp_abilities_api_init', function () {
 	);
 
 	spiral_mcp_register_ability( 'spiral-mcp/get-theme-style', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Leer el estilo de YOOtheme',
 		'description'         => 'Devuelve el estilo de YOOtheme: "style" (estilo base y variación, p. ej. "fuse" o "fuse:dark-yellow"), "less" (las variables LESS cambiadas respecto al estilo, p. ej. {"@global-primary-background": "#1e87f0"}), "custom_less" (LESS propio que se añade al final), la lista de estilos disponibles con sus variaciones y el estado de compilación. Para ver todas las variables con su valor por defecto usa spiral-mcp/list-style-variables.',
 		'category'            => 'spiral-mcp-styles',
@@ -409,6 +410,7 @@ add_action( 'wp_abilities_api_init', function () {
 	) );
 
 	spiral_mcp_register_ability( 'spiral-mcp/list-style-variables', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Listar variables de estilo',
 		'description'         => 'Lista las variables LESS del estilo activo de YOOtheme, agrupadas como en el Personalizador (component: global, base, button, navbar…; group: primary, typography, colors…). Para cada una: valor por defecto (expresión LESS sin evaluar, p. ej. "darken(@global-primary-background, 5%)" o "#1e87f0"), valor actual, tipo de campo (color, font, select-custom con sus opciones, boxshadow, text) y si está modificada. Para la paleta de marca empieza por component "global": los colores están en los grupos "colors" y "backgrounds" (el color principal es @global-primary-background); los grupos "primary" y "secondary" son las fuentes primaria y secundaria, no colores. Filtra para no recibir cientos de variables.',
 		'category'            => 'spiral-mcp-styles',
@@ -480,6 +482,7 @@ add_action( 'wp_abilities_api_init', function () {
 	) );
 
 	spiral_mcp_register_ability( 'spiral-mcp/update-theme-style', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Cambiar el estilo de YOOtheme',
 		'description'         => 'Cambia el estilo de YOOtheme: "style" (estilo base o "estilo:variación", ver spiral-mcp/get-theme-style), "less" (variables a cambiar, merge, p. ej. {"@global-primary-background": "#e63946", "@global-font-family": "\'Roboto\'"}; null devuelve una variable a su valor por defecto; las fuentes de Google van entre comillas simples y YOOtheme las descarga sola) y/o "custom_less" (reemplaza el LESS propio). IMPORTANTE: el CSS NO cambia hasta recompilar. La respuesta trae needs_recompile, recompile_url e instrucciones: abre esa URL en un navegador con sesión iniciada y espera a que spiral-mcp/get-style-status diga needs_recompile=false. Para un retoque que se vea al instante usa spiral-mcp/update-custom-css. Antes guarda un snapshot de la configuración ("snapshot_id").',
 		'category'            => 'spiral-mcp-styles',
@@ -577,6 +580,7 @@ add_action( 'wp_abilities_api_init', function () {
 	) );
 
 	spiral_mcp_register_ability( 'spiral-mcp/get-style-status', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Estado de compilación del estilo',
 		'description'         => 'Indica si hay cambios de estilo de YOOtheme pendientes de compilar (needs_recompile, desde cuándo), la versión y fecha del CSS compilado actual y la URL de recompilación con instrucciones. Cuando el CSS se ha recompilado después del último cambio, needs_recompile pasa a false sola.',
 		'category'            => 'spiral-mcp-styles',
@@ -590,6 +594,7 @@ add_action( 'wp_abilities_api_init', function () {
 	) );
 
 	spiral_mcp_register_ability( 'spiral-mcp/mark-style-compiled', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Marcar el estilo como compilado',
 		'description'         => 'Quita la marca de cambios de estilo pendientes. Normalmente no hace falta: spiral-mcp/get-style-status la quita sola al detectar el CSS nuevo. Úsala solo si se recompiló por otra vía. Si el CSS no es posterior al último cambio, exige "force": true (el sitio seguiría mostrando el estilo anterior).',
 		'category'            => 'spiral-mcp-styles',

@@ -417,11 +417,31 @@ Que el agente lleve un sitio multilingüe: idiomas, traducciones de páginas (co
 
 ---
 
+## Fase 13 — Modo Elementor (Spiral sin YOOtheme)
+
+Que Spiral tenga sentido en un sitio sin YOOtheme, en especial con Elementor (lo habitual es tener uno u otro): aporta el rol del agente, los permisos por grupos, la auditoría, los snapshots, la gestión del sitio y las integraciones, y deja el builder a Elementor y su propio MCP (4.3+, opción `elementor_mcp_enabled`).
+
+**Decisiones:**
+- **No reimplementar el builder de Elementor.** Su MCP ya registra 27 abilities `elementor/*` en la Abilities API (solo elementos V4 atómicos; escribe con `Document::save()` y revisiones de WordPress) y el MCP Adapter las publica en el mismo servidor. Spiral las envuelve con el filtro del core `wp_register_ability_args` (`includes/elementor.php`): capacidad `spiral_mcp_<grupo>` antes del permiso de Elementor, `spiral_mcp_log_run()` y purga de caché en las escrituras, código HTTP en los errores y entrada en el catálogo de Ajustes > Spiral-MCP (una desactivada se oculta al MCP y responde 403).
+- **Registrar solo lo que el sitio puede usar:** `'requires' => 'yootheme'` en las 31 abilities de YOOtheme; sin el tema no se registran. Antes aparecían en el catálogo del agente y fallaban con `spiral_mcp_no_yootheme` / `spiral_mcp_no_config` / `spiral_mcp_no_layout`, `get-style-status` inventaba una ruta y `update-yootheme-layout` guardaba un layout inerte. El catálogo las marca `available => false` y la página de ajustes las lista como no disponibles sin cambiar su estado.
+- **`builder`** (`yootheme`, `elementor`, `none`) en `list-content` y `get-content`; `update-content` rechaza `content` en páginas de Elementor (`spiral_mcp_elementor_content`), porque Elementor ignora `post_content`.
+- **Skill con dos ramas:** con YOOtheme, lo de siempre; con Elementor, la sección «Sitios con Elementor» y las recetas `elementor/create-page` → `build-composition` → `create-preview-link` → `publish-document`.
+
+- [x] `spiral_mcp_yootheme_active()`, `spiral_mcp_requirements()`, `'requires'` en el wrapper y en las 31 abilities; página de ajustes con las no disponibles.
+- [x] `includes/elementor.php`: detección (`spiral_mcp_elementor_built()`, `spiral_mcp_builder_of()`) y envoltorio de `elementor/*` con grupos content / design / media.
+- [x] `builder` en contenido, rechazo de `content` en páginas de Elementor, `duplicate-content` sin `_elementor_css`.
+- [x] Skill (sección, dos recetas, errores), README, CLAUDE.md, CHANGELOG.
+- [ ] Flujo completo desde un cliente MCP con el MCP de Elementor activado (crear, componer, previsualizar, publicar) con el rol del agente, y prueba de humo propia.
+
+**Resultado 13** (Elementor 4.3.5 en local; simulación de Twenty Twenty-Five como tema activo con `pre_option_template`): Spiral registra 74 abilities (105 con YOOtheme) y las 31 de YOOtheme quedan como no disponibles; `get-content` de la página 201 devuelve `builder: elementor` (102: `yootheme`, 51: `none`); `update-content` con `content` responde 400 `spiral_mcp_elementor_content` y con `menu_order` funciona; `elementor/get-page-structure` responde al rol del agente y `ability_invalid_permissions` a un suscriptor; `elementor/create-page` deja en la auditoría `elementor/create-page · post 203 · ok` y `list-widget-schemas` (lectura) no deja fila.
+
+---
+
 ## Fuera de alcance en esta etapa
 - Instalar, activar o actualizar temas. Los plugins se tratan en la Fase 8.
 - WooCommerce: configurar pasarelas de pago, crear o editar pedidos a mano (líneas e importes), editar clientes, informes y analítica, suscripciones y extensiones de pago.
 - Usuarios y roles más allá del rol `spiral_mcp_agent`.
-- Temas distintos de YOOtheme: las abilities de contenido, menús, medios y SEO deben funcionar con cualquier tema; las de diseño pueden exigir YOOtheme y devolver un error claro si no está activo.
+- Reimplementar el builder de Elementor en Spiral (Fase 13: se usa su MCP). Otros builders (Divi, Bricks, Gutenberg avanzado): solo con las abilities de contenido; las de diseño de YOOtheme no se registran sin el tema.
 
 ## Preguntas abiertas
 - ¿Spiral-MCP será solo para sitios propios, también para clientes o un producto de RasenFx? Afecta a la licencia (hoy GPL-2.0-or-later), a la actualización automática y al nivel de endurecimiento de la Fase 0.

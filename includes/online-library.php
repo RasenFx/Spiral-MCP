@@ -264,6 +264,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 1. Catálogo --------------------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/list-online-library', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Listar la librería online de YOOtheme',
 		'description'         => 'Lista los diseños prediseñados de la librería online de YOOtheme (los mismos que ofrece el Personalizador). "kind": "layout" (por defecto) trae diseños completos agrupados en "group": template (plantillas: Post, Index, Search, Error 404…), layout (páginas: Home, Services, About, Contact…), footer, dropdown (mega menús), search y dialog; "kind": "element" trae elementos sueltos (accordion, button, grid, slideshow…). Cada diseño pertenece a una web de ejemplo ("website", con el mismo nombre que los estilos: Circle, Fuse…): los del estilo activo del sitio encajan mejor. Filtra por group, type, website o search; "facets" da los valores posibles. En las plantillas, "template_type" es el tipo de plantilla del sitio que le corresponde (null = sin equivalencia clara). "preview" es una imagen de muestra. Después: spiral-mcp/get-online-library-item para ver su estructura y spiral-mcp/import-from-online-library para traerlo. No necesita la clave de API ("has_api_key" dice si la descarga será posible).',
 		'category'            => 'spiral-mcp-theme',
@@ -323,6 +324,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 2. Ver un diseño ---------------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/get-online-library-item', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Ver un diseño de la librería online',
 		'description'         => 'Descarga un diseño de la librería online de YOOtheme (con la clave de API del sitio, que no se muestra) y devuelve su estructura sin importarlo: el esquema de nodos (como spiral-mcp/get-layout-outline), cuántas imágenes trae, cuántos nodos tienen fuente dinámica y, en plantillas, el tipo de plantilla del sitio que le corresponde. Ojo: muchos diseños de la librería son contenido de muestra fijo (textos e imágenes de la web de ejemplo, sin fuentes dinámicas): tras importarlos hay que adaptarlos. "include_tree": true devuelve también el árbol completo.',
 		'category'            => 'spiral-mcp-theme',
@@ -363,6 +365,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	/* 3. Importar --------------------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/import-from-online-library', array(
+		'requires'            => 'yootheme',
 		'label'               => 'Importar de la librería online',
 		'description'         => 'Importa un diseño de la librería online de YOOtheme (ver spiral-mcp/list-online-library) con la clave de API del sitio. Descarga sus imágenes a la biblioteca de medios (como el Personalizador) y cambia sus URLs por rutas del sitio. "target": "template" crea una plantilla (solo diseños kind layout; "template_type" por defecto es el que corresponde al diseño; "status" por defecto "disabled", para revisarla antes de activarla con spiral-mcp/update-template); "library" lo guarda en la biblioteca del sitio (para spiral-mcp/insert-from-library); "insert" lo inserta en un layout ("id" de página o "area", y "path" como en spiral-mcp/insert-from-library: secciones en la raíz de una página, un elemento dentro de los children de una columna). Muchos diseños son contenido de muestra fijo: después cambia textos, enlaces e imágenes y, en plantillas, añade fuentes dinámicas (p. ej. posts.singlePost) para que muestren el contenido real.',
 		'category'            => 'spiral-mcp-theme',
