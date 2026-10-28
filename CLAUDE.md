@@ -11,7 +11,7 @@ El plan de trabajo está en [`docs/ROADMAP.md`](docs/ROADMAP.md). Léelo antes d
 - Opcional: Elementor 4.3+ con su MCP activado (opción `elementor_mcp_enabled`, wp-admin > Elementor > Elementor MCP): sus abilities `elementor/*` pasan por los permisos, la auditoría y el catálogo de Spiral.
 - PHP 8.1 como mínimo (lo exige la librería cliente de SPUpdater). El archivo principal no debe usar sintaxis posterior a PHP 7.4: tiene que poder interpretarse para mostrar el aviso de requisitos.
 
-## Estructura actual (v1.32.0)
+## Estructura actual (v1.32.1)
 ```
 spiral-mcp-control.php   cabecera, constantes, comprobación de requisitos, require_once y hooks de activación
 uninstall.php            borra el rol y las capacidades (las tablas solo con el filtro spiral_mcp_uninstall_drop_tables)

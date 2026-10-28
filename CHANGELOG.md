@@ -2,6 +2,11 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.32.1] — 2026-10-28 · Props de parallax en el catálogo de elementos
+
+### Corregido
+- El validador de layouts avisaba de «prop desconocido» con los props de parallax de YOOtheme (`image_parallax_bgy`, `image_parallax_easing`, `background_parallax_*`, `media_overlay_parallax_*` en secciones y columnas; `parallax_x`, `parallax_easing`… en los elementos con `animation` = `parallax`) aunque el efecto funcionaba. Esos campos viven en los paneles compartidos del builder (`packages/builder/config/customizer.php`), que YOOtheme solo carga en el Personalizador y no vienen en `Builder::getTypes()`. El catálogo los lee ahora con `Config::loadFile()` y los añade a cada tipo que abre el panel con un botón «Edit Parallax», así que `get-element-schema` también los documenta.
+
 ## [1.32.0] — 2026-10-27 · Modo Elementor: Spiral sin YOOtheme
 
 ### Añadido

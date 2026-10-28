@@ -109,6 +109,44 @@ function spiral_mcp_collect_fields( $fields, array &$out, array &$child_props ) 
 }
 
 /**
+ * Paneles compartidos del builder (packages/builder/config/customizer.php):
+ * nombre => props. Los abre un campo "button-panel" de un elemento ("Edit
+ * Parallax") y sus campos no están en el tipo: builder-parallax (parallax_x,
+ * parallax_easing…), background-parallax, image-parallax (image_parallax_bgy,
+ * image_parallax_easing…) y media-overlay-parallax. YOOtheme solo los carga
+ * en el Personalizador (evento customizer.init), así que se leen del archivo
+ * con Config::loadFile(), que resuelve sus @import sin tocar la configuración.
+ */
+function spiral_mcp_builder_panels() {
+	static $panels = null;
+	if ( null !== $panels ) {
+		return $panels;
+	}
+	$panels = array();
+	if ( ! function_exists( 'YOOtheme\app' ) || ! interface_exists( 'YOOtheme\Config' ) || ! class_exists( 'YOOtheme\Builder' ) ) {
+		return $panels;
+	}
+	try {
+		$file = dirname( ( new ReflectionClass( 'YOOtheme\Builder' ) )->getFileName(), 2 ) . '/config/customizer.php';
+		if ( ! is_readable( $file ) ) {
+			return $panels;
+		}
+		$config = \YOOtheme\app( \YOOtheme\Config::class )->loadFile( $file );
+	} catch ( Throwable $e ) {
+		return $panels;
+	}
+	foreach ( (array) ( $config['panels'] ?? array() ) as $name => $panel ) {
+		$fields      = array();
+		$child_props = array();
+		spiral_mcp_collect_fields( $panel['fields'] ?? array(), $fields, $child_props );
+		if ( $fields ) {
+			$panels[ $name ] = $fields;
+		}
+	}
+	return $panels;
+}
+
+/**
  * Catálogo de tipos: name => [ title, group, element, container, fragment,
  * item, fields, child_props, defaults ]. null si YOOtheme no está activo.
  */
@@ -122,14 +160,21 @@ function spiral_mcp_element_types() {
 		$types = array();
 		return null;
 	}
-	$raw   = json_decode( wp_json_encode( $builder->getTypes() ), true );
-	$types = array();
+	$raw    = json_decode( wp_json_encode( $builder->getTypes() ), true );
+	$shared = spiral_mcp_builder_panels();
+	$types  = array();
 	foreach ( (array) $raw as $name => $def ) {
 		$fields      = array();
 		$child_props = array();
 		spiral_mcp_collect_fields( $def['fields'] ?? array(), $fields, $child_props );
 		foreach ( (array) ( $def['panels'] ?? array() ) as $panel ) {
 			spiral_mcp_collect_fields( $panel['fields'] ?? array(), $fields, $child_props );
+		}
+		// Props de los paneles compartidos que abre el elemento (parallax).
+		foreach ( $fields as $field ) {
+			if ( 'button-panel' === ( $field['type'] ?? '' ) && isset( $shared[ $field['panel'] ?? '' ] ) ) {
+				$fields += $shared[ $field['panel'] ];
+			}
 		}
 		$item = null;
 		foreach ( $fields as $field ) {
@@ -445,7 +490,7 @@ add_action( 'wp_abilities_api_init', function () {
 	spiral_mcp_register_ability( 'spiral-mcp/get-element-schema', array(
 		'requires'            => 'yootheme',
 		'label'               => 'Esquema de un elemento',
-		'description'         => 'Devuelve los props que admite un tipo de elemento de YOOtheme: para cada uno, su tipo de campo (text si no se indica, select, checkbox, number, editor, image, link, color…), etiqueta, opciones permitidas (en los select) y si admite contenido dinámico ("source"). Incluye los valores por defecto del tipo y, en filas, los props que se ponen en las columnas hijas (width_default, width_small, width_medium…). En una fila con varias columnas pon "layout" (una de sus opciones, p. ej. "1-3,1-3,1-3") y los width_* coherentes en cada columna: sin "layout" la fila apila las columnas a ancho completo hasta que un width_* lo cambie. Omite los controles internos del editor (botones de panel y selectores de fuente dinámica). Los props de imagen llevan rutas relativas como wp-content/uploads/2024/11/logo.webp y los enlaces, rutas relativas como /contacto/.',
+		'description'         => 'Devuelve los props que admite un tipo de elemento de YOOtheme: para cada uno, su tipo de campo (text si no se indica, select, checkbox, number, editor, image, link, color…), etiqueta, opciones permitidas (en los select) y si admite contenido dinámico ("source"). Incluye los valores por defecto del tipo y, en filas, los props que se ponen en las columnas hijas (width_default, width_small, width_medium…). En una fila con varias columnas pon "layout" (una de sus opciones, p. ej. "1-3,1-3,1-3") y los width_* coherentes en cada columna: sin "layout" la fila apila las columnas a ancho completo hasta que un width_* lo cambie. Incluye los props de los paneles de parallax que abre el elemento (parallax_x, parallax_easing…; en secciones y columnas, image_parallax_bgy, image_parallax_easing, background_parallax_*, media_overlay_parallax_*; los parallax-stops son listas como "0,200"). Omite los controles internos del editor (botones de panel y selectores de fuente dinámica). Los props de imagen llevan rutas relativas como wp-content/uploads/2024/11/logo.webp y los enlaces, rutas relativas como /contacto/.',
 		'category'            => 'spiral-mcp-layout',
 		'group'               => array( 'content', 'design' ),
 		'input_schema'        => array(
@@ -471,7 +516,7 @@ add_action( 'wp_abilities_api_init', function () {
 				foreach ( $fields as $prop => $f ) {
 					$row = array(
 						'type'  => $f['type'] ?? 'text',
-						'label' => $f['label'] ?? '',
+						'label' => $f['label'] ?? ( $f['text'] ?? '' ),
 					);
 					// Controles del editor que no son props (botones de panel, selectores de fuente dinámica).
 					if ( '_' === substr( (string) $prop, 0, 1 ) || in_array( $row['type'], array( 'button-panel', 'hidden' ), true ) || 0 === strpos( $row['type'], 'source-' ) ) {
