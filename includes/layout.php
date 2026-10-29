@@ -33,15 +33,18 @@ function spiral_mcp_is_list( $value ) {
 	return is_array( $value ) && ( array() === $value || array_keys( $value ) === range( 0, count( $value ) - 1 ) );
 }
 
-/** Valor en una ruta, o WP_Error si no existe. */
-function spiral_mcp_pointer_get( $doc, $path ) {
+/**
+ * Valor en una ruta, o WP_Error si no existe. $hint: ability que da las rutas del documento
+ * (los helpers de puntero sirven para los layouts de YOOtheme y los árboles de Elementor).
+ */
+function spiral_mcp_pointer_get( $doc, $path, $hint = 'spiral-mcp/get-layout-outline' ) {
 	$tokens = spiral_mcp_pointer_parse( $path );
 	if ( is_wp_error( $tokens ) ) {
 		return $tokens;
 	}
 	foreach ( $tokens as $t ) {
 		if ( ! is_array( $doc ) || ! array_key_exists( $t, $doc ) ) {
-			return new WP_Error( 'spiral_mcp_path_not_found', sprintf( 'La ruta "%s" no existe en el layout. Consulta las rutas con spiral-mcp/get-layout-outline.', $path ) );
+			return new WP_Error( 'spiral_mcp_path_not_found', sprintf( 'La ruta "%s" no existe en el documento. Consulta las rutas con %s.', $path, $hint ) );
 		}
 		$doc = $doc[ $t ];
 	}
@@ -52,19 +55,19 @@ function spiral_mcp_pointer_get( $doc, $path ) {
  * Aplica una función al contenedor padre de una ruta. $fn( &$parent, $key )
  * devuelve true o WP_Error.
  */
-function spiral_mcp_pointer_parent( &$doc, $path, callable $fn ) {
+function spiral_mcp_pointer_parent( &$doc, $path, callable $fn, $hint = 'spiral-mcp/get-layout-outline' ) {
 	$tokens = spiral_mcp_pointer_parse( $path );
 	if ( is_wp_error( $tokens ) ) {
 		return $tokens;
 	}
 	if ( ! $tokens ) {
-		return new WP_Error( 'spiral_mcp_bad_path', 'No se puede operar sobre la raíz del layout; usa una ruta como /children/0.' );
+		return new WP_Error( 'spiral_mcp_bad_path', 'No se puede operar sobre la raíz del documento; usa una ruta como /children/0 (YOOtheme) o /0 (Elementor).' );
 	}
 	$key = array_pop( $tokens );
 	$ref = &$doc;
 	foreach ( $tokens as $t ) {
 		if ( ! is_array( $ref ) || ! array_key_exists( $t, $ref ) ) {
-			return new WP_Error( 'spiral_mcp_path_not_found', sprintf( 'La ruta "%s" no existe en el layout. Consulta las rutas con spiral-mcp/get-layout-outline.', $path ) );
+			return new WP_Error( 'spiral_mcp_path_not_found', sprintf( 'La ruta "%s" no existe en el documento. Consulta las rutas con %s.', $path, $hint ) );
 		}
 		$ref = &$ref[ $t ];
 	}
@@ -74,7 +77,7 @@ function spiral_mcp_pointer_parent( &$doc, $path, callable $fn ) {
 	return $fn( $ref, $key );
 }
 
-function spiral_mcp_pointer_add( &$doc, $path, $value ) {
+function spiral_mcp_pointer_add( &$doc, $path, $value, $hint = 'spiral-mcp/get-layout-outline' ) {
 	return spiral_mcp_pointer_parent( $doc, $path, function ( &$parent, $key ) use ( $value, $path ) {
 		if ( spiral_mcp_is_list( $parent ) && ( '-' === $key || ctype_digit( (string) $key ) ) ) {
 			$index = '-' === $key ? count( $parent ) : (int) $key;
@@ -86,13 +89,13 @@ function spiral_mcp_pointer_add( &$doc, $path, $value ) {
 			$parent[ $key ] = $value;
 		}
 		return true;
-	} );
+	}, $hint );
 }
 
-function spiral_mcp_pointer_remove( &$doc, $path ) {
+function spiral_mcp_pointer_remove( &$doc, $path, $hint = 'spiral-mcp/get-layout-outline' ) {
 	return spiral_mcp_pointer_parent( $doc, $path, function ( &$parent, $key ) use ( $path ) {
 		if ( ! array_key_exists( $key, $parent ) ) {
-			return new WP_Error( 'spiral_mcp_path_not_found', sprintf( 'La ruta "%s" no existe en el layout.', $path ) );
+			return new WP_Error( 'spiral_mcp_path_not_found', sprintf( 'La ruta "%s" no existe en el documento.', $path ) );
 		}
 		if ( spiral_mcp_is_list( $parent ) ) {
 			array_splice( $parent, (int) $key, 1 );
@@ -100,69 +103,66 @@ function spiral_mcp_pointer_remove( &$doc, $path ) {
 			unset( $parent[ $key ] );
 		}
 		return true;
-	} );
+	}, $hint );
 }
 
-function spiral_mcp_pointer_replace( &$doc, $path, $value ) {
+function spiral_mcp_pointer_replace( &$doc, $path, $value, $hint = 'spiral-mcp/get-layout-outline' ) {
 	return spiral_mcp_pointer_parent( $doc, $path, function ( &$parent, $key ) use ( $value, $path ) {
 		if ( ! array_key_exists( $key, $parent ) ) {
 			return new WP_Error( 'spiral_mcp_path_not_found', sprintf( 'La ruta "%s" no existe; para crearla usa "add".', $path ) );
 		}
 		$parent[ $key ] = $value;
 		return true;
-	} );
+	}, $hint );
+}
+
+/** Una operación JSON Patch (add, remove, replace, move, copy, test) sobre el documento. true o WP_Error. */
+function spiral_mcp_pointer_apply_op( array &$doc, array $op, $hint = 'spiral-mcp/get-layout-outline' ) {
+	$name = (string) ( $op['op'] ?? '' );
+	$path = (string) ( $op['path'] ?? '' );
+	$from = (string) ( $op['from'] ?? '' );
+	switch ( $name ) {
+		case 'add':
+		case 'replace':
+			if ( ! array_key_exists( 'value', $op ) ) {
+				return new WP_Error( 'spiral_mcp_bad_patch', '"' . $name . '" necesita "value".' );
+			}
+			return 'add' === $name ? spiral_mcp_pointer_add( $doc, $path, $op['value'], $hint ) : spiral_mcp_pointer_replace( $doc, $path, $op['value'], $hint );
+		case 'remove':
+			return spiral_mcp_pointer_remove( $doc, $path, $hint );
+		case 'move':
+		case 'copy':
+			$value = spiral_mcp_pointer_get( $doc, $from, $hint );
+			if ( is_wp_error( $value ) ) {
+				return $value;
+			}
+			if ( 'move' === $name ) {
+				if ( 0 === strpos( $path . '/', $from . '/' ) ) {
+					return new WP_Error( 'spiral_mcp_bad_patch', 'No se puede mover un nodo dentro de sí mismo.' );
+				}
+				$res = spiral_mcp_pointer_remove( $doc, $from, $hint );
+				if ( is_wp_error( $res ) ) {
+					return $res;
+				}
+			}
+			return spiral_mcp_pointer_add( $doc, $path, $value, $hint );
+		case 'test':
+			$value = spiral_mcp_pointer_get( $doc, $path, $hint );
+			return is_wp_error( $value ) ? $value : ( $value == ( $op['value'] ?? null ) ? true : new WP_Error( 'spiral_mcp_test_failed', sprintf( 'El valor de "%s" no coincide: el documento cambió desde que lo leíste.', $path ) ) ); // phpcs:ignore Universal.Operators.StrictComparisons.LooseEqual
+	}
+	return new WP_Error( 'spiral_mcp_bad_patch', sprintf( 'Operación "%s" no válida. Usa add, remove, replace, move, copy o test.', $name ) );
 }
 
 /**
  * Aplica operaciones JSON Patch a una copia del documento. Si alguna falla,
  * devuelve WP_Error (indicando cuál) y el documento original no cambia.
  */
-function spiral_mcp_layout_apply_patch( array $doc, array $ops ) {
+function spiral_mcp_layout_apply_patch( array $doc, array $ops, $hint = 'spiral-mcp/get-layout-outline' ) {
 	foreach ( array_values( $ops ) as $i => $op ) {
-		$op   = (array) $op;
-		$name = (string) ( $op['op'] ?? '' );
-		$path = (string) ( $op['path'] ?? '' );
-		$from = (string) ( $op['from'] ?? '' );
-		switch ( $name ) {
-			case 'add':
-			case 'replace':
-				if ( ! array_key_exists( 'value', $op ) ) {
-					$res = new WP_Error( 'spiral_mcp_bad_patch', '"' . $name . '" necesita "value".' );
-					break;
-				}
-				$res = 'add' === $name ? spiral_mcp_pointer_add( $doc, $path, $op['value'] ) : spiral_mcp_pointer_replace( $doc, $path, $op['value'] );
-				break;
-			case 'remove':
-				$res = spiral_mcp_pointer_remove( $doc, $path );
-				break;
-			case 'move':
-			case 'copy':
-				$value = spiral_mcp_pointer_get( $doc, $from );
-				if ( is_wp_error( $value ) ) {
-					$res = $value;
-					break;
-				}
-				if ( 'move' === $name ) {
-					if ( 0 === strpos( $path . '/', $from . '/' ) ) {
-						$res = new WP_Error( 'spiral_mcp_bad_patch', 'No se puede mover un nodo dentro de sí mismo.' );
-						break;
-					}
-					$res = spiral_mcp_pointer_remove( $doc, $from );
-					if ( is_wp_error( $res ) ) {
-						break;
-					}
-				}
-				$res = spiral_mcp_pointer_add( $doc, $path, $value );
-				break;
-			case 'test':
-				$value = spiral_mcp_pointer_get( $doc, $path );
-				$res   = is_wp_error( $value ) ? $value : ( $value == ( $op['value'] ?? null ) ? true : new WP_Error( 'spiral_mcp_test_failed', sprintf( 'El valor de "%s" no coincide: el layout cambió desde que lo leíste.', $path ) ) ); // phpcs:ignore Universal.Operators.StrictComparisons.LooseEqual
-				break;
-			default:
-				$res = new WP_Error( 'spiral_mcp_bad_patch', sprintf( 'Operación "%s" no válida. Usa add, remove, replace, move, copy o test.', $name ) );
-		}
+		$op  = (array) $op;
+		$res = spiral_mcp_pointer_apply_op( $doc, $op, $hint );
 		if ( is_wp_error( $res ) ) {
-			return new WP_Error( $res->get_error_code(), sprintf( 'Operación %d (%s): %s No se ha guardado nada.', $i, $name, $res->get_error_message() ) );
+			return new WP_Error( $res->get_error_code(), sprintf( 'Operación %d (%s): %s No se ha guardado nada.', $i, (string) ( $op['op'] ?? '' ), $res->get_error_message() ) );
 		}
 	}
 	return $doc;

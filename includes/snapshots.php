@@ -271,13 +271,13 @@ add_action( 'wp_abilities_api_init', function () {
 	/* 1. Listar snapshots ------------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/list-snapshots', array(
 		'label'               => 'Listar snapshots',
-		'description'         => 'Lista las copias automáticas que se guardan antes de cada cambio en la configuración del tema (kind theme_config), un menú (kind menu, ref = ID del menú), un widget (kind widgets, ref = ID del widget), los textos de un adjunto (kind media_meta, ref = ID del adjunto) o un meta de un post como la imagen destacada (kind post_meta, ref = "ID:clave"). Más reciente primero; no incluye los datos. Para deshacer un cambio pasa el "id" a spiral-mcp/restore-snapshot; spiral-mcp/list-activity indica qué snapshot generó cada cambio.',
+		'description'         => 'Lista las copias automáticas que se guardan antes de cada cambio en la configuración del tema (kind theme_config), un menú (kind menu, ref = ID del menú), un widget (kind widgets, ref = ID del widget), los textos de un adjunto (kind media_meta, ref = ID del adjunto) un meta de un post como la imagen destacada (kind post_meta, ref = "ID:clave") o el diseño de Elementor de un contenido (kind elementor_data, ref = ID del post). Más reciente primero; no incluye los datos. Para deshacer un cambio pasa el "id" a spiral-mcp/restore-snapshot; spiral-mcp/list-activity indica qué snapshot generó cada cambio.',
 		'category'            => 'spiral-mcp-snapshots',
 		'group'               => spiral_mcp_groups(),
 		'input_schema'        => array(
 			'type'       => 'object',
 			'properties' => array(
-				'kind'     => array( 'type' => 'string', 'description' => 'theme_config, menu, widgets, media_meta o post_meta.' ),
+				'kind'     => array( 'type' => 'string', 'description' => 'theme_config, menu, widgets, media_meta, post_meta, elementor_data…' ),
 				'ref'      => array( 'type' => 'string', 'description' => 'Objeto concreto: "config", ID de menú, ID de widget (p. ej. nav_menu-4), ID de adjunto o "ID:clave" (p. ej. 12:_thumbnail_id).' ),
 				'per_page' => array( 'type' => 'integer', 'minimum' => 1, 'maximum' => 100, 'default' => 20 ),
 				'page'     => array( 'type' => 'integer', 'minimum' => 1, 'default' => 1 ),

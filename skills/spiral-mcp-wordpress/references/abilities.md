@@ -1,15 +1,16 @@
 # Referencia de abilities spiral-mcp/*
 
-Generada a partir de los esquemas registrados por el plugin (v1.32.1). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
-
-Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; destructiva = requiere `"confirm": true`.
+Generada a partir de los esquemas registrados por el plugin (v1.33.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
 
 Las abilities de YOOtheme (layouts, `get-yootheme-layout`, áreas del tema, configuración, plantillas, biblioteca, librería online y estilo) solo existen si YOOtheme Pro es el tema activo. En un sitio con Elementor el diseño va por las herramientas `elementor/*` de su MCP, que no están en esta referencia: lee su descripción en la lista de herramientas (ver «Sitios con Elementor» en `SKILL.md`).
+
+Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; destructiva = requiere `"confirm": true`.
 
 ## Índice
 
 - [Contenido, taxonomías y SEO](#contenido-taxonomias-y-seo)
 - [Layouts y elementos](#layouts-y-elementos)
+- [Elementor (widgets clásicos)](#elementor-widgets-clasicos)
 - [Tema: áreas, configuración, plantillas, biblioteca, widgets y caché](#tema-areas-configuracion-plantillas-biblioteca-widgets-y-cache)
 - [Menús](#menus)
 - [Medios](#medios)
@@ -60,6 +61,20 @@ Las abilities de YOOtheme (layouts, `get-yootheme-layout`, áreas del tema, conf
 | `patch-layout` | escritura | id `integer`, area `string`, **operations** `array` |
 | `duplicate-content` | escritura | **id** `integer`, title `string`, slug `string`, language `string` |
 | `insert-from-library` | escritura | **item_id** `string`, id `integer`, area `string`, **path** `string` |
+
+## Elementor (widgets clásicos)
+
+| Ability | Tipo | Parámetros |
+|---|---|---|
+| `list-elementor-widgets` | lectura | category `string`, search `string` |
+| `get-elementor-widget-schema` | lectura | **type** `string`, tabs `array` |
+| `get-elementor-data` | lectura | **id** `integer`, draft `boolean` |
+| `get-elementor-outline` | lectura | **id** `integer`, draft `boolean` |
+| `get-elementor-texts` | lectura | **id** `integer`, draft `boolean`, element_id `string`, kinds `array` |
+| `get-elementor-node` | lectura | **id** `integer`, draft `boolean`, element_id `string`, path `string` |
+| `patch-elementor-data` | escritura | **id** `integer`, **operations** `array`, draft `boolean`, note `string` |
+| `update-elementor-data` | escritura | **id** `integer`, **elements** `array`, convert `boolean`, draft `boolean`, note `string` |
+| `publish-elementor-draft` | escritura | **id** `integer` |
 
 ## Tema: áreas, configuración, plantillas, biblioteca, widgets y caché
 
@@ -133,9 +148,9 @@ Las abilities de YOOtheme (layouts, `get-yootheme-layout`, áreas del tema, conf
 
 | Ability | Tipo | Parámetros |
 |---|---|---|
-| `get-preview-url` | escritura | **id** `integer`, hours `number` |
+| `get-preview-url` | escritura | **id** `integer`, hours `number`, draft `boolean` |
 | `revoke-preview-url` | escritura | **id** `integer`, token_id `string` |
-| `inspect-page` | lectura | id `integer`, path `string`, check_links `boolean`, max_links `integer` |
+| `inspect-page` | lectura | id `integer`, path `string`, check_links `boolean`, max_links `integer`, draft `boolean` |
 
 ## Ajustes del sitio
 
@@ -143,10 +158,10 @@ Las abilities de YOOtheme (layouts, `get-yootheme-layout`, áreas del tema, conf
 |---|---|---|
 | `get-cache-settings` | lectura | provider `string` |
 | `update-cache-settings` | escritura | provider `string`, settings `object`, provider_settings `object` |
-| `get-seo-settings` | lectura | section `"general" / "site_representation" / "content_types" / "taxonomies" / "archives" / "breadcrumbs" / "rss" / "social" / "verification" / "features" / "crawl"` |
-| `update-seo-settings` | escritura | **settings** `object` |
 | `get-site-settings` | lectura | — |
 | `update-site-settings` | escritura | blogname `string`, blogdescription `string`, show_on_front `"posts" / "page"`, page_on_front `integer`, page_for_posts `integer`, site_icon `integer`, timezone_string `string` |
+| `get-seo-settings` | lectura | section `"general" / "site_representation" / "content_types" / "taxonomies" / "archives" / "breadcrumbs" / "rss" / "social" / "verification" / "features" / "crawl"` |
+| `update-seo-settings` | escritura | **settings** `object` |
 
 ## Snapshots
 

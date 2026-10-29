@@ -69,7 +69,12 @@ function spiral_mcp_requirements() {
 		'yootheme' => array(
 			'active' => spiral_mcp_yootheme_active(),
 			'label'  => 'YOOtheme Pro',
-			'reason' => 'YOOtheme Pro no es el tema activo: no se registran y el agente no las ve. Si el sitio usa Elementor, el diseño va por las herramientas elementor/* de su MCP.',
+			'reason' => 'YOOtheme Pro no es el tema activo: no se registran y el agente no las ve. Si el sitio usa Elementor, el diseño va por las abilities de Elementor de Spiral (widgets clásicos) y, con su MCP activo, por elementor/* (elementos V4).',
+		),
+		'elementor' => array(
+			'active' => spiral_mcp_elementor_active(),
+			'label'  => 'Elementor',
+			'reason' => 'Elementor no está activo: no se registran y el agente no las ve.',
 		),
 	);
 }

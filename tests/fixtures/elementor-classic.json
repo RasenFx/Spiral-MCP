@@ -1,0 +1,35 @@
+[
+  {
+    "id": "a1b2c3d",
+    "elType": "section",
+    "isInner": false,
+    "settings": { "_title": "Cabecera de prueba", "layout": "boxed" },
+    "elements": [
+      {
+        "id": "b2c3d4e",
+        "elType": "column",
+        "settings": { "_column_size": 100 },
+        "elements": [
+          {
+            "id": "c3d4e5f",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": { "title": "Página de prueba", "header_size": "h1" }
+          },
+          {
+            "id": "d4e5f6a",
+            "elType": "widget",
+            "widgetType": "text-editor",
+            "settings": { "editor": "<p>Texto de prueba con <strong>negrita</strong> y un <a href=\"/contacto/\">enlace</a>.</p>" }
+          },
+          {
+            "id": "e5f6a7b",
+            "elType": "widget",
+            "widgetType": "image-carousel",
+            "settings": { "carousel": [], "slides_to_show": "3", "navigation": "both", "autoplay": "yes" }
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -110,8 +110,12 @@ case "$(jget roles)" in
 esac
 
 # --- Registro ------------------------------------------------------------
-rest GET '/wp-abilities/v1/abilities&per_page=100'
+# El listado pagina de 100 en 100 (máximo de la API): se juntan las dos primeras páginas.
+rest GET '/wp-abilities/v1/abilities&per_page=100&page=1'
 check 'listado de abilities' 200
+ABILITIES_PAGE1=$BODY
+rest GET '/wp-abilities/v1/abilities&per_page=100&page=2'
+[ "$STATUS" = 200 ] && BODY="$ABILITIES_PAGE1$BODY" || BODY=$ABILITIES_PAGE1
 for name in list-content get-content create-content update-content get-yootheme-layout update-yootheme-layout \
 	list-menus get-menu create-menu update-menu delete-menu add-menu-item update-menu-item delete-menu-item \
 	get-theme-layout update-theme-layout list-theme-backups restore-theme-backup list-widgets update-widget create-widget delete-widget \
@@ -123,7 +127,7 @@ for name in list-content get-content create-content update-content get-yootheme-
 	list-revisions restore-revision list-taxonomies list-terms create-term update-term delete-term \
 	get-seo update-seo get-site-settings update-site-settings get-custom-css update-custom-css \
 	get-theme-style list-style-variables update-theme-style get-style-status mark-style-compiled \
-	get-preview-url revoke-preview-url inspect-page; do
+	get-preview-url revoke-preview-url inspect-page 	list-elementor-widgets get-elementor-widget-schema get-elementor-data get-elementor-outline get-elementor-texts get-elementor-node patch-elementor-data update-elementor-data publish-elementor-draft; do
 	case "$BODY" in
 		*"\"spiral-mcp\\/$name\""* | *"\"spiral-mcp/$name\""*) ;;
 		*) ko "registrada spiral-mcp/$name" ;;
@@ -815,6 +819,124 @@ check 'set-featured-image' 200 snapshot_id media.id
 call GET spiral-mcp/find-media-usage "{\"id\":$MEDIA_ID}"
 check 'find-media-usage' 200 used posts
 eq 'find-media-usage: la página la usa como destacada' 'posts.0.where.0' featured_image
+
+# --- Elementor (widgets clásicos) ----------------------------------------
+# Necesita Elementor activo; el usuario del smoke es el rol del agente (sin unfiltered_html).
+call GET spiral-mcp/list-elementor-widgets '{"search":"carousel"}'
+if [ "$STATUS" = 200 ]; then
+	check 'list-elementor-widgets' 200 total widgets.0.name version elements.0.name
+	call GET spiral-mcp/get-elementor-widget-schema '{"type":"image-carousel"}'
+	check 'get-elementor-widget-schema (image-carousel)' 200 tabs.content.section_image_carousel.controls.carousel.hint tabs.content.section_image_carousel.controls.slides_to_show.options
+	call GET spiral-mcp/get-elementor-widget-schema '{"type":"heading","tabs":["all"]}'
+	check 'get-elementor-widget-schema (heading, todas las pestañas)' 200 tabs.style tabs.advanced
+	call GET spiral-mcp/get-elementor-widget-schema '{"type":"e-heading"}'
+	eq 'get-elementor-widget-schema rechaza un elemento V4' code spiral_mcp_unknown_element
+
+	call POST spiral-mcp/create-content '{"post_type":"page","title":"Smoke Elementor","status":"draft","content":"<p>Antes</p>"}'
+	check 'página para Elementor' 200 id
+	EL_ID=$(jget id)
+	EL_FIXTURE=$(cat "$DIR/fixtures/elementor-classic.json")
+	call GET spiral-mcp/get-elementor-outline "{\"id\":$EL_ID}"
+	eq 'get-elementor-outline en una página normal → not_elementor' code spiral_mcp_not_elementor
+	call POST spiral-mcp/update-elementor-data "{\"id\":$EL_ID,\"elements\":$EL_FIXTURE}"
+	eq 'update-elementor-data sin convert → not_elementor' code spiral_mcp_not_elementor
+	call POST spiral-mcp/update-elementor-data "{\"id\":$EL_ID,\"convert\":true,\"elements\":$EL_FIXTURE}"
+	check 'update-elementor-data (convert)' 200 updated converted revision_id snapshot_id warnings
+	EL_SNAP=$(jget snapshot_id)
+	call GET spiral-mcp/get-content "{\"id\":$EL_ID}"
+	eq 'get-content: builder elementor' builder elementor
+	eq 'get-content: elementor.template_type' elementor.template_type wp-page
+	call POST spiral-mcp/update-content "{\"id\":$EL_ID,\"content\":\"<p>x</p>\"}"
+	eq 'update-content rechaza content en una página de Elementor' code spiral_mcp_elementor_content
+	call GET spiral-mcp/get-elementor-data "{\"id\":$EL_ID}"
+	check 'get-elementor-data' 200 elements.0.elements.0.elements.0.id
+	eq 'get-elementor-data: el primer widget es el heading' elements.0.elements.0.elements.0.widgetType heading
+	call GET spiral-mcp/get-elementor-outline "{\"id\":$EL_ID}"
+	check 'get-elementor-outline' 200 nodes outline.0
+	eq 'get-elementor-outline: 5 nodos' nodes 5
+	call GET spiral-mcp/get-elementor-texts "{\"id\":$EL_ID,\"kinds\":[\"text\",\"link\"]}"
+	check 'get-elementor-texts' 200 total items.0.path items.0.value items.0.element_id
+	call GET spiral-mcp/get-elementor-node "{\"id\":$EL_ID,\"element_id\":\"c3d4e5f\"}"
+	eq 'get-elementor-node por element_id' node.widgetType heading
+	call GET spiral-mcp/get-elementor-node "{\"id\":$EL_ID,\"path\":\"/0/elements/0/elements/0/settings/title\"}"
+	eq 'get-elementor-node por ruta' node 'Página de prueba'
+
+	call GET spiral-mcp/get-media "{\"id\":$MEDIA_ID}"
+	EL_URL="${WP_URL%/}/$(jget path_relative)"
+	call POST spiral-mcp/patch-elementor-data "{\"id\":$EL_ID,\"operations\":[{\"op\":\"test\",\"path\":\"/0/elements/0/elements/0/settings/title\",\"value\":\"Página de prueba\"},{\"op\":\"replace\",\"path\":\"/0/elements/0/elements/0/settings/title\",\"value\":\"Título con patch\"},{\"op\":\"update\",\"element_id\":\"e5f6a7b\",\"settings\":{\"carousel\":[{\"id\":$MEDIA_ID,\"url\":\"$EL_URL\"}],\"slides_to_show\":\"2\",\"navigation\":\"nada\"}},{\"op\":\"insert\",\"parent_id\":\"b2c3d4e\",\"index\":1,\"node\":{\"elType\":\"widget\",\"widgetType\":\"button\",\"settings\":{\"text\":\"Contacto\",\"link\":{\"url\":\"/contacto/\"}}}},{\"op\":\"duplicate\",\"element_id\":\"c3d4e5f\"},{\"op\":\"move\",\"element_id\":\"e5f6a7b\",\"parent_id\":\"b2c3d4e\",\"index\":0}]}"
+	check 'patch-elementor-data (test, replace, update, insert, duplicate, move)' 200 updated revision_id undo_revision_id snapshot_id new_ids.3 warnings.0
+	EL_UNDO=$(jget undo_revision_id)
+	call GET spiral-mcp/get-elementor-node "{\"id\":$EL_ID,\"path\":\"/0/elements/0/elements/0\"}"
+	eq 'move: el carrusel es el primer widget' node.widgetType image-carousel
+	eq 'update: el carrusel tiene la imagen' node.settings.carousel.0.id "$MEDIA_ID"
+	call GET spiral-mcp/get-elementor-node "{\"id\":$EL_ID,\"element_id\":\"c3d4e5f\"}"
+	eq 'replace por ruta cambió el título' node.settings.title 'Título con patch'
+	call GET spiral-mcp/get-elementor-outline "{\"id\":$EL_ID}"
+	eq 'tras el patch hay 7 nodos' nodes 7
+	call POST spiral-mcp/patch-elementor-data "{\"id\":$EL_ID,\"operations\":[{\"op\":\"update\",\"element_id\":\"c3d4e5f\",\"settings\":{\"title\":\"NO\"}},{\"op\":\"remove\",\"path\":\"/99\"}]}"
+	[ "$STATUS" -ge 400 ] && ok 'patch-elementor-data es atómico (una op falla, nada se guarda)' || ko 'patch-elementor-data debería fallar'
+	call GET spiral-mcp/get-elementor-node "{\"id\":$EL_ID,\"element_id\":\"c3d4e5f\"}"
+	eq 'nada cambió tras el patch fallido' node.settings.title 'Título con patch'
+
+	call POST spiral-mcp/patch-elementor-data "{\"id\":$EL_ID,\"operations\":[{\"op\":\"insert\",\"parent_id\":\"b2c3d4e\",\"node\":{\"elType\":\"widget\",\"widgetType\":\"e-heading\"}}]}"
+	eq 'rechaza un elemento V4 (atómico)' code spiral_mcp_invalid_elementor_data
+	call POST spiral-mcp/patch-elementor-data "{\"id\":$EL_ID,\"operations\":[{\"op\":\"insert\",\"parent_id\":\"b2c3d4e\",\"node\":{\"elType\":\"widget\",\"widgetType\":\"no-existe\"}}]}"
+	eq 'rechaza un tipo no registrado' code spiral_mcp_invalid_elementor_data
+	call POST spiral-mcp/patch-elementor-data "{\"id\":$EL_ID,\"operations\":[{\"op\":\"insert\",\"parent_id\":\"document\",\"node\":{\"elType\":\"widget\",\"widgetType\":\"heading\"}}]}"
+	eq 'rechaza un widget en la raíz' code spiral_mcp_invalid_elementor_data
+	call POST spiral-mcp/patch-elementor-data "{\"id\":$EL_ID,\"operations\":[{\"op\":\"insert\",\"parent_id\":\"b2c3d4e\",\"node\":{\"elType\":\"widget\",\"widgetType\":\"html\",\"settings\":{\"html\":\"<script>alert(1)</script><p>x</p>\"}}}]}"
+	if [ "$(jget code)" = spiral_mcp_unfiltered_html ]; then ok 'widget html con script: 403 sin unfiltered_html'; elif [ "$STATUS" = 200 ]; then ok 'widget html con script: el usuario tiene unfiltered_html (se admite)'; else ko 'widget html con script'; fi
+
+	call POST spiral-mcp/update-content "{\"id\":$EL_ID,\"status\":\"publish\"}"
+	check 'publicar la página de Elementor' 200 id
+	call POST spiral-mcp/patch-elementor-data "{\"id\":$EL_ID,\"draft\":true,\"operations\":[{\"op\":\"update\",\"element_id\":\"c3d4e5f\",\"settings\":{\"title\":\"Título en borrador\"}}]}"
+	check 'patch-elementor-data con draft:true' 200 autosave_id snapshot_id
+	eq 'patch draft: la web no cambia' live_untouched true
+	call GET spiral-mcp/get-elementor-node "{\"id\":$EL_ID,\"element_id\":\"c3d4e5f\"}"
+	eq 'la versión publicada no cambió' node.settings.title 'Título con patch'
+	call GET spiral-mcp/get-elementor-node "{\"id\":$EL_ID,\"element_id\":\"c3d4e5f\",\"draft\":true}"
+	eq 'el borrador tiene el cambio' node.settings.title 'Título en borrador'
+	call GET spiral-mcp/get-content "{\"id\":$EL_ID}"
+	eq 'get-content: elementor.has_draft' elementor.has_draft true
+	call POST spiral-mcp/get-preview-url "{\"id\":$EL_ID,\"draft\":true}"
+	check 'get-preview-url con draft:true' 200 url token_id
+	eq 'get-preview-url: draft true' draft true
+	if [ -n "${SMOKE_INSPECT-}" ]; then
+		call GET spiral-mcp/inspect-page "{\"id\":$EL_ID,\"draft\":true,\"check_links\":false}"
+		check 'inspect-page con draft:true' 200 status
+		eq 'inspect-page: draft true' draft true
+		[ "$(printf '%s' "$BODY" | grep -c 'en borrador')" -ge 1 ] && ok 'inspect-page draft ve el borrador' || ko 'inspect-page draft no ve el borrador'
+		call GET spiral-mcp/inspect-page "{\"id\":$EL_ID,\"check_links\":false}"
+		[ "$(printf '%s' "$BODY" | grep -c 'en borrador')" = 0 ] && ok 'inspect-page sin draft ve la versión publicada' || ko 'inspect-page sin draft muestra el borrador'
+	fi
+	call POST spiral-mcp/publish-elementor-draft "{\"id\":$EL_ID}"
+	check 'publish-elementor-draft' 200 promoted revision_id snapshot_id
+	call GET spiral-mcp/get-elementor-node "{\"id\":$EL_ID,\"element_id\":\"c3d4e5f\"}"
+	eq 'la web tiene el borrador publicado' node.settings.title 'Título en borrador'
+	call POST spiral-mcp/publish-elementor-draft "{\"id\":$EL_ID}"
+	eq 'publish-elementor-draft sin borrador → no_draft' code spiral_mcp_elementor_no_draft
+
+	call POST spiral-mcp/restore-revision "{\"revision_id\":$EL_UNDO,\"confirm\":true}"
+	check 'restore-revision (página de Elementor)' 200
+	call GET spiral-mcp/get-elementor-node "{\"id\":$EL_ID,\"element_id\":\"c3d4e5f\"}"
+	eq 'restore-revision devolvió el título original' node.settings.title 'Página de prueba'
+	call POST spiral-mcp/restore-snapshot "{\"id\":$EL_SNAP,\"confirm\":true,\"include_later\":true}"
+	check 'restore-snapshot (elementor_data, anterior al convert)' 200
+	call GET spiral-mcp/get-content "{\"id\":$EL_ID}"
+	eq 'tras el snapshot la página ya no es de Elementor' builder none
+	call GET spiral-mcp/list-activity "{\"ability\":\"spiral-mcp/patch-elementor-data\",\"object_id\":\"$EL_ID\"}"
+	check 'list-activity registra patch-elementor-data' 200 items.0.snapshot_id
+	if [ -n "${SMOKE_ELEMENTOR_HEADER_ID-}" ]; then
+		call POST spiral-mcp/update-elementor-data "{\"id\":$SMOKE_ELEMENTOR_HEADER_ID,\"elements\":[]}"
+		eq 'plantilla header sin Elementor Pro → type_unsupported' code spiral_mcp_elementor_type_unsupported
+	else
+		echo 'AVISO plantilla header sin Pro omitida (php tests/elementor-setup.php <wp> y SMOKE_ELEMENTOR_HEADER_ID=<id>)'
+	fi
+	rest DELETE "/wp/v2/pages/$EL_ID&force=true"
+	check 'limpieza: borrar la página de Elementor' 200
+else
+	ok 'Elementor: no está activo (se omiten los widgets clásicos)'
+fi
 
 call DELETE spiral-mcp/delete-media "{\"id\":$MEDIA_ID}"
 [ "$STATUS" -ge 400 ] && ok 'delete-media sin confirm se rechaza' || ko 'delete-media sin confirm'

@@ -157,7 +157,7 @@ function spiral_mcp_content_details( WP_Post $post ) {
 		'terms'          => (object) $terms,
 		'featured_media' => $thumb ? array( 'id' => $thumb, 'path_relative' => spiral_mcp_media_relative( (string) wp_get_attachment_url( $thumb ) ) ) : null,
 		'meta'           => (object) $meta,
-	);
+	) + ( spiral_mcp_elementor_built( $post->ID ) && function_exists( 'spiral_mcp_elementor_info' ) ? array( 'elementor' => spiral_mcp_elementor_info( $post ) ) : array() );
 }
 
 /**
@@ -349,7 +349,7 @@ add_action( 'wp_abilities_api_init', function () {
 	// Campos ampliados de create-content y update-content.
 	$fields = array(
 		'title'          => array( 'type' => 'string' ),
-		'content'        => array( 'type' => 'string', 'description' => 'HTML o bloques de Gutenberg. En contenido de YOOtheme solo es el HTML de respaldo: el diseño se edita con las abilities de layout. En una página construida con Elementor ("builder": "elementor") no se admite: su diseño se edita con las herramientas elementor/*.' ),
+		'content'        => array( 'type' => 'string', 'description' => 'HTML o bloques de Gutenberg. En contenido de YOOtheme solo es el HTML de respaldo: el diseño se edita con las abilities de layout. En una página construida con Elementor ("builder": "elementor") no se admite: su diseño se edita con spiral-mcp/patch-elementor-data (widgets clásicos) o elementor/* (V4).' ),
 		'excerpt'        => array( 'type' => 'string' ),
 		'status'         => array( 'type' => 'string', 'enum' => spiral_mcp_statuses(), 'description' => 'draft (borrador), pending, private, publish, o future/publish con "date" futura para programar.' ),
 		'slug'           => array( 'type' => 'string' ),
@@ -449,7 +449,7 @@ add_action( 'wp_abilities_api_init', function () {
 	/* 2. Leer contenido -------------------------------------------------- */
 	spiral_mcp_register_ability( 'spiral-mcp/get-content', array(
 		'label'               => 'Obtener contenido',
-		'description'         => 'Devuelve la ficha completa de una página, entrada u otro contenido: título, estado, extracto, contenido en bruto, padre, orden, plantilla, autor, fecha (date local y date_gmt), comentarios, términos por taxonomía, imagen destacada (id y path_relative) y metas permitidos. Si "builder" es "yootheme", "content" es solo el HTML de respaldo; para el diseño usa spiral-mcp/get-layout-outline o spiral-mcp/get-yootheme-layout. Si es "elementor", el diseño está en los datos de Elementor y "content" no se muestra en la web: léelo y edítalo con las herramientas elementor/* (elementor/get-page-structure, elementor/manage-elements, elementor/build-composition).',
+		'description'         => 'Devuelve la ficha completa de una página, entrada u otro contenido: título, estado, extracto, contenido en bruto, padre, orden, plantilla, autor, fecha (date local y date_gmt), comentarios, términos por taxonomía, imagen destacada (id y path_relative) y metas permitidos. Si "builder" es "yootheme", "content" es solo el HTML de respaldo; para el diseño usa spiral-mcp/get-layout-outline o spiral-mcp/get-yootheme-layout. Si es "elementor", el diseño está en los datos de Elementor y "content" no se muestra en la web: léelo con spiral-mcp/get-elementor-outline y edítalo con spiral-mcp/patch-elementor-data (widgets clásicos; "elementor" trae versión, tipo de plantilla y si tienes un borrador); los elementos V4 van por las herramientas elementor/* de su MCP.',
 		'category'            => 'spiral-mcp-content',
 		'input_schema'        => array(
 			'type'       => 'object',

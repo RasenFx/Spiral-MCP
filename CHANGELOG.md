@@ -2,6 +2,23 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.33.0] — 2026-10-29 · Widgets clásicos de Elementor
+
+### Añadido
+- `includes/elementor-data.php`: el agente lee y edita páginas construidas con los widgets clásicos (V3) de Elementor (heading, text-editor, image, button, image-carousel, section/column/container…), que el MCP de Elementor no toca (solo edita elementos V4 atómicos y una lista cerrada de seis widgets V3). Nueve abilities con `'requires' => 'elementor'` en la categoría `spiral-mcp-elementor`: `list-elementor-widgets`, `get-elementor-widget-schema` (controles por pestaña y sección con la forma de cada valor), `get-elementor-data`, `get-elementor-outline`, `get-elementor-texts`, `get-elementor-node`, `patch-elementor-data` (operaciones por `element_id`: `update`, `replace_settings`, `remove`, `duplicate`, `move`, `insert`; y JSON Patch por ruta), `update-elementor-data` (árbol entero; `convert` convierte en página de Elementor un contenido normal) y `publish-elementor-draft`. Guardan con `Document::save()` de Elementor (kses sin `unfiltered_html`, revisión de WordPress con los metas `_elementor*`, versión, CSS y caché de elementos regenerados) tras un snapshot (kind `elementor_data`); con `"draft": true` en un contenido publicado escriben en un autosave de Elementor y la web no cambia hasta `publish-elementor-draft`.
+- Validación antes de guardar: estructura y colocación (widgets dentro de column o container, columns dentro de section), tipos registrados (los V4 nuevos, los widgets de Pro sin Pro y los desconocidos bloquean: Elementor los descartaría en silencio), ids únicos de 7 hexadecimales, ajustes desconocidos y valores fuera de opciones (avisos), HTML (un widget `html` con script se rechaza con 403 sin `unfiltered_html`; en el resto se avisa de lo que Elementor va a filtrar).
+- `get-preview-url` e `inspect-page` aceptan `"draft": true` para ver el autosave de Elementor del usuario (filtro `elementor/documents/get/post_id` en la vista previa firmada).
+- `get-content` devuelve `elementor` (versión, tipo de plantilla, si hay borrador, `autosave_id`, quién tiene la página abierta) en los contenidos de Elementor.
+- `tests/smoke.sh`: sección de Elementor (convertir, leer, patch, atomicidad, rechazos, borrador, vista previa, publicar, deshacer); `tests/fixtures/elementor-classic.json`; `tests/elementor-setup.php` crea una plantilla `header` para probar la guarda de tipos sin Pro.
+- Skill: sección «Sitios con Elementor» con las dos ramas (clásico y V4), recetas «Elementor clásico: editar una página existente» y «Elementor clásico: añadir un widget (image-carousel)», errores nuevos.
+
+### Cambiado
+- Los helpers JSON Pointer de `includes/layout.php` aceptan la ability de referencia en los mensajes (`$hint`) y `spiral_mcp_pointer_apply_op()` aplica una operación suelta: los comparten los layouts de YOOtheme y los árboles de Elementor.
+- Los mensajes de `update-content`, `get-content` y `create-content` sobre páginas de Elementor apuntan a las abilities nuevas; `elementor/*` queda para los elementos V4. El requisito `yootheme` explica lo mismo en Ajustes > Spiral-MCP.
+
+### Corregido
+- El filtro de HTML de los layouts quitaba el prefijo de cualquier texto que empezara por «palabra:» (p. ej. «Horario: 9-18») al tratarlo como protocolo peligroso; ahora solo actúa sobre `javascript:`, `vbscript:`, `data:`, `livescript:` y `mocha:`.
+
 ## [1.32.1] — 2026-10-28 · Props de parallax en el catálogo de elementos
 
 ### Corregido

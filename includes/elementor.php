@@ -10,6 +10,8 @@
  * servidor que las de Spiral. Aquí solo se les añade lo que el administrador espera de
  * cualquier herramienta del agente: la capacidad spiral_mcp_<grupo>, el registro en la
  * auditoría, la purga automática de caché y poder desactivarlas desde la página de ajustes.
+ * Ese MCP solo edita elementos V4 (atómicos); los widgets clásicos se leen y editan con las
+ * abilities de includes/elementor-data.php, a través de la Document API de Elementor.
  *
  * @package Spiral_MCP_Control
  */
@@ -48,7 +50,7 @@ function spiral_mcp_builder_of( WP_Post $post ) {
 function spiral_mcp_elementor_content_error( $post_id ) {
 	return new WP_Error(
 		'spiral_mcp_elementor_content',
-		sprintf( 'El contenido %d está construido con Elementor: su diseño está en los datos de Elementor y lo que envíes en "content" no se mostraría en la web. Edítalo con las herramientas elementor/* (elementor/get-page-structure, elementor/manage-elements, elementor/build-composition); si no aparecen en tu lista, el administrador tiene que activar el MCP de Elementor en wp-admin. Los demás campos (title, status, slug, parent, terms, featured_media…) sí se pueden cambiar con esta ability.', (int) $post_id )
+		sprintf( 'El contenido %d está construido con Elementor: su diseño está en los datos de Elementor y lo que envíes en "content" no se mostraría en la web. Edítalo con spiral-mcp/get-elementor-outline y spiral-mcp/patch-elementor-data (widgets clásicos); los elementos V4 (atómicos) van por las herramientas elementor/* de su MCP. Los demás campos (title, status, slug, parent, terms, featured_media…) sí se pueden cambiar con esta ability.', (int) $post_id )
 	);
 }
 

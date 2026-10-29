@@ -33,8 +33,10 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 - [Idiomas: traducir una página o entrada](#idiomas-traducir-una-página-o-entrada)
 - [Idiomas: menús, selector de idioma, header y footer](#idiomas-menús-selector-de-idioma-header-y-footer)
 - [Idiomas: nombre del sitio y otros textos sueltos](#idiomas-nombre-del-sitio-y-otros-textos-sueltos)
-- [Elementor: crear una página](#elementor-crear-una-página)
-- [Elementor: cambiar textos o secciones de una página](#elementor-cambiar-textos-o-secciones-de-una-página)
+- [Elementor clásico: editar una página existente](#elementor-clásico-editar-una-página-existente)
+- [Elementor clásico: añadir un widget (image-carousel)](#elementor-clásico-añadir-un-widget-image-carousel)
+- [Elementor V4: crear una página con su MCP](#elementor-v4-crear-una-página-con-su-mcp)
+- [Elementor V4: cambiar elementos atómicos](#elementor-v4-cambiar-elementos-atómicos)
 - [Deshacer un cambio](#deshacer-un-cambio)
 
 ## Crear una página nueva a partir de otra
@@ -361,9 +363,29 @@ Para enlazar dos contenidos que ya existen como traducciones (o desenlazarlos), 
 2. `update-string-translations {"language": "en", "strings": [{"original": "Mi Empresa", "translation": "My Company"}]}`. El `original` tiene que ser exacto; `""` borra la traducción.
 3. El original (idioma por defecto) se cambia donde siempre (`update-site-settings`, `update-widget`): al cambiarlo, su traducción se pierde y hay que volver a hacerla.
 
-## Elementor: crear una página
+## Elementor clásico: editar una página existente
 
-Solo en sitios con Elementor (hay herramientas `elementor/*` y no hay `list-elements`). El diseño lo hace el MCP de Elementor; Spiral aporta lo demás (ver «Sitios con Elementor» en `SKILL.md`).
+Para páginas hechas con widgets clásicos de Elementor (lo habitual). No hace falta el MCP de Elementor ni el Editor Atómico.
+
+1. `list-content {"search": "servicios"}` y confirma `"builder": "elementor"`. `get-content {"id"}` dice en `elementor.has_draft` si ya tienes un borrador pendiente.
+2. `get-elementor-outline {"id": 12}`: una línea por elemento con ruta, tipo, `#id` y extracto. Si marca `[V4]`, ese elemento va por `elementor/*`; si marca `[tipo no registrado]` o `[necesita Elementor Pro]`, avisa al usuario antes de guardar nada (el guardado fallará mientras sigan ahí).
+3. Localiza qué cambiar: `get-elementor-texts {"id": 12}` (textos con su `path`; `"kinds": ["text", "link", "image"]` para enlaces e imágenes) o `get-elementor-node {"id": 12, "element_id": "a1b2c3d"}` (todos los ajustes del elemento). Si dudas de un ajuste, `get-elementor-widget-schema {"type": "heading"}`.
+4. Cambia con `patch-elementor-data`. Por id, mezclando ajustes: `{"id": 12, "operations": [{"op": "update", "element_id": "a1b2c3d", "settings": {"title": "Nuevo título"}}]}`. Por ruta, con comprobación: `[{"op": "test", "path": "/0/elements/0/elements/1/settings/title", "value": "Título actual"}, {"op": "replace", "path": "…/settings/title", "value": "Nuevo título"}]`. Mover: `{"op": "move", "element_id": "a1b2c3d", "parent_id": "<id de la column>", "index": 0}`. Quitar: `{"op": "remove", "element_id": …}`. Duplicar: `{"op": "duplicate", "element_id": …}`. Varias operaciones en una llamada: se aplican en orden y, si una falla, no se guarda nada.
+5. Página publicada: por defecto la web cambia al momento (deshacer con `restore-revision {"revision_id": <undo_revision_id>}`). Si el cambio es grande o el usuario quiere verlo antes, añade `"draft": true`: la web no cambia, revisas con `inspect-page {"id": 12, "draft": true}` o `get-preview-url {"id": 12, "draft": true}` y publicas con `publish-elementor-draft {"id": 12}`.
+6. Lee los `warnings` (ajustes desconocidos, valores fuera de opciones, HTML filtrado) y `inspect-page {"id": 12}` al terminar.
+
+## Elementor clásico: añadir un widget (image-carousel)
+
+1. `upload-media` con cada imagen (devuelve `id` y `path_relative`; la URL completa es la del sitio + `path_relative`).
+2. `get-elementor-widget-schema {"type": "image-carousel"}`: `carousel` es una `gallery` (`[{"id", "url"}]`), `slides_to_show` un select (`"1"`…`"10"`), `navigation` (`both`, `arrows`, `dots`, `none`), `autoplay` un interruptor (`"yes"` o `""`), `link_to` (`none`, `file`, `custom`). `"tabs": ["all"]` para estilos (flechas, puntos, espaciado).
+3. `get-elementor-outline {"id": 12}` para elegir la column (o container) donde va y su `id`.
+4. `patch-elementor-data {"id": 12, "operations": [{"op": "insert", "parent_id": "<id de la column>", "index": 1, "node": {"elType": "widget", "widgetType": "image-carousel", "settings": {"carousel": [{"id": 45, "url": "https://sitio.test/wp-content/uploads/2026/10/a.jpg"}, {"id": 46, "url": "…"}], "slides_to_show": "3", "slides_to_show_mobile": "1", "navigation": "both", "autoplay": "yes"}}}]}`. El id del widget se genera; `new_ids` lo devuelve.
+5. Para una sección nueva completa, inserta en `"parent_id": "document"` un nodo `section` con su `column` y los widgets dentro (`_column_size` se reparte si no lo pones); copia un nodo existente con `get-elementor-node` como plantilla de estilos.
+6. `inspect-page {"id": 12}` (o con `"draft": true` si guardaste en borrador) y publica si procede.
+
+## Elementor V4: crear una página con su MCP
+
+Solo con el MCP de Elementor activado y el Editor Atómico (hay herramientas `elementor/*`). Produce elementos V4, que el editor clásico no administra: si el sitio lo mantiene una persona con widgets clásicos, prefiere la receta «Elementor clásico» con `create-content` + `update-elementor-data {"convert": true}`.
 
 1. `elementor/create-page {"title": "Servicios", "post_type": "page"}`: borrador marcado para Elementor (devuelve `id`). No uses `create-content` para esto: la página no sería de Elementor.
 2. Lee `elementor/style-best-practices` y, para los tipos y props, `elementor/list-widget-schemas` / `elementor/get-widget-schema`. Comprueba los destinos de los enlaces con `list-content` y sube las imágenes con `upload-media` (`elementor/list-assets` las lista por `id`).
@@ -372,17 +394,19 @@ Solo en sitios con Elementor (hay herramientas `elementor/*` y no hay `list-elem
 5. SEO, slug, página madre e imagen destacada: `update-seo` y `update-content` (sin `content`).
 6. Publica con `elementor/publish-document {"post_id": <id>}`. Para deshacer, `restore-revision` (Elementor guarda sus datos en las revisiones de WordPress) o `trash-content`.
 
-## Elementor: cambiar textos o secciones de una página
+## Elementor V4: cambiar elementos atómicos
+
+Solo para los elementos que `get-elementor-outline` marca `[V4]`; los clásicos van por «Elementor clásico: editar una página existente».
 
 1. `list-content {"search": "…"}` y confirma `"builder": "elementor"`.
 2. `elementor/get-page-structure {"post_id": <id>, "include_content": true}`: árbol con el `id` de cada elemento y su contenido.
 3. Cambios puntuales: `elementor/manage-elements {"post_id": <id>, "operations": [...]}` (varias operaciones en una llamada). Secciones nuevas: `elementor/build-composition` con `parent_id`.
 4. En una página publicada los cambios quedan como borrador de Elementor: compruébalos con `elementor/create-preview-link` y publícalos con `elementor/publish-document`.
-5. Si la página tiene widgets clásicos (no atómicos), Elementor no los edita desde el MCP: díselo al usuario para que los cambie en su editor.
+5. Si `manage-elements` responde `elementor_v3_not_supported`, el elemento es clásico: usa `patch-elementor-data` de spiral-mcp con ese mismo `id`.
 
 ## Deshacer un cambio
 
-- **Página o entrada (título, contenido, layout):** `restore-revision {"revision_id": <undo_revision_id>, "confirm": true}` (o búscala con `list-revisions {"id": 12}`). Antes guarda el estado actual, así que también se puede deshacer la restauración.
+- **Página o entrada (título, contenido, layout):** `restore-revision {"revision_id": <undo_revision_id>, "confirm": true}` (o búscala con `list-revisions {"id": 12}`). Antes guarda el estado actual, así que también se puede deshacer la restauración. Vale igual para el diseño de Elementor: `patch-elementor-data`, `update-elementor-data` y `publish-elementor-draft` devuelven `undo_revision_id` y también `snapshot_id` (kind `elementor_data`); un borrador (`"draft": true`) no toca la web, así que no hay nada que deshacer hasta publicarlo.
 - **Un valor concreto** (un color, una sección de la configuración): lo más seguro es revertir solo ese valor con la herramienta que lo cambió. Por ejemplo `update-theme-style {"less": {"@global-primary-background": null}}` vuelve al valor por defecto del estilo. Para saber el valor anterior, mira `list-activity {"ability": "spiral-mcp/update-theme-style", "result": "ok"}`.
 - **Con snapshot:** `list-activity` (filtra por `ability` u `object_id`) → `restore-snapshot {"id": <snapshot_id>, "confirm": true}`. Si después hubo otros cambios en el mismo objeto, la llamada falla y los lista (en la configuración del tema, también en qué secciones difiere). Entonces restaura solo la parte que toca: `"parts": ["less"]` (estilo) o `["footer"]`. `"include_later": true` lo restaura entero y deshace también lo posterior: solo si el usuario lo quiere.
 - Restaurar el snapshot de un menú recién creado lo borra.

@@ -13,8 +13,15 @@ defined( 'ABSPATH' ) || exit;
  *
  * Formato: "<post_id>.<caduca>.<id>.<firma>", con firma = HMAC-SHA256 de los
  * tres primeros campos con una sal de WordPress. El <id> se guarda en el meta
- * _spiral_mcp_previews del post ( id => caducidad ): borrarlo revoca el token.
+ * _spiral_mcp_previews del post ( id => caducidad, o id => [ 'exp' => caducidad,
+ * 'draft' => usuario ] para ver el borrador de Elementor de ese usuario ):
+ * borrarlo revoca el token.
  * ---------------------------------------------------------------------- */
+
+/** Caducidad de una entrada del meta de tokens (número o array con "exp"). */
+function spiral_mcp_preview_expiry( $entry ) {
+	return (int) ( is_array( $entry ) ? ( $entry['exp'] ?? 0 ) : $entry );
+}
 
 /** Firma de un token. */
 function spiral_mcp_preview_sign( $post_id, $expires, $nonce ) {
@@ -25,8 +32,8 @@ function spiral_mcp_preview_sign( $post_id, $expires, $nonce ) {
 function spiral_mcp_preview_tokens( $post_id ) {
 	$tokens = get_post_meta( (int) $post_id, '_spiral_mcp_previews', true );
 	$tokens = is_array( $tokens ) ? $tokens : array();
-	$valid  = array_filter( $tokens, function ( $expires ) {
-		return (int) $expires > time();
+	$valid  = array_filter( $tokens, function ( $entry ) {
+		return spiral_mcp_preview_expiry( $entry ) > time();
 	} );
 	if ( count( $valid ) !== count( $tokens ) ) {
 		$valid ? update_post_meta( (int) $post_id, '_spiral_mcp_previews', $valid ) : delete_post_meta( (int) $post_id, '_spiral_mcp_previews' );
@@ -34,12 +41,15 @@ function spiral_mcp_preview_tokens( $post_id ) {
 	return $valid;
 }
 
-/** Crea un token. Devuelve [ token, id, caducidad ]. */
-function spiral_mcp_preview_create( $post_id, $seconds ) {
+/**
+ * Crea un token. Devuelve [ token, id, caducidad ]. Con $draft_user, la vista previa muestra
+ * el borrador de Elementor (autosave) de ese usuario en vez de la versión guardada.
+ */
+function spiral_mcp_preview_create( $post_id, $seconds, $draft_user = 0 ) {
 	$expires            = time() + (int) $seconds;
 	$nonce              = wp_generate_password( 12, false, false );
 	$tokens             = spiral_mcp_preview_tokens( $post_id );
-	$tokens[ $nonce ]   = $expires;
+	$tokens[ $nonce ]   = $draft_user ? array( 'exp' => $expires, 'draft' => (int) $draft_user ) : $expires;
 	update_post_meta( (int) $post_id, '_spiral_mcp_previews', $tokens );
 	$token = (int) $post_id . '.' . $expires . '.' . $nonce . '.' . spiral_mcp_preview_sign( $post_id, $expires, $nonce );
 	return array( $token, $nonce, $expires );
@@ -72,6 +82,27 @@ function spiral_mcp_preview_verify( $token ) {
 	return isset( $tokens[ $nonce ] ) ? (int) $post_id : 0;
 }
 
+/** Usuario cuyo borrador de Elementor muestra un token (0 si es una vista previa normal). */
+function spiral_mcp_preview_draft_user( $token ) {
+	$parts = explode( '.', (string) $token );
+	if ( 4 !== count( $parts ) ) {
+		return 0;
+	}
+	$tokens = spiral_mcp_preview_tokens( $parts[0] );
+	$entry  = $tokens[ $parts[2] ] ?? null;
+	return is_array( $entry ) ? (int) ( $entry['draft'] ?? 0 ) : 0;
+}
+
+/** Vista previa del borrador de Elementor: autosave del usuario del token, o null si no hay. */
+function spiral_mcp_preview_elementor_autosave( $post_id, $user_id ) {
+	$post     = get_post( $post_id );
+	$autosave = $post ? wp_get_post_autosave( $post_id, (int) $user_id ) : false;
+	if ( ! $autosave || mysql2date( 'U', $autosave->post_modified_gmt, false ) <= mysql2date( 'U', $post->post_modified_gmt, false ) ) {
+		return null;
+	}
+	return (int) $autosave->ID;
+}
+
 /** URL de vista previa de un post con un token. */
 function spiral_mcp_preview_link( WP_Post $post, $token ) {
 	$link = 'publish' === $post->post_status ? get_permalink( $post ) : add_query_arg( 'preview', 'true', get_permalink( $post ) );
@@ -83,9 +114,18 @@ add_action( 'init', function () {
 	if ( is_admin() || empty( $_GET['spiral_preview'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		return;
 	}
-	$post_id = spiral_mcp_preview_verify( sanitize_text_field( wp_unslash( $_GET['spiral_preview'] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	$token   = sanitize_text_field( wp_unslash( $_GET['spiral_preview'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	$post_id = spiral_mcp_preview_verify( $token );
 	if ( ! $post_id ) {
 		return;
+	}
+	// Borrador de Elementor: Elementor renderiza el autosave (con su CSS de vista previa) en vez del documento guardado.
+	$draft_user = spiral_mcp_preview_draft_user( $token );
+	$autosave   = $draft_user ? spiral_mcp_preview_elementor_autosave( $post_id, $draft_user ) : null;
+	if ( $autosave ) {
+		add_filter( 'elementor/documents/get/post_id', function ( $id ) use ( $post_id, $autosave ) {
+			return (int) $id === $post_id ? $autosave : $id;
+		} );
 	}
 	add_filter( 'posts_results', function ( $posts, $query ) use ( $post_id ) {
 		if ( $query->is_main_query() && 1 === count( $posts ) && (int) $posts[0]->ID === $post_id && 'publish' !== $posts[0]->post_status ) {
@@ -331,7 +371,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	spiral_mcp_register_ability( 'spiral-mcp/get-preview-url', array(
 		'label'               => 'Obtener URL de vista previa',
-		'description'         => 'Devuelve una URL temporal para ver una página o entrada (también borradores, pendientes o programadas) sin iniciar sesión: por ejemplo, para abrirla con tu navegador y hacer una captura antes de publicar. Caduca a las "hours" horas (1 por defecto, máximo 24), solo sirve para ese contenido, no se indexa y se puede revocar con spiral-mcp/revoke-preview-url. Compártela solo con quien deba ver el borrador.',
+		'description'         => 'Devuelve una URL temporal para ver una página o entrada (también borradores, pendientes o programadas) sin iniciar sesión: por ejemplo, para abrirla con tu navegador y hacer una captura antes de publicar. Caduca a las "hours" horas (1 por defecto, máximo 24), solo sirve para ese contenido, no se indexa y se puede revocar con spiral-mcp/revoke-preview-url. Compártela solo con quien deba ver el borrador. En una página de Elementor, "draft": true muestra tu borrador de Elementor (el autosave de patch-elementor-data con "draft": true) en vez de la versión publicada.',
 		'category'            => 'spiral-mcp-preview',
 		'log'                 => array( 'type' => 'post', 'id' => 'id' ),
 		'input_schema'        => array(
@@ -340,6 +380,7 @@ add_action( 'wp_abilities_api_init', function () {
 			'properties' => array(
 				'id'    => array( 'type' => 'integer' ),
 				'hours' => array( 'type' => 'number', 'minimum' => 0.1, 'maximum' => 24, 'default' => 1 ),
+				'draft' => array( 'type' => 'boolean', 'default' => false, 'description' => 'Página de Elementor: ver tu borrador (autosave) en vez de la versión guardada.' ),
 			),
 		),
 		'permission_callback' => $can_post,
@@ -351,15 +392,22 @@ add_action( 'wp_abilities_api_init', function () {
 			if ( 'trash' === $post->post_status ) {
 				return new WP_Error( 'spiral_mcp_trashed', 'El contenido está en la papelera.' );
 			}
-			$hours                    = min( 24, max( 0.1, (float) ( $input['hours'] ?? 1 ) ) );
-			list( $token, $id, $exp ) = spiral_mcp_preview_create( $post->ID, (int) round( $hours * HOUR_IN_SECONDS ) );
+			$hours = min( 24, max( 0.1, (float) ( $input['hours'] ?? 1 ) ) );
+			$draft = ! empty( $input['draft'] );
+			$notes = array();
+			if ( $draft && ! spiral_mcp_preview_elementor_autosave( $post->ID, get_current_user_id() ) ) {
+				$draft   = false;
+				$notes[] = 'No tienes ningún borrador de Elementor de este contenido: la URL muestra la versión guardada.';
+			}
+			list( $token, $id, $exp ) = spiral_mcp_preview_create( $post->ID, (int) round( $hours * HOUR_IN_SECONDS ), $draft ? get_current_user_id() : 0 );
 			return array(
 				'id'         => (int) $post->ID,
 				'status'     => $post->post_status,
 				'url'        => spiral_mcp_preview_link( $post, $token ),
 				'token_id'   => $id,
 				'expires_at' => gmdate( 'Y-m-d\TH:i:s\Z', $exp ),
-			);
+				'draft'      => $draft,
+			) + ( $notes ? array( 'notes' => $notes ) : array() );
 		},
 		'meta'                => spiral_mcp_meta( false ),
 	) );
@@ -390,7 +438,7 @@ add_action( 'wp_abilities_api_init', function () {
 
 	spiral_mcp_register_ability( 'spiral-mcp/inspect-page', array(
 		'label'               => 'Inspeccionar una página',
-		'description'         => 'Renderiza una página como la ve un visitante (también borradores, con una vista previa interna que se revoca al terminar) y devuelve un informe sin el HTML: código HTTP; SEO efectivo (title, description, canonical, robots, Open Graph); encabezados h1–h6 en orden ("in_content": false si son del tema, como widgets de la cabecera o el formulario de comentarios); enlaces internos agrupados por destino ("count" y "texts"; con su código HTTP: los rotos van en links.broken, con "target_status" si el destino existe pero no está publicado; "self" si apuntan a la propia vista previa) y externos; imágenes sin alt; "warnings" con lo que conviene corregir en el contenido (sin h1, varios h1, saltos de nivel, sin description, enlaces rotos, imágenes sin alt); y "notes" aclaratorias. Úsala antes de publicar y después de cada cambio importante. Indica "id" o "path" (ruta relativa, p. ej. /contacto/).',
+		'description'         => 'Renderiza una página como la ve un visitante (también borradores, con una vista previa interna que se revoca al terminar) y devuelve un informe sin el HTML: código HTTP; SEO efectivo (title, description, canonical, robots, Open Graph); encabezados h1–h6 en orden ("in_content": false si son del tema, como widgets de la cabecera o el formulario de comentarios); enlaces internos agrupados por destino ("count" y "texts"; con su código HTTP: los rotos van en links.broken, con "target_status" si el destino existe pero no está publicado; "self" si apuntan a la propia vista previa) y externos; imágenes sin alt; "warnings" con lo que conviene corregir en el contenido (sin h1, varios h1, saltos de nivel, sin description, enlaces rotos, imágenes sin alt); y "notes" aclaratorias. Úsala antes de publicar y después de cada cambio importante. Indica "id" o "path" (ruta relativa, p. ej. /contacto/). En una página de Elementor, "draft": true inspecciona tu borrador de Elementor (autosave) en vez de la versión publicada.',
 		'category'            => 'spiral-mcp-preview',
 		'group'               => array( 'content', 'design' ),
 		'input_schema'        => array(
@@ -400,6 +448,7 @@ add_action( 'wp_abilities_api_init', function () {
 				'path'        => array( 'type' => 'string', 'description' => 'Ruta relativa del sitio, p. ej. / o /contacto/.' ),
 				'check_links' => array( 'type' => 'boolean', 'default' => true ),
 				'max_links'   => array( 'type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'default' => 40 ),
+				'draft'       => array( 'type' => 'boolean', 'default' => false, 'description' => 'Con "id" de una página de Elementor: inspeccionar tu borrador (autosave).' ),
 			),
 		),
 		'permission_callback' => function ( $input = array() ) {
@@ -414,12 +463,16 @@ add_action( 'wp_abilities_api_init', function () {
 				if ( is_wp_error( $post ) ) {
 					return $post;
 				}
-				$public = 'publish' === $post->post_status;
+				$draft  = ! empty( $input['draft'] ) && spiral_mcp_preview_elementor_autosave( $post->ID, get_current_user_id() );
+				$public = 'publish' === $post->post_status && ! $draft;
 				if ( $public ) {
 					$url = get_permalink( $post );
 				} else {
-					list( $token, $revoke ) = spiral_mcp_preview_create( $post->ID, 10 * MINUTE_IN_SECONDS );
+					list( $token, $revoke ) = spiral_mcp_preview_create( $post->ID, 10 * MINUTE_IN_SECONDS, $draft ? get_current_user_id() : 0 );
 					$url                    = spiral_mcp_preview_link( $post, $token );
+				}
+				if ( ! empty( $input['draft'] ) && ! $draft ) {
+					$draft_note = 'No tienes ningún borrador de Elementor de este contenido: se inspeccionó la versión guardada.';
 				}
 			} elseif ( ! empty( $input['path'] ) ) {
 				$path = (string) $input['path'];
@@ -444,12 +497,16 @@ add_action( 'wp_abilities_api_init', function () {
 				array_unshift( $report['warnings'], sprintf( 'La página responde con HTTP %d.', $code ) );
 			}
 			if ( $revoke ) {
-				$report['notes'][] = 'Inspeccionada como vista previa (no está publicada): el robots "noindex" lo añade la vista previa; al publicar se aplica el del sitio y el SEO del contenido.';
+				$report['notes'][] = ! empty( $draft ) ? 'Inspeccionado tu borrador de Elementor (autosave), no la versión publicada: publícalo con spiral-mcp/publish-elementor-draft.' : 'Inspeccionada como vista previa (no está publicada): el robots "noindex" lo añade la vista previa; al publicar se aplica el del sitio y el SEO del contenido.';
+			}
+			if ( ! empty( $draft_note ) ) {
+				$report['notes'][] = $draft_note;
 			}
 			return array(
 				'url'     => $revoke ? remove_query_arg( array( 'spiral_preview', 'preview' ), $url ) : $url,
 				'status'  => $code,
 				'preview' => (bool) $revoke,
+				'draft'   => ! empty( $draft ),
 			) + $report;
 		},
 		'meta'                => spiral_mcp_meta( true, false, true ),

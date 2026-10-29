@@ -31,6 +31,7 @@ foreach ( wp_get_abilities() as $ability ) {
 $titles = array(
 	'spiral-mcp-content'   => 'Contenido, taxonomías y SEO',
 	'spiral-mcp-layout'    => 'Layouts y elementos',
+	'spiral-mcp-elementor' => 'Elementor (widgets clásicos)',
 	'spiral-mcp-theme'     => 'Tema: áreas, configuración, plantillas, biblioteca, widgets y caché',
 	'spiral-mcp-menus'     => 'Menús',
 	'spiral-mcp-media'     => 'Medios',

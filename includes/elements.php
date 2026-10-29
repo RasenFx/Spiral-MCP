@@ -380,9 +380,10 @@ function spiral_mcp_sanitize_props( array &$props, $prefix = '' ) {
 		if ( ! is_string( $value ) || '' === $value ) {
 			continue;
 		}
-		// Un enlace o ruta con protocolo peligroso (javascript:, data:…): como en los atributos href.
+		// Un enlace con protocolo peligroso (javascript:, data:…): como en los atributos href.
+		// Solo esos: un texto como "Horario: 9-18" también empieza por "palabra:" y no se toca.
 		if ( false === strpos( $value, '<' ) ) {
-			if ( preg_match( '/^\s*[a-z][a-z0-9+.\-]*\s*:/i', $value ) ) {
+			if ( preg_match( '/^\s*(javascript|vbscript|data|livescript|mocha)\s*:/i', $value ) ) {
 				$clean = wp_kses_bad_protocol( $value, wp_allowed_protocols() );
 				if ( $clean !== $value ) {
 					$value     = $clean;

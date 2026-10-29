@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Spiral-MCP-Control
  * Description:       Registra abilities (Abilities API) para que un agente de IA gestione el sitio a través del MCP Adapter: contenido, medios, menús, widgets, SEO, ajustes, cachés y plugins con cualquier tema; el builder, la configuración, las plantillas y los estilos con YOOtheme Pro; y con Elementor, sus herramientas elementor/* bajo los mismos permisos y auditoría. Con registro de auditoría, snapshots y rol propio para el agente.
- * Version:           1.32.1
+ * Version:           1.33.0
  * Requires at least: 6.9
  * Requires PHP:      8.1
  * Requires Plugins:  mcp-adapter
@@ -13,7 +13,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-const SPIRAL_MCP_VERSION = '1.32.1';
+const SPIRAL_MCP_VERSION = '1.33.0';
 const SPIRAL_MCP_FILE    = __FILE__;
 define( 'SPIRAL_MCP_DIR', plugin_dir_path( __FILE__ ) );
 
@@ -33,6 +33,7 @@ if ( ! function_exists( 'wp_register_ability' ) ) {
 require_once SPIRAL_MCP_DIR . 'includes/core.php';
 require_once SPIRAL_MCP_DIR . 'includes/permissions.php';
 require_once SPIRAL_MCP_DIR . 'includes/elementor.php';
+require_once SPIRAL_MCP_DIR . 'includes/elementor-data.php';
 require_once SPIRAL_MCP_DIR . 'includes/activity.php';
 require_once SPIRAL_MCP_DIR . 'includes/snapshots.php';
 require_once SPIRAL_MCP_DIR . 'includes/install.php';
