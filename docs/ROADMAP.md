@@ -463,6 +463,22 @@ Motivo: en los sitios reales las páginas están hechas con widgets clásicos (V
 
 ---
 
+## Fase 14 — Tipos de contenido y taxonomías (Custom Post Type UI) (v1.34.0)
+
+Que el agente pueda dar estructura a un sitio sin wp-admin: un tipo «proyecto» con su taxonomía «sector», un tipo «testimonio»… Custom Post Type UI (CPTUI) es el plugin habitual para eso y guarda todo en dos opciones, así que la integración es pequeña y reversible.
+
+**Decisiones:**
+- **Escribir las opciones de CPTUI con su estructura y sus hooks**, no llamar a `cptui_update_post_type()` / `cptui_update_taxonomy()`: dependen de `$_POST` y de `manage_options` (ver CLAUDE.md). Registrar al momento con `cptui_register_single_*()` y hacer el flush que CPTUI deja para el siguiente `admin_init`.
+- **Grupo `settings`** con `edit_theme_options`: es estructura del sitio, como la portada o la identidad; el agente lo tiene por defecto. Borrar y renombrar exigen `confirm`; borrar no toca los contenidos ni los términos (como CPTUI) y lo avisa; `delete_content` los manda a la papelera.
+- Después de crear, todo lo demás ya existe: `list-post-types`, `create-content`, `create-term`, `terms`, SEO, menús. Los enums de `post_type` y `taxonomy` se calculan al registrar las abilities: el tipo nuevo entra en la siguiente petición.
+
+- [x] `includes/cptui.php`: diez abilities, validaciones de CPTUI, registro inmediato, snapshot kinds `cptui_post_type` y `cptui_taxonomy`.
+- [x] Prueba funcional con el rol del agente (82 comprobaciones) y sección de `tests/smoke.sh`.
+- [x] Skill (descripción, convención, receta, errores, referencia), README, CLAUDE.md, CHANGELOG.
+- [ ] Añadir el tipo nuevo a `elementor_cpt_support` desde la ability (hoy solo avisa).
+
+---
+
 ## Fuera de alcance en esta etapa
 - Instalar, activar o actualizar temas. Los plugins se tratan en la Fase 8.
 - WooCommerce: configurar pasarelas de pago, crear o editar pedidos a mano (líneas e importes), editar clientes, informes y analítica, suscripciones y extensiones de pago.

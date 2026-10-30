@@ -41,6 +41,7 @@ $titles = array(
 	'spiral-mcp-snapshots' => 'Snapshots',
 	'spiral-mcp-plugins'   => 'Plugins',
 	'spiral-mcp-forms'     => 'Formularios (Contact Form 7)',
+	'spiral-mcp-cptui'     => 'Tipos de contenido y taxonomías (Custom Post Type UI)',
 	'spiral-mcp-shop'      => 'Tienda (WooCommerce)',
 	'spiral-mcp-orders'    => 'Pedidos y clientes (WooCommerce)',
 	'spiral-mcp-languages' => 'Idiomas (Polylang)',

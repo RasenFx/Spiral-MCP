@@ -2,6 +2,16 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.34.0] — 2026-10-30 · Tipos de contenido y taxonomías con Custom Post Type UI
+
+### Añadido
+- `includes/cptui.php` (categoría `spiral-mcp-cptui`, grupo `settings`), solo si Custom Post Type UI está activo: el agente crea, lee, edita, renombra y borra los tipos de contenido y las taxonomías personalizados de CPTUI. Diez abilities: `list-custom-post-types`, `get-custom-post-type`, `create-custom-post-type`, `update-custom-post-type` (con `new_name` + `confirm` para renombrar: mueve los contenidos y reasigna las taxonomías de CPTUI), `delete-custom-post-type` (`confirm`; `delete_content` manda sus contenidos a la papelera), `list-custom-taxonomies`, `get-custom-taxonomy`, `create-custom-taxonomy`, `update-custom-taxonomy` (renombrar mueve los términos) y `delete-custom-taxonomy`. Mismos ajustes que el formulario de CPTUI (visibilidad, archivo, URLs, menú, icono, `supports`, `taxonomies`, `object_types`, `labels`, término por defecto…), con los valores por defecto de CPTUI.
+- Se escriben las opciones `cptui_post_types` / `cptui_taxonomies` con la estructura de CPTUI, disparando sus hooks (`cptui_before_update_*`, `cptui_pre_save_*`, `cptui_*_update_save`, `cptui_after_update_*` y los de borrado) y su transient de flush; el tipo o la taxonomía se registra en la misma petición (`cptui_register_single_post_type()` / `cptui_register_single_taxonomy()`) y se regeneran las reglas de reescritura, así la respuesta ya trae `registered_args` y en la siguiente llamada el tipo entra en `list-post-types`, `list-content` y `create-content`, y la taxonomía en `create-term` y `terms`.
+- Validaciones de CPTUI: slug en minúsculas (20 caracteres en tipos, 32 en taxonomías), reservados (`cptui_reserved_post_types()` / `cptui_reserved_taxonomies()`), ya registrado por el tema u otro plugin, choque con el slug de una página, comillas; además `supports`, taxonomías y tipos existentes, `menu_position`, `capability_type` y etiquetas desconocidas (aviso).
+- Snapshot kinds `cptui_post_type` y `cptui_taxonomy` (la entrada guardada; restaurar la recrea o la quita y la registra o desregistra al momento). Al borrar, los contenidos o términos no se tocan y la respuesta avisa de cuántos quedan sin tipo o taxonomía registrada.
+- `tests/smoke.sh`: sección de CPTUI (rechazos, crear tipo y taxonomía, contenido y término en el tipo nuevo, editar, renombrar, snapshots, borrar y limpieza).
+- Skill: descripción, convención «Tipos de contenido personalizados», receta «Crear un tipo de contenido personalizado (CPTUI)», errores nuevos y referencia de abilities.
+
 ## [1.33.0] — 2026-10-29 · Widgets clásicos de Elementor
 
 ### Añadido

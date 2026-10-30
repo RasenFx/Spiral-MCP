@@ -1,6 +1,6 @@
 # Referencia de abilities spiral-mcp/*
 
-Generada a partir de los esquemas registrados por el plugin (v1.33.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
+Generada a partir de los esquemas registrados por el plugin (v1.34.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
 
 Las abilities de YOOtheme (layouts, `get-yootheme-layout`, áreas del tema, configuración, plantillas, biblioteca, librería online y estilo) solo existen si YOOtheme Pro es el tema activo. En un sitio con Elementor el diseño va por las herramientas `elementor/*` de su MCP, que no están en esta referencia: lee su descripción en la lista de herramientas (ver «Sitios con Elementor» en `SKILL.md`).
 
@@ -20,6 +20,7 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 - [Snapshots](#snapshots)
 - [Plugins](#plugins)
 - [Formularios (Contact Form 7)](#formularios-contact-form-7)
+- [Tipos de contenido y taxonomías (Custom Post Type UI)](#tipos-de-contenido-y-taxonomias-custom-post-type-ui)
 - [Tienda (WooCommerce)](#tienda-woocommerce)
 - [Pedidos y clientes (WooCommerce)](#pedidos-y-clientes-woocommerce)
 - [Idiomas (Polylang)](#idiomas-polylang)
@@ -191,6 +192,21 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 | `create-form` | escritura | **title** `string`, template `string`, mail `object`, mail_2 `object`, messages `object`, additional_settings `string`, confirm `boolean`, copy_from `string / integer`, locale `string` |
 | `update-form` | escritura | **id** `string / integer`, title `string`, template `string`, mail `object`, mail_2 `object`, messages `object`, additional_settings `string`, confirm `boolean` |
 | `delete-form` | destructiva | **id** `string / integer`, **confirm** `boolean` |
+
+## Tipos de contenido y taxonomías (Custom Post Type UI)
+
+| Ability | Tipo | Parámetros |
+|---|---|---|
+| `list-custom-post-types` | lectura | — |
+| `get-custom-post-type` | lectura | **name** `string` |
+| `create-custom-post-type` | escritura | **name** `string`, label `string`, singular_label `string`, description `string`, public `boolean`, publicly_queryable `boolean`, show_ui `boolean`, show_in_menu `boolean`, show_in_menu_string `string`, show_in_nav_menus `boolean`, show_in_rest `boolean`, rest_base `string`, has_archive `boolean`, has_archive_string `string`, exclude_from_search `boolean`, capability_type `string`, hierarchical `boolean`, can_export `boolean`, delete_with_user `boolean`, rewrite `boolean`, rewrite_slug `string`, rewrite_withfront `boolean`, query_var `boolean`, query_var_slug `string`, menu_position `string / integer`, menu_icon `string`, supports `array`, custom_supports `string`, taxonomies `array`, labels `object`, enter_title_here `string` |
+| `update-custom-post-type` | escritura | **name** `string`, new_name `string`, confirm `boolean`, label `string`, singular_label `string`, description `string`, public `boolean`, publicly_queryable `boolean`, show_ui `boolean`, show_in_menu `boolean`, show_in_menu_string `string`, show_in_nav_menus `boolean`, show_in_rest `boolean`, rest_base `string`, has_archive `boolean`, has_archive_string `string`, exclude_from_search `boolean`, capability_type `string`, hierarchical `boolean`, can_export `boolean`, delete_with_user `boolean`, rewrite `boolean`, rewrite_slug `string`, rewrite_withfront `boolean`, query_var `boolean`, query_var_slug `string`, menu_position `string / integer`, menu_icon `string`, supports `array`, custom_supports `string`, taxonomies `array`, labels `object`, enter_title_here `string` |
+| `delete-custom-post-type` | destructiva | **name** `string`, **confirm** `boolean`, delete_content `boolean` |
+| `list-custom-taxonomies` | lectura | — |
+| `get-custom-taxonomy` | lectura | **name** `string` |
+| `create-custom-taxonomy` | escritura | **name** `string`, label `string`, singular_label `string`, description `string`, **object_types** `array`, public `boolean`, publicly_queryable `boolean`, hierarchical `boolean`, show_ui `boolean`, show_in_menu `boolean`, show_in_nav_menus `boolean`, show_in_rest `boolean`, rest_base `string`, show_admin_column `boolean`, show_tagcloud `boolean`, show_in_quick_edit `boolean`, sort `boolean`, rewrite `boolean`, rewrite_slug `string`, rewrite_withfront `boolean`, rewrite_hierarchical `boolean`, query_var `boolean`, query_var_slug `string`, default_term `string`, labels `object` |
+| `update-custom-taxonomy` | escritura | **name** `string`, new_name `string`, confirm `boolean`, label `string`, singular_label `string`, description `string`, object_types `array`, public `boolean`, publicly_queryable `boolean`, hierarchical `boolean`, show_ui `boolean`, show_in_menu `boolean`, show_in_nav_menus `boolean`, show_in_rest `boolean`, rest_base `string`, show_admin_column `boolean`, show_tagcloud `boolean`, show_in_quick_edit `boolean`, sort `boolean`, rewrite `boolean`, rewrite_slug `string`, rewrite_withfront `boolean`, rewrite_hierarchical `boolean`, query_var `boolean`, query_var_slug `string`, default_term `string`, labels `object` |
+| `delete-custom-taxonomy` | destructiva | **name** `string`, **confirm** `boolean` |
 
 ## Tienda (WooCommerce)
 

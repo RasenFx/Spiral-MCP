@@ -490,6 +490,110 @@ else
 	ok 'formularios: Contact Form 7 no está activo (se omiten)'
 fi
 
+# Tipos de contenido y taxonomías de Custom Post Type UI (solo si está activo: si no, las abilities no se registran).
+# El tipo se crea en una petición y en la siguiente ya entra en el enum de post_type de list-content / create-content.
+call GET spiral-mcp/list-custom-post-types
+if [ "$STATUS" = 200 ]; then
+	check 'list-custom-post-types' 200 post_types plugin other_post_types
+	call POST spiral-mcp/create-custom-post-type '{"name":"post"}'
+	printf '%s' "$BODY" | grep -q spiral_mcp_cptui_reserved && ok 'create-custom-post-type: rechaza un slug reservado' || ko 'create-custom-post-type debería rechazar "post"'
+	call POST spiral-mcp/create-custom-post-type '{"name":"Smoke Tipo"}'
+	printf '%s' "$BODY" | grep -q spiral_mcp_bad_slug && ok 'create-custom-post-type: rechaza mayúsculas y espacios' || ko 'create-custom-post-type debería rechazar "Smoke Tipo"'
+	call POST spiral-mcp/create-custom-post-type '{"name":"smk_proyecto","label":"Proyectos smoke","singular_label":"Proyecto smoke","has_archive":true,"rewrite_slug":"proyectos-smoke","supports":["title","editor","thumbnail","excerpt"],"menu_icon":"dashicons-portfolio","labels":{"add_new_item":"Añadir proyecto"}}'
+	if check 'create-custom-post-type' 200 created snapshot_id settings registered_args; then
+		eq 'create-custom-post-type: registrado al momento' registered true
+		eq 'create-custom-post-type: archivo' archive_url /proyectos-smoke/
+		eq 'create-custom-post-type: etiqueta registrada' registered_args.labels.add_new_item 'Añadir proyecto'
+		CPT_SNAPSHOT=$(jget snapshot_id)
+		call POST spiral-mcp/create-custom-post-type '{"name":"smk_proyecto"}'
+		printf '%s' "$BODY" | grep -q spiral_mcp_cptui_exists && ok 'create-custom-post-type: rechaza un slug ya usado por CPTUI' || ko 'create-custom-post-type debería rechazar el duplicado'
+		call GET spiral-mcp/list-post-types
+		printf '%s' "$BODY" | grep -q '"name":"smk_proyecto"' && ok 'list-post-types ve el tipo nuevo' || ko 'list-post-types debería ver smk_proyecto'
+		call POST spiral-mcp/create-content '{"post_type":"smk_proyecto","title":"Proyecto smoke","status":"publish","content":"<p>Proyecto de prueba.</p>"}'
+		if check 'create-content en el tipo nuevo' 200 id; then
+			CPT_POST_ID=$(jget id)
+			call GET spiral-mcp/list-content '{"post_type":"smk_proyecto","status":"publish"}'
+			check 'list-content filtra por el tipo nuevo' 200 items.0.id
+			eq 'list-content: tipo' items.0.type smk_proyecto
+		fi
+		call POST spiral-mcp/create-custom-taxonomy '{"name":"smk_sector","label":"Sectores smoke","singular_label":"Sector smoke","object_types":["smk_proyecto"],"hierarchical":true,"show_admin_column":true}'
+		if check 'create-custom-taxonomy' 200 created snapshot_id settings; then
+			eq 'create-custom-taxonomy: registrada al momento' registered true
+			eq 'create-custom-taxonomy: jerárquica' hierarchical true
+			call GET spiral-mcp/get-custom-taxonomy '{"name":"smk_sector"}'
+			check 'get-custom-taxonomy' 200 settings registered_args
+			eq 'get-custom-taxonomy: tipos' settings.object_types '["smk_proyecto"]'
+			call POST spiral-mcp/create-term '{"taxonomy":"smk_sector","name":"Industria smoke"}'
+			if check 'create-term en la taxonomía nueva' 200 id; then
+				CPT_TERM_ID=$(jget id)
+				if [ -n "${CPT_POST_ID:-}" ]; then
+					call POST spiral-mcp/update-content "{\"id\":$CPT_POST_ID,\"terms\":{\"smk_sector\":[$CPT_TERM_ID]}}"
+					check 'update-content asigna el término de la taxonomía nueva' 200 id
+					call GET spiral-mcp/get-content "{\"id\":$CPT_POST_ID}"
+					printf '%s' "$BODY" | grep -q 'Industria smoke' && ok 'get-content: término asignado' || ko 'get-content debería mostrar el término'
+				fi
+			fi
+			call POST spiral-mcp/update-custom-taxonomy '{"name":"smk_sector","object_types":["smk_proyecto","post"],"show_admin_column":false}'
+			check 'update-custom-taxonomy' 200 updated snapshot_id
+			eq 'update-custom-taxonomy: tipos' object_types '["smk_proyecto","post"]'
+			call POST spiral-mcp/update-custom-taxonomy '{"name":"smk_sector","new_name":"smk_sector2"}'
+			printf '%s' "$BODY" | grep -q spiral_mcp_confirm && ok 'update-custom-taxonomy: renombrar exige confirm' || ko 'update-custom-taxonomy debería exigir confirm para renombrar'
+		fi
+		call GET spiral-mcp/get-custom-post-type '{"name":"smk_proyecto"}'
+		check 'get-custom-post-type' 200 settings registered_args count
+		eq 'get-custom-post-type: supports' settings.supports '["title","editor","thumbnail","excerpt"]'
+		call POST spiral-mcp/update-custom-post-type '{"name":"smk_proyecto"}'
+		printf '%s' "$BODY" | grep -q spiral_mcp_nothing && ok 'update-custom-post-type: sin cambios se rechaza' || ko 'update-custom-post-type sin cambios'
+		call POST spiral-mcp/update-custom-post-type '{"name":"smk_proyecto","label":"Trabajos smoke","has_archive":false}'
+		check 'update-custom-post-type' 200 updated snapshot_id
+		eq 'update-custom-post-type: etiqueta' label 'Trabajos smoke'
+		eq 'update-custom-post-type: singular conservado' singular_label 'Proyecto smoke'
+		eq 'update-custom-post-type: sin archivo' has_archive false
+		call POST spiral-mcp/update-custom-post-type '{"name":"smk_proyecto","new_name":"smk_trabajo"}'
+		printf '%s' "$BODY" | grep -q spiral_mcp_confirm && ok 'update-custom-post-type: renombrar exige confirm' || ko 'update-custom-post-type debería exigir confirm para renombrar'
+		call POST spiral-mcp/update-custom-post-type '{"name":"smk_proyecto","new_name":"smk_trabajo","confirm":true}'
+		if check 'update-custom-post-type: renombrar' 200 renamed_from moved snapshot_id_new; then
+			eq 'renombrar: contenidos movidos' moved 1
+			call GET spiral-mcp/get-content "{\"id\":${CPT_POST_ID:-0}}"
+			eq 'renombrar: el contenido tiene el tipo nuevo' type smk_trabajo
+			call GET spiral-mcp/list-custom-taxonomies
+			printf '%s' "$BODY" | grep -q '"smk_trabajo"' && ok 'renombrar: la taxonomía sigue asignada al tipo nuevo' || ko 'renombrar debería reasignar la taxonomía'
+			CPT_NAME=smk_trabajo
+		else
+			CPT_NAME=smk_proyecto
+		fi
+		call GET spiral-mcp/list-snapshots '{"kind":"cptui_post_type","per_page":5}'
+		check 'list-snapshots cptui_post_type' 200 items.0.id
+		# Término y contenido fuera antes de quitar la taxonomía y el tipo: sin ellos registrados ya no habría forma de borrarlos por REST.
+		if [ -n "${CPT_TERM_ID:-}" ]; then
+			call DELETE spiral-mcp/delete-term "{\"term_id\":$CPT_TERM_ID,\"confirm\":true}"
+			check 'delete-term de la taxonomía smoke' 200 deleted
+		fi
+		if [ -n "${CPT_POST_ID:-}" ]; then
+			call POST spiral-mcp/trash-content "{\"id\":$CPT_POST_ID}"
+			call DELETE spiral-mcp/delete-content "{\"id\":$CPT_POST_ID,\"confirm\":true}"
+			check 'delete-content del contenido smoke' 200 deleted
+		fi
+		call POST spiral-mcp/delete-custom-taxonomy '{"name":"smk_sector","confirm":false}'
+		[ "$STATUS" -ge 400 ] && ok 'delete-custom-taxonomy exige confirm' || ko 'delete-custom-taxonomy sin confirm no debería borrar'
+		call POST spiral-mcp/delete-custom-taxonomy '{"name":"smk_sector","confirm":true}'
+		check 'delete-custom-taxonomy' 200 deleted snapshot_id
+		call POST spiral-mcp/delete-custom-post-type "{\"name\":\"$CPT_NAME\",\"confirm\":false}"
+		[ "$STATUS" -ge 400 ] && ok 'delete-custom-post-type exige confirm' || ko 'delete-custom-post-type sin confirm no debería borrar'
+		call POST spiral-mcp/delete-custom-post-type "{\"name\":\"$CPT_NAME\",\"confirm\":true,\"delete_content\":true}"
+		if check 'delete-custom-post-type' 200 deleted snapshot_id trashed count; then
+			eq 'delete-custom-post-type: sin contenidos que dejar sin tipo' count 0
+		fi
+		# Restaurar el snapshot de la creación (null) deja el sitio como estaba si algo quedó a medias.
+		call POST spiral-mcp/restore-snapshot "{\"id\":$CPT_SNAPSHOT,\"confirm\":true,\"include_later\":true}"
+		check 'restore-snapshot del tipo (vuelve a no existir)' 200 restored
+		call GET spiral-mcp/list-custom-post-types
+		printf '%s' "$BODY" | grep -q '"smk_' && ko 'limpieza: quedan tipos smoke en CPTUI' || ok 'limpieza: sin tipos smoke en CPTUI'
+	fi
+else
+	ok 'tipos de contenido: Custom Post Type UI no está activo (se omiten)'
+fi
+
 # Ajustes generales de Yoast SEO (solo si está activo: si no, las abilities no se registran).
 call GET spiral-mcp/get-seo-settings
 if [ "$STATUS" = 200 ]; then

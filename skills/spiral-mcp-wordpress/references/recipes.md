@@ -23,6 +23,7 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 - [Un cambio no se ve (cachés)](#un-cambio-no-se-ve-cachés)
 - [Acelerar el sitio](#acelerar-el-sitio)
 - [Añadir un formulario de contacto](#añadir-un-formulario-de-contacto)
+- [Crear un tipo de contenido personalizado (CPTUI)](#crear-un-tipo-de-contenido-personalizado-cptui)
 - [Tienda: crear un producto](#tienda-crear-un-producto)
 - [Tienda: producto con variaciones (tallas, colores)](#tienda-producto-con-variaciones-tallas-colores)
 - [Tienda: abrirla (moneda, envíos, impuestos)](#tienda-abrirla-moneda-envíos-impuestos)
@@ -274,6 +275,17 @@ Necesita Contact Form 7 activo (si no, no existen las herramientas `*-form`; pro
 6. Inserta el `shortcode` en la página: `patch-layout` con un elemento `{"type": "text", "props": {"content": "<p>[contact-form-7 id=\"a58ff5f\" title=\"Contacto\"]</p>"}}` donde corresponda (o en el contenido, si la página no usa YOOtheme).
 7. Revisa con `get-preview-url` + una captura o `inspect-page`, y mira `config_errors` de la respuesta: CF7 avisa, p. ej., de un remitente de otro dominio, o de "Unsafe email config" si activas el correo de respuesta al visitante (`mail_2`) sin reCAPTCHA o Turnstile (díselo al usuario).
 8. Contact Form 7 no guarda los mensajes recibidos (`stores_submissions` en `list-forms`; hace falta el plugin Flamingo).
+
+## Crear un tipo de contenido personalizado (CPTUI)
+
+Necesita Custom Post Type UI activo (si no, no existen las herramientas `*-custom-post-type`; propón instalarlo con la receta «Instalar un plugin», solo si el usuario quiere). Ejemplo: una sección «Proyectos» clasificados por «Sector».
+
+1. `list-post-types` y `list-taxonomies`: comprueba que no exista ya algo equivalente (un tipo del tema o de otro plugin no se gestiona con CPTUI). `list-custom-post-types` dice qué ha creado CPTUI y `other_post_types`, los demás.
+2. `create-custom-post-type {"name": "proyecto", "label": "Proyectos", "singular_label": "Proyecto", "has_archive": true, "supports": ["title", "editor", "thumbnail", "excerpt"], "menu_icon": "dashicons-portfolio", "menu_position": 20}`. El `name` es el slug interno (minúsculas, sin espacios, 20 caracteres como mucho) y no conviene cambiarlo después; `rewrite_slug` cambia solo la URL (`/trabajos/…`). `"hierarchical": true` lo hace funcionar como las páginas (con padre y orden); por defecto funciona como las entradas. La respuesta trae `registered_args` (cómo lo ha registrado WordPress) y `archive_url`.
+3. `create-custom-taxonomy {"name": "sector", "label": "Sectores", "singular_label": "Sector", "object_types": ["proyecto"], "hierarchical": true, "show_admin_column": true}`. `hierarchical` = como las categorías; sin él, como las etiquetas. Para asignar al tipo una taxonomía que ya existe (`category`, `post_tag`), usa `"taxonomies"` en `create-custom-post-type` / `update-custom-post-type`.
+4. Desde la siguiente llamada el tipo y la taxonomía son normales: `create-term {"taxonomy": "sector", "name": "Industria"}`, `create-content {"post_type": "proyecto", "title": "…", "status": "draft", "terms": {"sector": ["industria"]}, "featured_media": 12}`, `list-content {"post_type": "proyecto"}`, SEO con `update-seo`, y un elemento de menú al archivo (`add-menu-item` con `type: custom` y la `archive_url`) o a cada proyecto.
+5. Si el sitio usa Elementor y el usuario quiere diseñar los proyectos con él, hay que añadir el tipo en Elementor > Ajustes > Tipos de contenido (no hay herramienta para eso): díselo. Con YOOtheme, las plantillas (`create-template`) y los elementos dinámicos ya ven el tipo nuevo.
+6. Cambios después: `get-custom-post-type` → `update-custom-post-type` solo con lo que cambia (los demás ajustes se conservan). Renombrar el slug (`new_name` + `confirm`) mueve los contenidos y cambia todas sus URLs: solo si el usuario lo pide, y recuérdale las redirecciones. Borrar (`delete-custom-post-type`, `confirm`) no borra los contenidos: quedan invisibles en la base de datos hasta recrear el tipo o restaurar el `snapshot_id`; con `"delete_content": true` van antes a la papelera.
 
 ## Tienda: crear un producto
 
