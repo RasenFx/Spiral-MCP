@@ -594,6 +594,61 @@ else
 	ok 'tipos de contenido: Custom Post Type UI no está activo (se omiten)'
 fi
 
+# Campos personalizados de Secure Custom Fields (solo si está activo). El grupo de campos se crea con la
+# ability scf/create-field-group de SCF envuelta por Spiral (permiso, confirm, snapshot) y los valores con las de Spiral.
+call GET spiral-mcp/list-custom-fields
+if [ "$STATUS" = 200 ]; then
+	check 'list-custom-fields (todos)' 200 field_groups options_pages field_types
+	call POST scf/create-field-group '{"key":"group_smk_page","title":"Smoke SCF","location":[[{"param":"post_type","operator":"==","value":"page"}]],"fields":[{"key":"field_smk_sub","label":"Subtítulo","name":"smk_subtitulo","type":"text","required":1},{"key":"field_smk_num","label":"Orden","name":"smk_orden","type":"number","min":0,"max":10},{"key":"field_smk_sel","label":"Color","name":"smk_color","type":"select","choices":{"rojo":"Rojo","azul":"Azul"}},{"key":"field_smk_rep","label":"Enlaces","name":"smk_enlaces","type":"repeater","sub_fields":[{"key":"field_smk_rep_t","label":"Texto","name":"texto","type":"text"},{"key":"field_smk_rep_u","label":"URL","name":"url","type":"url"}]}]}'
+	if check 'scf/create-field-group (envuelta por Spiral)' 200 ID key snapshot_id; then
+		SCF_GROUP_ID=$(jget ID)
+		eq 'scf/create-field-group: 4 campos guardados' 'fields.#' 4
+		call GET spiral-mcp/list-custom-fields '{"post_type":"page"}'
+		check 'list-custom-fields page' 200 field_groups.0.fields field_names
+		eq 'list-custom-fields: nombres' field_names '["smk_subtitulo","smk_orden","smk_color","smk_enlaces"]'
+		eq 'list-custom-fields: subcampos del repetidor' 'field_groups.0.fields.3.sub_fields.#' 2
+		call POST spiral-mcp/update-custom-fields "{\"id\":$PAGE_ID,\"fields\":{\"smk_subtitulo\":\"Hola\",\"smk_orden\":50}}"
+		printf '%s' "$BODY" | grep -q spiral_mcp_scf_invalid_value && ok 'update-custom-fields: valida el rango' || ko 'update-custom-fields debería rechazar 50 > max 10'
+		call POST spiral-mcp/update-custom-fields "{\"id\":$PAGE_ID,\"fields\":{\"smk_nope\":1}}"
+		printf '%s' "$BODY" | grep -q spiral_mcp_scf_unknown_field && ok 'update-custom-fields: campo desconocido' || ko 'update-custom-fields debería rechazar smk_nope'
+		call POST spiral-mcp/update-custom-fields "{\"id\":$PAGE_ID,\"fields\":{\"smk_subtitulo\":\"Hola\",\"smk_orden\":3,\"smk_color\":\"azul\",\"smk_enlaces\":[{\"texto\":\"Contacto\",\"url\":\"https://ejemplo.com/contacto/\"}]}}"
+		if check 'update-custom-fields' 200 updated snapshot_id fields resolved; then
+			SCF_SNAPSHOT=$(jget snapshot_id)
+			eq 'update-custom-fields: subtítulo' fields.smk_subtitulo Hola
+			eq 'update-custom-fields: fila del repetidor' fields.smk_enlaces.0.texto Contacto
+		fi
+		call GET spiral-mcp/get-content "{\"id\":$PAGE_ID}"
+		check 'get-content con campos de SCF' 200 field_groups fields resolved
+		eq 'get-content: valor' fields.smk_color azul
+		call POST spiral-mcp/update-content "{\"id\":$PAGE_ID,\"fields\":{\"smk_orden\":7,\"smk_color\":null}}"
+		check 'update-content con fields' 200 fields fields_snapshot_id
+		eq 'update-content: orden' fields.smk_orden 7
+		call GET spiral-mcp/get-custom-fields "{\"id\":$PAGE_ID}"
+		check 'get-custom-fields' 200 fields resolved
+		eq 'get-custom-fields: color borrado' fields.smk_color null
+		call POST spiral-mcp/restore-snapshot "{\"id\":$SCF_SNAPSHOT,\"confirm\":true,\"include_later\":true}"
+		check 'restore-snapshot scf_values' 200 restored
+		call GET spiral-mcp/get-custom-fields "{\"id\":$PAGE_ID}"
+		eq 'restore-snapshot: subtítulo vacío otra vez' fields.smk_subtitulo null
+		call POST spiral-mcp/create-content "{\"post_type\":\"page\",\"title\":\"Smoke SCF\",\"status\":\"draft\",\"fields\":{\"smk_subtitulo\":\"Nueva\"}}"
+		if check 'create-content con fields' 200 id fields; then
+			SCF_PAGE=$(jget id)
+			eq 'create-content: campo guardado' fields.smk_subtitulo Nueva
+			rest DELETE "/wp/v2/pages/$SCF_PAGE&force=true"
+			check 'limpieza: página con campos' 200
+		fi
+		# Las scf/delete-* son destructivas e idempotentes: por REST van con DELETE (la entrada en la query).
+		call DELETE scf/delete-field-group '{"identifier":"group_smk_page"}'
+		printf '%s' "$BODY" | grep -q spiral_mcp_confirm && ok 'scf/delete-field-group exige confirm (Spiral)' || ko 'scf/delete-field-group sin confirm no debería borrar'
+		call DELETE scf/delete-field-group '{"identifier":"group_smk_page","confirm":true}'
+		check 'scf/delete-field-group con confirm' 200 deleted snapshot_id
+		call GET spiral-mcp/list-custom-fields '{"post_type":"page"}'
+		eq 'limpieza: sin grupos smoke' 'field_groups.#' 0
+	fi
+else
+	ok 'campos personalizados: Secure Custom Fields no está activo (se omiten)'
+fi
+
 # Ajustes generales de Yoast SEO (solo si está activo: si no, las abilities no se registran).
 call GET spiral-mcp/get-seo-settings
 if [ "$STATUS" = 200 ]; then

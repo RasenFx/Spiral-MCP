@@ -41,6 +41,7 @@ Las abilities llevan el prefijo `spiral-mcp/`. La referencia completa de paráme
 | Pedidos | con WooCommerce activo y permiso aparte: pedidos (estado, notas, reembolsos) y clientes (lectura) |
 | Idiomas | con Polylang activo: idiomas y ajustes, traducciones de páginas (con su diseño de YOOtheme), entradas y términos, textos sueltos (nombre del sitio, widgets), menús por idioma y selector de idioma; las abilities de contenido, términos, menús y widgets aceptan `language` |
 | Formularios | con Contact Form 7 activo: listar (y dónde se usan), leer, crear, editar y borrar; cambiar a quién llega el correo exige confirmación |
+| Campos personalizados | con Secure Custom Fields activo: qué campos aplican a cada tipo, contenido, término o página de opciones y cómo se escriben; leer y cambiar sus valores (también `fields` en leer, crear y editar contenido), con validación de SCF y snapshot; las herramientas `scf/*` de SCF (grupos de campos, campos, tipos, taxonomías y páginas de opciones) bajo los permisos, la auditoría, los snapshots y la confirmación de Spiral |
 | Tipos de contenido | con Custom Post Type UI activo: crear, leer, editar, renombrar y borrar tipos de contenido y taxonomías personalizados (los mismos ajustes que su formulario), registrados al momento; después se gestionan con las abilities de contenido y términos |
 | Cachés | estado, purga, precarga y ajustes de la herramienta de caché del sitio (ver abajo) |
 | Auditoría | registro de actividad, snapshots y restauración (también parcial) |
@@ -114,7 +115,7 @@ Para añadir otra herramienta sin tocar el plugin, registra un adaptador con el 
   Opcionales: `SMOKE_INSPECT=1` (inspección de páginas), `SMOKE_ONLINE=1` (librería online de YOOtheme), `SMOKE_CACHE_WRITE=1` (escritura de ajustes de caché; el usuario necesita `spiral_mcp_cache`), `SMOKE_PLUGINS=1` (con los dos cerrojos de plugins abiertos para ese usuario: comprueba los protegidos y `confirm`; sin él, comprueba que la gestión está cerrada).
 - Pruebas de seguridad (plan, batería automatizada y resultados): [`docs/pruebas-seguridad.md`](docs/pruebas-seguridad.md). Contra un WordPress **local**: `php tests/security-setup.php /ruta/wordpress https://mi-sitio.test /ruta/privada/creds.env` y después `SEC_ENV=/ruta/privada/creds.env WP_PATH=/ruta/wordpress bash tests/security.sh`.
 - Plugins de prueba para la gestión de plugins en [`tests/fixtures/plugins/`](tests/fixtures/plugins/): uno que da error fatal al cargarse, otro que rompe la web pública, uno incompatible, uno con desinstalación y uno cuya versión 2.0.0 rompe la portada (con un mu-plugin que anuncia esa actualización). Cópialos a `wp-content/plugins` de un sitio **local**.
-- Tras añadir o cambiar abilities: `php tests/gen-skill-abilities.php /ruta/al/wordpress` regenera la referencia del skill. Solo ve las abilities registradas: hazlo con Contact Form 7, Yoast SEO, WooCommerce, Polylang y Custom Post Type UI activos, o quitará sus secciones (revisa el diff).
+- Tras añadir o cambiar abilities: `php tests/gen-skill-abilities.php /ruta/al/wordpress` regenera la referencia del skill. Solo ve las abilities registradas: hazlo con Contact Form 7, Yoast SEO, WooCommerce, Polylang, Custom Post Type UI y Secure Custom Fields activos, o quitará sus secciones (revisa el diff).
 - ZIP de instalación:
 
   ```bash

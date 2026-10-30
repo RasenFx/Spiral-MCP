@@ -2,6 +2,17 @@
 
 Todos los cambios relevantes de Spiral-MCP-Control. Versionado [SemVer](https://semver.org/lang/es/).
 
+## [1.35.0] — 2026-10-30 · Campos personalizados con Secure Custom Fields
+
+### Añadido
+- `includes/scf.php`, solo si Secure Custom Fields (o ACF) está activo. **Valores** (categoría `spiral-mcp-fields`, grupo `content`): `list-custom-fields` (qué grupos y campos aplican a un tipo de contenido, contenido, taxonomía, término o página de opciones, con el tipo de cada campo y cómo se escribe su valor: `value`, `choices`, `sub_fields`, `layouts`; sin parámetros, todos los grupos, las páginas de opciones y los tipos de campo), `get-custom-fields` y `update-custom-fields` (`id`, `term_id` u `options_page`; `fields` = {nombre o clave: valor}, null borra). Además `fields` en `get-content` (con `field_groups` y `resolved`: medios, contenidos, términos y usuarios expandidos), `create-content` y `update-content` (filtro `spiral_mcp_ability_args`). Los valores se normalizan por tipo (booleanos, IDs, enlaces, fechas, filas de repeater/group/flexible_content por nombre o clave de subcampo), se validan con `acf_validate_value()` (obligatorios, min/max…) y el HTML se filtra con `wp_kses_post` sin `unfiltered_html` ni `spiral_mcp_code`. Snapshot kind `scf_values` (restaurable).
+- **Estructura**: las 48 abilities `scf/*` que registra SCF (grupos de campos, campos, tipos de contenido, taxonomías y páginas de opciones) pasan por Spiral con el filtro del core `wp_register_ability_args`, como las de Elementor: grupo `settings`, permiso nativo de SCF (`manage_options`) o `edit_theme_options` (el rol del agente no tiene `manage_options`), auditoría, snapshot antes de cada escritura (kind `scf_entity`, exportación de SCF restaurable con su importador; `snapshot_id` en la respuesta), `"confirm": true` en las de borrar (que devuelven `{deleted, snapshot_id}`), `wp_kses_post` en los textos de campos y grupos sin `unfiltered_html`, `register_meta_box_cb` / `meta_box_cb` / `meta_box_sanitize_cb` / `rest_controller_class` solo con `spiral_mcp_code`, y catálogo en Ajustes > Spiral-MCP. Correcciones sobre SCF: `scf/create-field-group` y `scf/update-field-group` guardan `fields` con el importador (SCF los ignoraba) y devuelven los campos exportados; `scf/import-*` sin `ID` de una clave existente actualiza en vez de duplicar.
+- `tests/smoke.sh`: sección de SCF (grupo de campos por `scf/create-field-group`, listado por tipo, validación, escritura, `get-content`, `update-content` y `create-content` con `fields`, snapshot, `confirm` al borrar).
+- Skill: descripción, convención «Campos personalizados (SCF)», receta «Campos personalizados: crear campos y rellenarlos (SCF)», errores nuevos, referencia regenerada.
+
+### Cambiado
+- CPTUI: `register_meta_box_cb`, `meta_box_cb` (salvo `false`) y `rest_controller_class` exigen `spiral_mcp_code` (son funciones o clases PHP que WordPress ejecutaría).
+
 ## [1.34.0] — 2026-10-30 · Tipos de contenido y taxonomías con Custom Post Type UI
 
 ### Añadido

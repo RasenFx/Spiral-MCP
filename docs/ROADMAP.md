@@ -479,6 +479,22 @@ Que el agente pueda dar estructura a un sitio sin wp-admin: un tipo «proyecto»
 
 ---
 
+## Fase 15 — Campos personalizados (Secure Custom Fields) (v1.35.0)
+
+Un sitio real tiene campos propios (dirección, precio, galería, horario…) en sus tipos de contenido. Secure Custom Fields (fork de ACF en wordpress.org) ya trae 48 abilities `scf/*` para la estructura (grupos de campos, campos, tipos, taxonomías y páginas de opciones), pero exigen `manage_options`, no guardan snapshots, no piden confirmación y no tocan los valores.
+
+**Decisiones:**
+- **Envolver `scf/*`, no reimplementar** (como con Elementor): `wp_register_ability_args` añade grupo `settings`, permiso (`manage_options` de SCF o `edit_theme_options`), auditoría, snapshot `scf_entity` (exportación de SCF, restaurable con su importador), `confirm` en las de borrar, kses en los textos y `spiral_mcp_code` para los callables. Se corrigen de paso dos carencias de SCF: `fields` en create/update-field-group y los duplicados de `import-*`.
+- **Valores con abilities propias** (`list-custom-fields`, `get-custom-fields`, `update-custom-fields`) y `fields` en las de contenido: el agente no debería tener que conocer la forma interna de cada tipo de campo; `list-custom-fields` se la cuenta (`value`, `choices`, `sub_fields`, `layouts`) y la escritura normaliza y valida antes de guardar.
+
+- [x] `includes/scf.php`: valores (3 abilities + `fields` en contenido, snapshot `scf_values`) y envoltorio de `scf/*` (snapshot `scf_entity`).
+- [x] Prueba funcional con el rol del agente (64 comprobaciones) y sección de `tests/smoke.sh`.
+- [x] Skill (descripción, convención, receta, errores, referencia), README, CLAUDE.md, CHANGELOG.
+- [ ] Campos de usuario (`user_<id>`) y de comentarios: fuera por ahora (datos personales).
+- [ ] Bloques de SCF (`acf_register_block_type`) y la UI de opciones de SCF (`acf-ui-options-page`) con valores por `options_page`: probado solo con páginas registradas por código o por `scf/create-ui-options-page`.
+
+---
+
 ## Fuera de alcance en esta etapa
 - Instalar, activar o actualizar temas. Los plugins se tratan en la Fase 8.
 - WooCommerce: configurar pasarelas de pago, crear o editar pedidos a mano (líneas e importes), editar clientes, informes y analítica, suscripciones y extensiones de pago.

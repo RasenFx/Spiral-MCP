@@ -24,6 +24,7 @@ Pasos probados para las tareas habituales. Todas siguen el flujo de `SKILL.md`: 
 - [Acelerar el sitio](#acelerar-el-sitio)
 - [Añadir un formulario de contacto](#añadir-un-formulario-de-contacto)
 - [Crear un tipo de contenido personalizado (CPTUI)](#crear-un-tipo-de-contenido-personalizado-cptui)
+- [Campos personalizados: crear campos y rellenarlos (SCF)](#campos-personalizados-crear-campos-y-rellenarlos-scf)
 - [Tienda: crear un producto](#tienda-crear-un-producto)
 - [Tienda: producto con variaciones (tallas, colores)](#tienda-producto-con-variaciones-tallas-colores)
 - [Tienda: abrirla (moneda, envíos, impuestos)](#tienda-abrirla-moneda-envíos-impuestos)
@@ -286,6 +287,19 @@ Necesita Custom Post Type UI activo (si no, no existen las herramientas `*-custo
 4. Desde la siguiente llamada el tipo y la taxonomía son normales: `create-term {"taxonomy": "sector", "name": "Industria"}`, `create-content {"post_type": "proyecto", "title": "…", "status": "draft", "terms": {"sector": ["industria"]}, "featured_media": 12}`, `list-content {"post_type": "proyecto"}`, SEO con `update-seo`, y un elemento de menú al archivo (`add-menu-item` con `type: custom` y la `archive_url`) o a cada proyecto.
 5. Si el sitio usa Elementor y el usuario quiere diseñar los proyectos con él, hay que añadir el tipo en Elementor > Ajustes > Tipos de contenido (no hay herramienta para eso): díselo. Con YOOtheme, las plantillas (`create-template`) y los elementos dinámicos ya ven el tipo nuevo.
 6. Cambios después: `get-custom-post-type` → `update-custom-post-type` solo con lo que cambia (los demás ajustes se conservan). Renombrar el slug (`new_name` + `confirm`) mueve los contenidos y cambia todas sus URLs: solo si el usuario lo pide, y recuérdale las redirecciones. Borrar (`delete-custom-post-type`, `confirm`) no borra los contenidos: quedan invisibles en la base de datos hasta recrear el tipo o restaurar el `snapshot_id`; con `"delete_content": true` van antes a la papelera.
+
+## Campos personalizados: crear campos y rellenarlos (SCF)
+
+Necesita Secure Custom Fields activo (si no, no existen `list-custom-fields` ni las `scf/*`). Ejemplo: ficha de un «restaurante» (tipo creado con CPTUI) con dirección, precio medio, foto, tipo de cocina y horario.
+
+1. `list-custom-fields {"post_type": "restaurantes"}`: quizá ya haya campos. Sin parámetros lista todos los grupos del sitio y las páginas de opciones.
+2. Crea el grupo con la herramienta de SCF: `scf/create-field-group {"key": "group_restaurante", "title": "Ficha del restaurante", "location": [[{"param": "post_type", "operator": "==", "value": "restaurantes"}]], "fields": [...]}`. Cada campo lleva `key` (`field_…`, único y fijo), `label`, `name` (el que usarás para escribir) y `type`: `text`, `textarea`, `wysiwyg`, `number` (`min`, `max`), `true_false`, `select` / `radio` / `checkbox` (`choices`: {clave: etiqueta}), `image` / `file` / `gallery`, `link`, `url`, `email`, `date_picker`, `post_object` / `relationship` (`post_type`), `taxonomy` (`taxonomy`, `field_type`), `repeater` y `group` (`sub_fields`), `flexible_content` (`layouts`). La respuesta trae `snapshot_id` por si hay que deshacer. Para retocar un campo: `scf/update-field {"ID": …}`; para añadir uno: `scf/create-field` con `parent` = ID del grupo; `scf/update-field-group` con `fields` reemplaza la lista entera.
+3. `list-custom-fields {"post_type": "restaurantes"}` de nuevo: cada campo dice en `value` qué enviar (p. ej. «ID de un medio», «un valor de choices», «lista de filas»).
+4. Rellena al crear o editar: `create-content {"post_type": "restaurantes", "title": "Casa Lucía", "status": "draft", "fields": {"direccion": "Plaza Mayor 3", "precio_medio": 25, "foto": 123, "cocina": "casera", "terraza": true, "horario": [{"dia": "Lunes", "horas": "13-16"}]}}` o `update-custom-fields {"id": 496, "fields": {...}}` (solo los campos enviados; `null` borra). Los medios van por ID (`upload-media` / `list-media`), las opciones por su clave, los enlaces como `{"url": "/contacto/", "title": "Reservas"}`, las fechas como `"20261101"`.
+5. Si algo no encaja, la respuesta lo dice antes de guardar nada: `spiral_mcp_scf_unknown_field` (nombre que no aplica), `spiral_mcp_bad_value` (forma del valor o subcampo desconocido), `spiral_mcp_scf_invalid_value` (regla de SCF: obligatorio, rango…). Los `warnings` avisan de HTML filtrado o de opciones fuera de `choices`.
+6. Comprueba con `get-content` (`fields` y `resolved`, con las fotos y contenidos expandidos) y en la web con `get-preview-url` o `inspect-page`. Para que el tema muestre los campos hace falta una plantilla que los pinte (YOOtheme: fuente dinámica en los elementos; Elementor Pro: etiquetas dinámicas); si el sitio no lo tiene, díselo al usuario.
+7. Página de opciones (datos globales: teléfono, horario del negocio): `scf/create-ui-options-page {"key": "ui_options_page_ajustes", "title": "Ajustes del sitio", "menu_slug": "ajustes-sitio"}` → grupo con `location` `[[{"param": "options_page", "operator": "==", "value": "ajustes-sitio"}]]` → `update-custom-fields {"options_page": "ajustes-sitio", "fields": {...}}`.
+8. Deshacer: `restore-snapshot` con el `snapshot_id` de `update-custom-fields` (kind `scf_values`) o el de una herramienta `scf/*` (kind `scf_entity`; `list-activity` lo guarda si no lo anotaste).
 
 ## Tienda: crear un producto
 

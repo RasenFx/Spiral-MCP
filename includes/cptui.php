@@ -274,6 +274,12 @@ function spiral_mcp_cptui_post_type_prepare( array $in, ?array $current = null, 
 	if ( '' === (string) $data['menu_icon'] ) {
 		$data['menu_icon'] = null;
 	}
+	// Una función o clase PHP que WordPress ejecutaría: solo con el permiso de código.
+	foreach ( array( 'register_meta_box_cb', 'rest_controller_class' ) as $key ) {
+		if ( array_key_exists( $key, $in ) && '' !== (string) $data[ $key ] && ! current_user_can( 'spiral_mcp_code' ) ) {
+			return new WP_Error( 'spiral_mcp_code_capability', sprintf( '"%s" es una función o clase PHP: solo se puede indicar con la capacidad spiral_mcp_code. Déjalo vacío.', $key ), array( 'status' => 403 ) );
+		}
+	}
 	if ( '' === (string) $data['register_meta_box_cb'] ) {
 		$data['register_meta_box_cb'] = null;
 	}
@@ -385,6 +391,11 @@ function spiral_mcp_cptui_taxonomy_prepare( array $in, ?array $current = null, &
 	}
 	if ( 'false' === strtolower( (string) $data['meta_box_cb'] ) ) {
 		$data['meta_box_cb'] = 'false';
+	}
+	foreach ( array( 'meta_box_cb', 'rest_controller_class' ) as $key ) {
+		if ( array_key_exists( $key, $in ) && '' !== (string) $data[ $key ] && 'false' !== $data[ $key ] && ! current_user_can( 'spiral_mcp_code' ) ) {
+			return new WP_Error( 'spiral_mcp_code_capability', sprintf( '"%s" es una función o clase PHP: solo se puede indicar con la capacidad spiral_mcp_code. Déjalo vacío.', $key ), array( 'status' => 403 ) );
+		}
 	}
 	return $data;
 }

@@ -1,8 +1,8 @@
 # Referencia de abilities spiral-mcp/*
 
-Generada a partir de los esquemas registrados por el plugin (v1.34.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
+Generada a partir de los esquemas registrados por el plugin (v1.35.0). Cada ability trae además su descripción completa en la lista de herramientas MCP: léela allí para los detalles. Aquí está la vista de conjunto: método implícito, parámetros obligatorios (**negrita**) y opcionales.
 
-Las abilities de YOOtheme (layouts, `get-yootheme-layout`, áreas del tema, configuración, plantillas, biblioteca, librería online y estilo) solo existen si YOOtheme Pro es el tema activo. En un sitio con Elementor el diseño va por las herramientas `elementor/*` de su MCP, que no están en esta referencia: lee su descripción en la lista de herramientas (ver «Sitios con Elementor» en `SKILL.md`).
+Las abilities de YOOtheme (layouts, `get-yootheme-layout`, áreas del tema, configuración, plantillas, biblioteca, librería online y estilo) solo existen si YOOtheme Pro es el tema activo. En un sitio con Elementor el diseño va por las herramientas `elementor/*` de su MCP, y con Secure Custom Fields la estructura de los campos (grupos, campos, tipos, taxonomías y páginas de opciones) por las `scf/*` que registra SCF; ninguna de las dos está en esta referencia (Spiral solo las envuelve): lee su descripción en la lista de herramientas (ver «Sitios con Elementor» y «Campos personalizados» en `SKILL.md`).
 
 Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; destructiva = requiere `"confirm": true`.
 
@@ -21,6 +21,7 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 - [Plugins](#plugins)
 - [Formularios (Contact Form 7)](#formularios-contact-form-7)
 - [Tipos de contenido y taxonomías (Custom Post Type UI)](#tipos-de-contenido-y-taxonomias-custom-post-type-ui)
+- [Campos personalizados (Secure Custom Fields)](#campos-personalizados-secure-custom-fields)
 - [Tienda (WooCommerce)](#tienda-woocommerce)
 - [Pedidos y clientes (WooCommerce)](#pedidos-y-clientes-woocommerce)
 - [Idiomas (Polylang)](#idiomas-polylang)
@@ -31,10 +32,10 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 | Ability | Tipo | Parámetros |
 |---|---|---|
 | `list-post-types` | lectura | — |
-| `list-content` | lectura | post_type `"any" / "post" / "page" / "product"`, status `"any" / "publish" / "future" / "draft" / "pending" / "private" / "trash"`, search `string`, parent `integer`, per_page `integer`, page `integer`, language `string` |
+| `list-content` | lectura | post_type `"any" / "post" / "page" / "e-floating-buttons" / "elementor_library" / "product" / "restaurantes"`, status `"any" / "publish" / "future" / "draft" / "pending" / "private" / "trash"`, search `string`, parent `integer`, per_page `integer`, page `integer`, language `string` |
 | `get-content` | lectura | **id** `integer` |
-| `create-content` | escritura | post_type `"post" / "page" / "product"`, **title** `string`, content `string`, excerpt `string`, status `"publish" / "future" / "draft" / "pending" / "private"`, slug `string`, parent `integer`, menu_order `integer`, template `string`, author `integer`, date `string`, comment_status `"open" / "closed"`, terms `object`, featured_media `integer`, meta `object`, language `string`, translation_of `integer` |
-| `update-content` | escritura | **id** `integer`, title `string`, content `string`, excerpt `string`, status `"publish" / "future" / "draft" / "pending" / "private"`, slug `string`, parent `integer`, menu_order `integer`, template `string`, author `integer`, date `string`, comment_status `"open" / "closed"`, terms `object`, featured_media `integer`, meta `object` |
+| `create-content` | escritura | post_type `"post" / "page" / "e-floating-buttons" / "elementor_library" / "product" / "restaurantes"`, **title** `string`, content `string`, excerpt `string`, status `"publish" / "future" / "draft" / "pending" / "private"`, slug `string`, parent `integer`, menu_order `integer`, template `string`, author `integer`, date `string`, comment_status `"open" / "closed"`, terms `object`, featured_media `integer`, meta `object`, language `string`, translation_of `integer`, fields `object` |
+| `update-content` | escritura | **id** `integer`, title `string`, content `string`, excerpt `string`, status `"publish" / "future" / "draft" / "pending" / "private"`, slug `string`, parent `integer`, menu_order `integer`, template `string`, author `integer`, date `string`, comment_status `"open" / "closed"`, terms `object`, featured_media `integer`, meta `object`, fields `object` |
 | `trash-content` | escritura | **id** `integer` |
 | `restore-content` | escritura | **id** `integer` |
 | `delete-content` | destructiva | **id** `integer`, **confirm** `boolean` |
@@ -159,10 +160,10 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 |---|---|---|
 | `get-cache-settings` | lectura | provider `string` |
 | `update-cache-settings` | escritura | provider `string`, settings `object`, provider_settings `object` |
-| `get-site-settings` | lectura | — |
-| `update-site-settings` | escritura | blogname `string`, blogdescription `string`, show_on_front `"posts" / "page"`, page_on_front `integer`, page_for_posts `integer`, site_icon `integer`, timezone_string `string` |
 | `get-seo-settings` | lectura | section `"general" / "site_representation" / "content_types" / "taxonomies" / "archives" / "breadcrumbs" / "rss" / "social" / "verification" / "features" / "crawl"` |
 | `update-seo-settings` | escritura | **settings** `object` |
+| `get-site-settings` | lectura | — |
+| `update-site-settings` | escritura | blogname `string`, blogdescription `string`, show_on_front `"posts" / "page"`, page_on_front `integer`, page_for_posts `integer`, site_icon `integer`, timezone_string `string` |
 
 ## Snapshots
 
@@ -207,6 +208,14 @@ Leyenda: lectura = no cambia nada; escritura = se registra en la auditoría; des
 | `create-custom-taxonomy` | escritura | **name** `string`, label `string`, singular_label `string`, description `string`, **object_types** `array`, public `boolean`, publicly_queryable `boolean`, hierarchical `boolean`, show_ui `boolean`, show_in_menu `boolean`, show_in_nav_menus `boolean`, show_in_rest `boolean`, rest_base `string`, show_admin_column `boolean`, show_tagcloud `boolean`, show_in_quick_edit `boolean`, sort `boolean`, rewrite `boolean`, rewrite_slug `string`, rewrite_withfront `boolean`, rewrite_hierarchical `boolean`, query_var `boolean`, query_var_slug `string`, default_term `string`, labels `object` |
 | `update-custom-taxonomy` | escritura | **name** `string`, new_name `string`, confirm `boolean`, label `string`, singular_label `string`, description `string`, object_types `array`, public `boolean`, publicly_queryable `boolean`, hierarchical `boolean`, show_ui `boolean`, show_in_menu `boolean`, show_in_nav_menus `boolean`, show_in_rest `boolean`, rest_base `string`, show_admin_column `boolean`, show_tagcloud `boolean`, show_in_quick_edit `boolean`, sort `boolean`, rewrite `boolean`, rewrite_slug `string`, rewrite_withfront `boolean`, rewrite_hierarchical `boolean`, query_var `boolean`, query_var_slug `string`, default_term `string`, labels `object` |
 | `delete-custom-taxonomy` | destructiva | **name** `string`, **confirm** `boolean` |
+
+## Campos personalizados (Secure Custom Fields)
+
+| Ability | Tipo | Parámetros |
+|---|---|---|
+| `list-custom-fields` | lectura | id `integer`, term_id `integer`, options_page `string`, post_type `string`, taxonomy `string` |
+| `get-custom-fields` | lectura | id `integer`, term_id `integer`, options_page `string` |
+| `update-custom-fields` | escritura | id `integer`, term_id `integer`, options_page `string`, **fields** `object` |
 
 ## Tienda (WooCommerce)
 
